@@ -1,0 +1,101 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558 
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        /*{
+            "type": "shell",
+            "label": "Win64 Debug",
+            "command": "faster-vcvars.bat 64 && cl.exe",
+            "args": [
+                "-nologo",          //Don't show useless crap
+                "-Zi",              //Debug format (PDB)
+                "-EHsc",            //Exception model to use
+                "-FC",              //Show full path of source code files
+                "-WX",              //Treat warnings as errors
+                "-W4",              //Warning level
+                "-wd4100",          //Ignore warning 4100
+                "-wd4189",
+                "-wd4505",
+                "-MTd",             //CRT linking mode
+                "-Oi",              //Use intrinsics where possible
+                "-Od",              //Optimization level
+                "-GR-",             //Disable runtime type information
+                "-Iinclude",        //Header files folder
+                "-Febin\\Debug\\Gain.exe", //Executable folder
+                "-Fobin\\Debug\\",         //Object files folder
+                "-Fdbin\\Debug\\",         //Debug files folder
+//                "-Faasm\\",         //Output asm files
+                "-DUNICODE",
+                "-D_UNICODE",
+                "src\\test.cpp",
+                "/link",
+                "/MACHINE:X64",
+                "-LIBPATH:lib",     //Add library folder
+                "-INCREMENTAL:NO",  //Disable incremental linking
+                "-OPT:REF",         //Linker optimizations
+                "user32.lib",
+                "gdi32.lib",
+                "glad64.lib",
+                "opengl32.lib",
+            ],
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "group": "build"
+        },
+        {
+            "type": "shell",
+            "label": "Win32 Debug",
+            "command": "faster-vcvars.bat 32 && cl.exe",
+            "args": [
+                "-nologo",          //Don't show useless crap
+                "-Zi",              //Debug format (PDB)
+                "-EHsc",            //Exception model to use
+                "-FC",              //Show full path of source code files
+                "-WX",              //Treat warnings as errors
+                "-W4",              //Warning level
+                "-wd4100",          //Ignore warning 4100
+                "-wd4189",
+                "-wd4505",
+                "-MTd",             //CRT linking mode
+                "-Oi",              //Use intrinsics where possible
+                "-Od",              //Optimization level
+                "-GR-",             //Disable runtime type information
+                "-Iinclude",        //Header files folder
+                "-Febin\\Debug\\Gain.exe", //Executable folder
+                "-Fobin\\Debug\\",         //Object files folder
+                "-Fdbin\\Debug\\\\",         //Debug files folder
+//                "-Faasm\\",         //Output asm files
+                "-DUNICODE",
+                "-D_UNICODE",
+                "src\\test.cpp",
+                "/link",
+                "/MACHINE:X86",
+                "-LIBPATH:lib",     //Add library folder
+                "-INCREMENTAL:NO",  //Disable incremental linking
+                "-OPT:REF",         //Linker optimizations
+                "user32.lib",
+                "gdi32.lib",
+                "glad32.lib",
+                "opengl32.lib",
+            ],
+            "problemMatcher": [
+                "$msCompile"
+            ],
+            "group": "build"
+        },*/
+        {
+            "type": "shell",
+            "label": "Build",
+            "windows": {
+                "command": "faster-vcvars.bat 64 && ${command:cmake.tasksBuildCommand}"
+            },
+            "command": "${command:cmake.tasksBuildCommand}",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+    ]
+}
