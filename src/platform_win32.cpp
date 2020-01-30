@@ -2,16 +2,22 @@
 #include <glad/glad.h>
 
 #include <cstdio>
+#include <stdint.h>
+
+typedef void (*updateFunction)();
+static void updateStub() {}
+struct GameCode {
+    HMODULE dll;
+    FILETIME dllLastWriteTime;
+    updateFunction update;
+};
+static GameCode gameCode{}; //? Should this have a constructor so that functions initialize to their stubs automatically?
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch(uMsg) {
         case WM_DESTROY: {
             PostQuitMessage(0);
         } break;
-
-        case WM_PAINT: {
-            ValidateRect(hwnd, nullptr);
-        } return 0;
 
         case WM_SIZE: {
             glViewport(0, 0, LOWORD(lParam), HIWORD(lParam));
@@ -24,12 +30,74 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     return 0;
 }
 
+static FILETIME getLastWriteTime(char* filename) {
+    FILETIME lastWriteTime{};
+
+    WIN32_FIND_DATAA fileData;
+    HANDLE findHandle = FindFirstFileA(filename, &fileData);
+    if(findHandle != INVALID_HANDLE_VALUE) {
+        FindClose(findHandle);
+        lastWriteTime = fileData.ftLastWriteTime;
+    }
+
+    return lastWriteTime;
+}
+
+static GameCode reloadGameCode(char* gameDLLPath) {
+    if(gameCode.dll && !FreeLibrary(gameCode.dll)) {
+        printf("Couldn't free game code DLL");
+        return gameCode;
+    }
+
+    GameCode result;
+    result.update = updateStub;
+
+    char* DestDLLPath = ".\\bin\\game_tmp.dll";
+    
+    if(CopyFileA(gameDLLPath, DestDLLPath, false))
+        result.dll = LoadLibraryA("..\\bin\\game_tmp.dll");
+    else {
+        result.dll = nullptr;
+        return result;
+    }
+
+    result.dllLastWriteTime = getLastWriteTime(gameDLLPath);
+
+    if(!result.dll)
+        printf("Failed to load game code DLL");
+    else {
+        result.update = (updateFunction)GetProcAddress(result.dll, "update");
+        if(!result.update) {
+            printf("Failed to load update function");
+            result.update = updateStub;
+        }
+    }
+
+    return result;
+}
+
 static void handleEvents(MSG *msg, bool &quit) {
     while(PeekMessage(msg, nullptr, 0, 0, PM_REMOVE)) {
-        TranslateMessage(msg);
-        DispatchMessage(msg);
-        if(msg->message == WM_QUIT)
-            quit = true;
+        switch(msg->message) {
+            case WM_QUIT: {
+                quit = true;
+            } break;
+
+            case WM_KEYUP: {
+                uint32_t VKCode = (uint32_t)msg->wParam;
+
+                /*switch(VKCode) {
+                    case 'R':
+                        gameCode = reloadGameCode(&gameCode);
+                        break;
+                }*/
+            } break;
+
+            default: {
+                TranslateMessage(msg);
+                DispatchMessage(msg);
+            }
+        }
     }
 }
 
@@ -61,10 +129,6 @@ static bool initOpenGL(HDC dc) {
     glViewport(0, 0, 800, 600);
 
     return true;
-}
-
-static void gameUpdate() {
-
 }
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow) {
@@ -204,38 +268,54 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
     glBindVertexArray(0);
 
     MSG msg{};
-    LARGE_INTEGER currentTime;
-    QueryPerformanceCounter(&currentTime);
+
+    LARGE_INTEGER frameTime;
+    LARGE_INTEGER prevFrameTime;
+    QueryPerformanceCounter(&prevFrameTime);
     LARGE_INTEGER frequency;
     QueryPerformanceFrequency(&frequency);
 
+    const float maxFrameTime = 0.25f;
+    const float targetFrameRate = 0.016f;
     double accum = 0.0f;
     double fixedDeltaTime = 0.02f;
 
+    char* gameDLLPath = ".\\bin\\game.dll";
+    gameCode = reloadGameCode(gameDLLPath);
+
     bool quit = false;
-    while(!quit) {
-        LARGE_INTEGER newTime;
-        QueryPerformanceCounter(&newTime);
-        double frameTime = (newTime.QuadPart - currentTime.QuadPart) / (double)frequency.QuadPart;
-        if(frameTime > 0.25f)
-            frameTime = 0.25f;
-        currentTime = newTime;
+    while(!quit) {      
+        
+        QueryPerformanceCounter(&frameTime);
+        double deltaTime = (frameTime.QuadPart - prevFrameTime.QuadPart) / (double)frequency.QuadPart;
+#ifdef DEBUG
+        printf_s("last frame: %f ms\n", deltaTime);
+        printf_s("FPS: %f\n", 1 / deltaTime);
+        fflush(stdout);
+#endif
+        if(deltaTime > maxFrameTime)
+            deltaTime = maxFrameTime;   //Framerate too low, we are falling behind in the simulation! D: Preventing spiral of death.
+        prevFrameTime = frameTime;
+
+        FILETIME lastWriteTime = getLastWriteTime(gameDLLPath);
+        if(CompareFileTime(&gameCode.dllLastWriteTime, &lastWriteTime) != 0)
+            gameCode = reloadGameCode(gameDLLPath);
 
         handleEvents(&msg, quit);
 
-        accum += frameTime;
+        accum += deltaTime;
         
         while(accum >= fixedDeltaTime) {
-            gameUpdate();
-            //printf_s("gameUpdate, accum: %f ms\n", accum * 1000);
+            gameCode.update();
+            //printf_s("update, accum: %f ms\n", accum * 1000);
             accum -= fixedDeltaTime;
             //printf_s("remaining %f ms\n", accum * 1000);
         }
 
         float lerp = (float)(accum / fixedDeltaTime);
 
+        //TODO: After learning OpenGL put rendering code into a function gameCode.render()
         //* RENDERING *//
-        
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
@@ -249,10 +329,16 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
         glBindVertexArray(VAO[1]);
         glDrawArrays(GL_TRIANGLES, 0, 3);
 
-        SwapBuffers(dc);
+        //TODO Implement Vsync switch
+        //TODO Make this less shitty
+        //! This should only happen if VSync is off
+        LARGE_INTEGER afterRenderTime;
+        QueryPerformanceCounter(&afterRenderTime);
+        double afterRenderDelta = (afterRenderTime.QuadPart - frameTime.QuadPart) / (double)frequency.QuadPart;
+        if(afterRenderDelta < targetFrameRate + 0.00025f)
+            Sleep((targetFrameRate + 0.00025f - afterRenderDelta) * 1000);
 
-        printf_s("FPS: %f\n", 1 / frameTime);
-        fflush(stdout);
+        SwapBuffers(dc);
     }
 
     return 0;

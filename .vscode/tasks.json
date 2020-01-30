@@ -89,7 +89,7 @@
             "type": "shell",
             "label": "Build",
             "windows": {
-                "command": "faster-vcvars.bat 64 && ${command:cmake.tasksBuildCommand}"
+                "command": "scripts\\faster-vcvars.bat 64 && ${command:cmake.tasksBuildCommand}"
             },
             "command": "${command:cmake.tasksBuildCommand}",
             "group": {
