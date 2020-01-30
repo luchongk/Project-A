@@ -276,7 +276,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
     QueryPerformanceFrequency(&frequency);
 
     const float maxFrameTime = 0.25f;
-    const float targetFrameRate = 0.016f;
+    const float targetFrameRate = 0.033f;
     double accum = 0.0f;
     double fixedDeltaTime = 0.02f;
 
@@ -314,7 +314,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
 
         float lerp = (float)(accum / fixedDeltaTime);
 
-        //TODO: After learning OpenGL put rendering code into a function gameCode.render()
+        //TODO: After learning OpenGL put rendering code into the DLL (ie. gameCode.render())
         //* RENDERING *//
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
@@ -330,15 +330,22 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
         glDrawArrays(GL_TRIANGLES, 0, 3);
 
         //TODO Implement Vsync switch
-        //TODO Make this less shitty
         //! This should only happen if VSync is off
         LARGE_INTEGER afterRenderTime;
         QueryPerformanceCounter(&afterRenderTime);
         double afterRenderDelta = (afterRenderTime.QuadPart - frameTime.QuadPart) / (double)frequency.QuadPart;
-        if(afterRenderDelta < targetFrameRate + 0.00025f)
-            Sleep((targetFrameRate + 0.00025f - afterRenderDelta) * 1000);
+        if(afterRenderDelta < targetFrameRate) {
+            timeBeginPeriod(1);
+            Sleep((targetFrameRate - afterRenderDelta) * 1000 - 1);
+            timeEndPeriod(1);
+        }
 
         SwapBuffers(dc);
+
+        while(afterRenderDelta < targetFrameRate) {
+            QueryPerformanceCounter(&afterRenderTime);
+            afterRenderDelta = (afterRenderTime.QuadPart - frameTime.QuadPart) / (double)frequency.QuadPart;
+        }
     }
 
     return 0;

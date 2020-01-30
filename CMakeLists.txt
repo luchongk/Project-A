@@ -12,7 +12,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG")
 
 add_executable(Gain WIN32 src/platform_win32.cpp)
 
-target_link_libraries(Gain game glad opengl32)
+target_link_libraries(Gain game glad opengl32 winmm)
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
