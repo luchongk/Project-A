@@ -13,8 +13,9 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG")
 add_executable(Gain WIN32 src/platform_win32.cpp)
 
 target_link_libraries(Gain game glad opengl32 winmm)
+target_link_libraries(game glad opengl32)
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
 add_custom_command(TARGET game PRE_BUILD COMMAND del /Q ..\\bin\\game*.pdb > NUL 2>&1)
-add_custom_command(TARGET game POST_BUILD COMMAND ../scripts/renamePdb)
+set_target_properties(game PROPERTIES PDB_NAME ..\\bin\\game%time:~3,2%-%time:~6,2%-%RANDOM%)

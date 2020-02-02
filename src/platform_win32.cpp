@@ -6,10 +6,13 @@
 
 typedef void (*updateFunction)();
 static void updateStub() {}
+typedef void (*renderFunction)(unsigned int, unsigned int);
+static void renderStub(unsigned int, unsigned int) {}
 struct GameCode {
     HMODULE dll;
     FILETIME dllLastWriteTime;
     updateFunction update;
+    renderFunction render;
 };
 static GameCode gameCode{}; //? Should this have a constructor so that functions initialize to their stubs automatically?
 
@@ -51,6 +54,7 @@ static GameCode reloadGameCode(char* gameDLLPath) {
 
     GameCode result;
     result.update = updateStub;
+    result.render = renderStub;
 
     char* DestDLLPath = ".\\bin\\game_tmp.dll";
     
@@ -64,12 +68,21 @@ static GameCode reloadGameCode(char* gameDLLPath) {
     result.dllLastWriteTime = getLastWriteTime(gameDLLPath);
 
     if(!result.dll)
-        printf("Failed to load game code DLL");
+        printf("Failed to load game code DLL\n");
     else {
+        void (*init)() = (void(*)()) GetProcAddress(result.dll, "init");
+        if(init)
+            init();
+
         result.update = (updateFunction)GetProcAddress(result.dll, "update");
         if(!result.update) {
-            printf("Failed to load update function");
+            printf("Failed to load update function\n");
             result.update = updateStub;
+        }
+        result.render = (renderFunction)GetProcAddress(result.dll, "render");
+        if(!result.render) {
+            printf("Failed to load render function\n");
+            result.render = renderStub;
         }
     }
 
@@ -231,42 +244,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
     glDeleteShader(fragmentShaderOrange);
     glDeleteShader(fragmentShaderYellow);
 
-    float vertices[]{
-        -0.5f, -0.5f, 0.0f,
-        0.0f, -0.5f, 0.0f,
-        -0.25f, 0.5f, 0.0f,
-    };
-
-    float vertices2[] = {
-        0.0f, -0.5f, 0.0f,
-        0.5f, -0.5f, 0.0f,
-        0.25f, 0.5f, 0.0f,
-    };
-    
-    //Create VAO
-    unsigned int VAO[2];
-    glGenVertexArrays(2, VAO);
-
-    unsigned int VBO[2];
-    glGenBuffers(2, VBO);
-
-    //TRIANGLE 1
-    glBindVertexArray(VAO[0]);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO[0]);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    
-    //TRIANGLE 2
-    glBindVertexArray(VAO[1]);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO[1]);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices2), vertices2, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(0);
-
     MSG msg{};
 
     LARGE_INTEGER frameTime;
@@ -316,18 +293,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
 
         //TODO: After learning OpenGL put rendering code into the DLL (ie. gameCode.render())
         //* RENDERING *//
-        glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        glUseProgram(shaderProgramOrange);
-        
-        glBindVertexArray(VAO[0]);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
-
-        glUseProgram(shaderProgramYellow);
-        
-        glBindVertexArray(VAO[1]);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        gameCode.render(shaderProgramOrange, shaderProgramYellow);
 
         //TODO Implement Vsync switch
         //! This should only happen if VSync is off
