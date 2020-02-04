@@ -1,118 +1,13 @@
-#include <windows.h>
-#include <glad/glad.h>
-
 #include <cstdio>
 #include <stdint.h>
 
-typedef void (*updateFunction)();
-static void updateStub() {}
-typedef void (*renderFunction)(unsigned int, unsigned int);
-static void renderStub(unsigned int, unsigned int) {}
-struct GameCode {
-    HMODULE dll;
-    FILETIME dllLastWriteTime;
-    updateFunction update;
-    renderFunction render;
-};
-static GameCode gameCode{}; //? Should this have a constructor so that functions initialize to their stubs automatically?
+#include <windows.h>
+#include <glad/glad.h>
 
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    switch(uMsg) {
-        case WM_DESTROY: {
-            PostQuitMessage(0);
-        } break;
+#include "platform.h"
+#include "platform_win32.h"
 
-        case WM_SIZE: {
-            glViewport(0, 0, LOWORD(lParam), HIWORD(lParam));
-        } break;
-
-        default:
-            return DefWindowProc(hwnd, uMsg, wParam, lParam);
-    }
-
-    return 0;
-}
-
-static FILETIME getLastWriteTime(char* filename) {
-    FILETIME lastWriteTime{};
-
-    WIN32_FIND_DATAA fileData;
-    HANDLE findHandle = FindFirstFileA(filename, &fileData);
-    if(findHandle != INVALID_HANDLE_VALUE) {
-        FindClose(findHandle);
-        lastWriteTime = fileData.ftLastWriteTime;
-    }
-
-    return lastWriteTime;
-}
-
-static GameCode reloadGameCode(char* gameDLLPath) {
-    if(gameCode.dll && !FreeLibrary(gameCode.dll)) {
-        printf("Couldn't free game code DLL");
-        return gameCode;
-    }
-
-    GameCode result;
-    result.update = updateStub;
-    result.render = renderStub;
-
-    char* DestDLLPath = ".\\bin\\game_tmp.dll";
-    
-    if(CopyFileA(gameDLLPath, DestDLLPath, false))
-        result.dll = LoadLibraryA("..\\bin\\game_tmp.dll");
-    else {
-        result.dll = nullptr;
-        return result;
-    }
-
-    result.dllLastWriteTime = getLastWriteTime(gameDLLPath);
-
-    if(!result.dll)
-        printf("Failed to load game code DLL\n");
-    else {
-        void (*init)() = (void(*)()) GetProcAddress(result.dll, "init");
-        if(init)
-            init();
-
-        result.update = (updateFunction)GetProcAddress(result.dll, "update");
-        if(!result.update) {
-            printf("Failed to load update function\n");
-            result.update = updateStub;
-        }
-        result.render = (renderFunction)GetProcAddress(result.dll, "render");
-        if(!result.render) {
-            printf("Failed to load render function\n");
-            result.render = renderStub;
-        }
-    }
-
-    return result;
-}
-
-static void handleEvents(MSG *msg, bool &quit) {
-    while(PeekMessage(msg, nullptr, 0, 0, PM_REMOVE)) {
-        switch(msg->message) {
-            case WM_QUIT: {
-                quit = true;
-            } break;
-
-            case WM_KEYUP: {
-                uint32_t VKCode = (uint32_t)msg->wParam;
-
-                /*switch(VKCode) {
-                    case 'R':
-                        gameCode = reloadGameCode(&gameCode);
-                        break;
-                }*/
-            } break;
-
-            default: {
-                TranslateMessage(msg);
-                DispatchMessage(msg);
-            }
-        }
-    }
-}
+static LARGE_INTEGER frequency;     //TODO: Think of a way to unglobalize this
 
 static bool initOpenGL(HDC dc) {
     PIXELFORMATDESCRIPTOR pfd{};
@@ -144,6 +39,118 @@ static bool initOpenGL(HDC dc) {
     return true;
 }
 
+static FILETIME getLastWriteTime(char* filename) {
+    FILETIME lastWriteTime{};
+
+    WIN32_FIND_DATAA fileData;
+    HANDLE findHandle = FindFirstFileA(filename, &fileData);
+    if(findHandle != INVALID_HANDLE_VALUE) {
+        FindClose(findHandle);
+        lastWriteTime = fileData.ftLastWriteTime;
+    }
+
+    return lastWriteTime;
+}
+
+static void reloadGameCode(char* gameDLLPath, GameCode* gameCode, GameMemory* gameMemory) {
+    if(gameCode->dll && !FreeLibrary(gameCode->dll)) {
+        printf("Couldn't free game code DLL");
+        return;
+    }
+
+    gameCode->api.start = startStub;
+    gameCode->api.update = updateStub;
+    gameCode->api.render = renderStub;
+
+    char* DestDLLPath = ".\\bin\\game_tmp.dll";
+    
+    if(CopyFileA(gameDLLPath, DestDLLPath, false))
+        gameCode->dll = LoadLibraryA("..\\bin\\game_tmp.dll");
+    else {
+        gameCode->dll = nullptr;
+        return;
+    }
+
+    gameCode->dllLastWriteTime = getLastWriteTime(gameDLLPath);
+
+    if(!gameCode->dll)
+        printf("Failed to load game code DLL\n");
+    else {
+        void (*onLoad)(GameMemory*) = (void(*)(GameMemory*))GetProcAddress(gameCode->dll, "onLoad");
+        if(onLoad)
+            onLoad(gameMemory);
+        
+        gameCode->api.start = (startFunction*)GetProcAddress(gameCode->dll, "start");
+        if(!gameCode->api.start) {
+            printf("Failed to load start function\n");
+            gameCode->api.start = startStub;
+        }
+        gameCode->api.update = (updateFunction*)GetProcAddress(gameCode->dll, "update");
+        if(!gameCode->api.update) {
+            printf("Failed to load update function\n");
+            gameCode->api.update = updateStub;
+        }
+        gameCode->api.render = (renderFunction*)GetProcAddress(gameCode->dll, "render");
+        if(!gameCode->api.render) {
+            printf("Failed to load render function\n");
+            gameCode->api.render = renderStub;
+        }
+    }
+}
+
+static void handleEvents(MSG *msg, bool &quit) {
+    while(PeekMessage(msg, nullptr, 0, 0, PM_REMOVE)) {
+        switch(msg->message) {
+            case WM_QUIT: {
+                quit = true;
+            } break;
+
+            case WM_KEYUP: {
+                uint32_t VKCode = (uint32_t)msg->wParam;
+
+                /*switch(VKCode) {
+                    case 'R':
+                        gameCode = reloadGameCode(&gameCode);
+                        break;
+                }*/
+            } break;
+
+            default: {
+                TranslateMessage(msg);
+                DispatchMessage(msg);
+            }
+        }
+    }
+}
+
+inline static double getTimeElapsed(LARGE_INTEGER start, LARGE_INTEGER end) {
+    assert(start.QuadPart < end.QuadPart);
+    return (end.QuadPart - start.QuadPart) / (double)frequency.QuadPart;
+}
+
+inline static LARGE_INTEGER getWallClock() {
+    LARGE_INTEGER current;
+    QueryPerformanceCounter(&current);
+    return current;
+}
+
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    switch(uMsg) {
+        case WM_DESTROY: {
+            PostQuitMessage(0);
+        } break;
+
+        case WM_SIZE: {
+            glViewport(0, 0, LOWORD(lParam), HIWORD(lParam));
+        } break;
+
+        default:
+            return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    }
+
+    return 0;
+}
+
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow) {
     const wchar_t CLASS_NAME[] = L"Gain";
 
@@ -154,7 +161,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     SetCursor(wc.hCursor);
     wc.style = CS_OWNDC;
-
+    
     if(!RegisterClass(&wc))
         return 1;
 
@@ -171,147 +178,72 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
         return 1;
 
     ShowWindow(hwnd, nCmdShow);
-
-    char* vertexShaderSrc = 
-        "#version 460 core\n"
-        "layout (location = 0) in vec3 aPos;\n\n"
-        "void main() {\n"
-        "    gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
-        "}";
-
-    char* fragmentShaderOrangeSrc = 
-        "#version 460 core\n"
-        "out vec4 FragColor;\n\n"
-        "void main() {\n"
-        "    FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);\n"
-        "}";
-
-    char* fragmentShaderYellowSrc = 
-        "#version 460 core\n"
-        "out vec4 FragColor;\n\n"
-        "void main() {\n"
-        "    FragColor = vec4(1.0f, 1.0f, 0.0f, 1.0f);\n"
-        "}";
-
-    //Compile vertex shader
-    unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
-
-    glShaderSource(vertexShader, 1, &vertexShaderSrc, nullptr);
-    glCompileShader(vertexShader);
-
-    /*int success = 0;
-    char infoLog[512];
-    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-    if(!success) {
-        glGetShaderInfoLog(vertexShader, 512, nullptr, infoLog);
-        OutputDebugStringA("ERROR VERTEX SHADER COMPILATION FAILED: ");
-        OutputDebugStringA(infoLog);
-        return 1;
-    }*/
-
-    //Compile orange fragment shader
-    unsigned int fragmentShaderOrange = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShaderOrange, 1, &fragmentShaderOrangeSrc, nullptr);
-    glCompileShader(fragmentShaderOrange);
-
-    //Compile yellow fragment shader
-    unsigned int fragmentShaderYellow = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShaderYellow, 1, &fragmentShaderYellowSrc, nullptr);
-    glCompileShader(fragmentShaderYellow);
-
-    //Link orange program
-    unsigned int shaderProgramOrange = glCreateProgram();
-    glAttachShader(shaderProgramOrange, vertexShader);
-    glAttachShader(shaderProgramOrange, fragmentShaderOrange);
-    glLinkProgram(shaderProgramOrange);
-
-    /*success = 0;
-    glGetProgramiv(shaderProgramOrange, GL_LINK_STATUS, &success);
-    if(!success) {
-        glGetProgramInfoLog(shaderProgramOrange, 512, nullptr, infoLog);
-        OutputDebugStringA("ERROR SHADER PROGRAM LINKING FAILED: ");
-        OutputDebugStringA(infoLog);
-        return 1;
-    }*/
-
-    //Link yellow program
-    unsigned int shaderProgramYellow = glCreateProgram();
-    glAttachShader(shaderProgramYellow, vertexShader);
-    glAttachShader(shaderProgramYellow, fragmentShaderYellow);
-    glLinkProgram(shaderProgramYellow);
-
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShaderOrange);
-    glDeleteShader(fragmentShaderYellow);
-
+    
     MSG msg{};
 
+    timeBeginPeriod(1);
     LARGE_INTEGER frameTime;
-    LARGE_INTEGER prevFrameTime;
-    QueryPerformanceCounter(&prevFrameTime);
-    LARGE_INTEGER frequency;
+    QueryPerformanceCounter(&frameTime);
     QueryPerformanceFrequency(&frequency);
 
-    const float maxFrameTime = 0.25f;
-    const float targetFrameRate = 0.033f;
+    constexpr float maxFrameTime = 0.25f;
+    constexpr float targetFrameRate = 0.0166f;
     double accum = 0.0f;
+    double deltaTime = 0.0f;
     double fixedDeltaTime = 0.02f;
 
+    GameMemory* gameMemory = (GameMemory*)VirtualAlloc(0, 64000000, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+
     char* gameDLLPath = ".\\bin\\game.dll";
-    gameCode = reloadGameCode(gameDLLPath);
+    GameCode gameCode{};
+    reloadGameCode(gameDLLPath, &gameCode, gameMemory);
+    assert(gameCode.dll);
+    gameCode.api.start(gameMemory);
 
     bool quit = false;
     while(!quit) {      
-        
-        QueryPerformanceCounter(&frameTime);
-        double deltaTime = (frameTime.QuadPart - prevFrameTime.QuadPart) / (double)frequency.QuadPart;
-#ifdef DEBUG
-        printf_s("last frame: %f ms\n", deltaTime);
-        printf_s("FPS: %f\n", 1 / deltaTime);
-        fflush(stdout);
-#endif
-        if(deltaTime > maxFrameTime)
-            deltaTime = maxFrameTime;   //Framerate too low, we are falling behind in the simulation! D: Preventing spiral of death.
-        prevFrameTime = frameTime;
-
         FILETIME lastWriteTime = getLastWriteTime(gameDLLPath);
         if(CompareFileTime(&gameCode.dllLastWriteTime, &lastWriteTime) != 0)
-            gameCode = reloadGameCode(gameDLLPath);
+            reloadGameCode(gameDLLPath, &gameCode, gameMemory);
 
         handleEvents(&msg, quit);
 
+        if(deltaTime > maxFrameTime)
+            deltaTime = maxFrameTime;   //Framerate too low, we are falling behind in the simulation! D: Preventing spiral of death.
+        
         accum += deltaTime;
         
         while(accum >= fixedDeltaTime) {
-            gameCode.update();
-            //printf_s("update, accum: %f ms\n", accum * 1000);
+            gameCode.api.update(gameMemory);
             accum -= fixedDeltaTime;
-            //printf_s("remaining %f ms\n", accum * 1000);
         }
 
         float lerp = (float)(accum / fixedDeltaTime);
 
-        //TODO: After learning OpenGL put rendering code into the DLL (ie. gameCode.render())
         //* RENDERING *//
-        gameCode.render(shaderProgramOrange, shaderProgramYellow);
+        gameCode.api.render();
 
         //TODO Implement Vsync switch
         //! This should only happen if VSync is off
-        LARGE_INTEGER afterRenderTime;
-        QueryPerformanceCounter(&afterRenderTime);
-        double afterRenderDelta = (afterRenderTime.QuadPart - frameTime.QuadPart) / (double)frequency.QuadPart;
-        if(afterRenderDelta < targetFrameRate) {
-            timeBeginPeriod(1);
-            Sleep((targetFrameRate - afterRenderDelta) * 1000 - 1);
-            timeEndPeriod(1);
+        LARGE_INTEGER workCounter = getWallClock();
+        double workDelta = getTimeElapsed(frameTime, workCounter);
+        if(workDelta < targetFrameRate) {
+            Sleep((int)((targetFrameRate - workDelta) * 1000 - 1));
+            workCounter = getWallClock();
+            workDelta = getTimeElapsed(frameTime, workCounter);
         }
-
+        while(workDelta < targetFrameRate) {
+            workCounter = getWallClock();
+            workDelta = getTimeElapsed(frameTime, workCounter);
+        }
+        frameTime = workCounter;
+        deltaTime = workDelta;
+#if 1
+        printf_s("last frame: %f ms\n", deltaTime);
+        printf_s("FPS: %f\n", 1 / deltaTime);
+        fflush(stdout);
+#endif
         SwapBuffers(dc);
-
-        while(afterRenderDelta < targetFrameRate) {
-            QueryPerformanceCounter(&afterRenderTime);
-            afterRenderDelta = (afterRenderTime.QuadPart - frameTime.QuadPart) / (double)frequency.QuadPart;
-        }
     }
 
     return 0;
