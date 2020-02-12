@@ -1,12 +1,12 @@
 #include <iostream>
-#include "shader.h"
-#include "glad/glad.h"
 
-Shader::Shader() {
-    this->ID = 0;
-}
+Shader::Shader(const char* name, const char* vertexSrc, const char* fragmentSrc) {
+    int i = 0;
+    while(*name) {
+        this->name[i++] = *name++;
+    }
+    this->name[i] = '\0';
 
-Shader::Shader(const char* vertexSrc, const char* fragmentSrc) {
     unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertexShader, 1, &vertexSrc, nullptr);
     glCompileShader(vertexShader);
@@ -45,6 +45,14 @@ Shader::Shader(const char* vertexSrc, const char* fragmentSrc) {
 
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
+}
+
+const char* Shader::getName() {
+    return this->name;
+}
+
+unsigned int Shader::getId() {
+    return ID;
 }
 
 void Shader::use() {

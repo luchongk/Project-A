@@ -1,11 +1,10 @@
 #include <cstdio>
-#include <stdint.h>
-
+#include <new>
 #include <windows.h>
-#include <glad/glad.h>
 
-#include "platform.h"
 #include "platform_win32.h"
+
+#include "shaderManager.cpp"
 
 static LARGE_INTEGER frequency;     //TODO: Think of a way to unglobalize this
 
@@ -106,9 +105,9 @@ static void handleEvents(MSG *msg, bool &quit) {
             } break;
 
             case WM_KEYUP: {
-                uint32_t VKCode = (uint32_t)msg->wParam;
+                /*uint32_t VKCode = (uint32_t)msg->wParam;
 
-                /*switch(VKCode) {
+                switch(VKCode) {
                     case 'R':
                         gameCode = reloadGameCode(&gameCode);
                         break;
@@ -123,9 +122,9 @@ static void handleEvents(MSG *msg, bool &quit) {
     }
 }
 
-inline static double getTimeElapsed(LARGE_INTEGER start, LARGE_INTEGER end) {
+inline static float getTimeElapsed(LARGE_INTEGER start, LARGE_INTEGER end) {
     assert(start.QuadPart < end.QuadPart);
-    return (end.QuadPart - start.QuadPart) / (double)frequency.QuadPart;
+    return (end.QuadPart - start.QuadPart) / (float)frequency.QuadPart;
 }
 
 inline static LARGE_INTEGER getWallClock() {
@@ -187,24 +186,53 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
     QueryPerformanceFrequency(&frequency);
 
     constexpr float maxFrameTime = 0.25f;
-    constexpr float targetFrameRate = 0.0166f;
-    double accum = 0.0f;
-    double deltaTime = 0.0f;
-    double fixedDeltaTime = 0.02f;
+    constexpr float targetFrameRate = 0.0083f;
+    float accum = 0.0f;
+    float deltaTime = 0.0f;
+    float fixedDeltaTime = 0.02f;
 
-    GameMemory* gameMemory = (GameMemory*)VirtualAlloc(0, 64000000, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    GameMemory gameMemory{};
+    gameMemory.totalSize = megabytes(256);
+    void* memoryBase = VirtualAlloc(0, gameMemory.totalSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    gameMemory.shaderManager = new (memoryBase) ShaderManager{100};
+    gameMemory.data = (char*)memoryBase + sizeof(ShaderManager) + gameMemory.shaderManager->getSize();
+
+    char* vertexShaderSrc = 
+        "#version 460 core\n"
+        "layout (location = 0) in vec3 inPosition;\n"
+        "layout (location = 1) in vec2 inTexCoord;\n"
+        "out vec3 Position;\n"
+        "out vec2 TexCoord;\n\n"
+        "void main() {\n"
+        "    Position = inPosition;\n"
+        "    TexCoord = inTexCoord;\n"
+        "    gl_Position = vec4(inPosition.x, inPosition.y, inPosition.z, 1.0f);\n"
+        "}";
+
+    char* fragmentShaderSrc = 
+        "#version 460 core\n"
+        "in vec3 Position;\n"
+        "in vec2 TexCoord;\n"
+        "out vec4 FragColor;\n"
+        "uniform float Color;\n"
+        "uniform sampler2D s;\n"
+        "void main() {\n"
+        "    FragColor = texture(s, TexCoord) * vec4(Color, 1.0f - Color, Color, 1.0f);\n"
+        "}";
+    
+    gameMemory.shaderManager->setShader("bla", vertexShaderSrc, fragmentShaderSrc);
 
     char* gameDLLPath = ".\\bin\\game.dll";
     GameCode gameCode{};
-    reloadGameCode(gameDLLPath, &gameCode, gameMemory);
+    reloadGameCode(gameDLLPath, &gameCode, &gameMemory);
     assert(gameCode.dll);
-    gameCode.api.start(gameMemory);
+    gameCode.api.start(&gameMemory);
 
     bool quit = false;
     while(!quit) {      
         FILETIME lastWriteTime = getLastWriteTime(gameDLLPath);
         if(CompareFileTime(&gameCode.dllLastWriteTime, &lastWriteTime) != 0)
-            reloadGameCode(gameDLLPath, &gameCode, gameMemory);
+            reloadGameCode(gameDLLPath, &gameCode, &gameMemory);
 
         handleEvents(&msg, quit);
 
@@ -214,19 +242,19 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
         accum += deltaTime;
         
         while(accum >= fixedDeltaTime) {
-            gameCode.api.update(gameMemory);
+            gameCode.api.update(&gameMemory);
             accum -= fixedDeltaTime;
         }
 
         float lerp = (float)(accum / fixedDeltaTime);
 
         //* RENDERING *//
-        gameCode.api.render();
+        gameCode.api.render(&gameMemory);
 
         //TODO Implement Vsync switch
         //! This should only happen if VSync is off
         LARGE_INTEGER workCounter = getWallClock();
-        double workDelta = getTimeElapsed(frameTime, workCounter);
+        float workDelta = getTimeElapsed(frameTime, workCounter);
         if(workDelta < targetFrameRate) {
             Sleep((int)((targetFrameRate - workDelta) * 1000 - 1));
             workCounter = getWallClock();

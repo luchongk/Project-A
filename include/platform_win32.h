@@ -2,6 +2,8 @@
 #define PLATFORM_WIN32_H
 
 #include <windows.h>
+
+#include "common.h"
 #include "platform.h"
 
 struct GameCode {
