@@ -1,10 +1,10 @@
 #include <cstdio>
-#include <new>
-#include <windows.h>
 
 #include "platform_win32.h"
 
-#include "shaderManager.cpp"
+#include "linear_allocator.cpp"
+#include "shader.cpp"
+#include "shader_manager.cpp"
 
 static LARGE_INTEGER frequency;     //TODO: Think of a way to unglobalize this
 
@@ -61,11 +61,12 @@ static void reloadGameCode(char* gameDLLPath, GameCode* gameCode, GameMemory* ga
     gameCode->api.update = updateStub;
     gameCode->api.render = renderStub;
 
-    char* DestDLLPath = ".\\bin\\game_tmp.dll";
+    char* DestDLLPath = ".\\game_tmp.dll";
     
     if(CopyFileA(gameDLLPath, DestDLLPath, false))
-        gameCode->dll = LoadLibraryA("..\\bin\\game_tmp.dll");
+        gameCode->dll = LoadLibraryA(DestDLLPath);
     else {
+        DWORD err = GetLastError();
         gameCode->dll = nullptr;
         return;
     }
@@ -186,16 +187,18 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
     QueryPerformanceFrequency(&frequency);
 
     constexpr float maxFrameTime = 0.25f;
-    constexpr float targetFrameRate = 0.0083f;
+    constexpr float targetFrameRate = 0.0166f;
     float accum = 0.0f;
     float deltaTime = 0.0f;
     float fixedDeltaTime = 0.02f;
 
     GameMemory gameMemory{};
     gameMemory.totalSize = megabytes(256);
-    void* memoryBase = VirtualAlloc(0, gameMemory.totalSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-    gameMemory.shaderManager = new (memoryBase) ShaderManager{100};
-    gameMemory.data = (char*)memoryBase + sizeof(ShaderManager) + gameMemory.shaderManager->getSize();
+    void* memoryBase = (void*)VirtualAlloc(0, gameMemory.totalSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    LinearAllocator lalloc{megabytes(128), memoryBase};
+    
+    gameMemory.shaderManager = lalloc.push<ShaderManager>(100, &lalloc);
+    gameMemory.data = (uint8_t*)lalloc.getBase() + lalloc.getSize() + 1;
 
     char* vertexShaderSrc = 
         "#version 460 core\n"
@@ -222,7 +225,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
     
     gameMemory.shaderManager->setShader("bla", vertexShaderSrc, fragmentShaderSrc);
 
-    char* gameDLLPath = ".\\bin\\game.dll";
+    char* gameDLLPath = ".\\game.dll";
     GameCode gameCode{};
     reloadGameCode(gameDLLPath, &gameCode, &gameMemory);
     assert(gameCode.dll);

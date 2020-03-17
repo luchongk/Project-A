@@ -1,8 +1,11 @@
-#include <stdio.h>
+#include <iostream>
 
 #include "common.h"
+#include "reflection.h"
+#include "serializer.h"
 
-#include "shaderManager.cpp"
+#include "shader.cpp"
+#include "shader_manager.cpp"
 #include "stb_image.cpp"
 
 #define DLLEXPORT extern "C" __declspec(dllexport)
@@ -25,11 +28,32 @@ static float vertices2[] {
 static unsigned int texture;
 
 struct GameState {
-    float vertices[15];
+    float vertices[100];
     float vertices2[15];
 };
 
+REFLECTION_REGISTRATION {
+    reflection::class_<GameState>("GameState")
+        .setField("vertices", &GameState::vertices)
+        .setField("vertices2", &GameState::vertices2);
+}
+
 DLLEXPORT void onLoad(GameMemory* gameMemory) {
+    GameState* gameState = (GameState*)gameMemory->data;
+
+    //Serializer::deserialize(gameState, (uint8_t*)gameMemory->data + sizeof(gameState));
+}
+
+DLLEXPORT void onUnload(GameMemory* gameMemory) {
+    GameState* gameState = (GameState*)gameMemory->data;
+
+    //! Copy meta schema to memory, then serialize game data
+    reflection::Type* meta = reflection::get<GameState>();
+    Serializer::serialize(gameState, (uint8_t*)gameMemory->data + sizeof(gameState));
+}
+
+DLLEXPORT void start(GameMemory* gameMemory) {
+    
     gladLoadGL();
 
     glGenTextures(1, &texture);
@@ -41,7 +65,7 @@ DLLEXPORT void onLoad(GameMemory* gameMemory) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     // load and generate the texture
     int width, height, nrChannels;
-    unsigned char *data = stbi_load("Untitled.png", &width, &height, &nrChannels, 0);
+    unsigned char *data = stbi_load("..\\Untitled.png", &width, &height, &nrChannels, 0);
     if (data)
     {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
@@ -75,10 +99,10 @@ DLLEXPORT void onLoad(GameMemory* gameMemory) {
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
-}
 
-DLLEXPORT void start(GameMemory* gameMemory) {
     GameState* gameState = (GameState*)gameMemory->data;
+
+    //std::cout << sizeof(gameState->vertices) << std::endl;
 
     for(int i = 0; i < 15; i++) {
         gameState->vertices[i] = vertices[i];
@@ -88,6 +112,8 @@ DLLEXPORT void start(GameMemory* gameMemory) {
 
 DLLEXPORT void update(GameMemory* gameMemory) {
     GameState* gameState = (GameState*)gameMemory->data;
+
+    //std::cout << t->getField("vertices")->type->size << std::endl;
     
     for(int i = 0; i < 15; i++) {
         if(i % 5 == 0)
@@ -98,8 +124,6 @@ DLLEXPORT void update(GameMemory* gameMemory) {
         if(i % 5 == 0)
             gameState->vertices2[i] += 0.002f;
     }
-
-    //std::cout << gameState->a.getA() << "\n" << b->getA() << "\nBsA:" << gameState->b.getA() << std::endl;
 }
 
 DLLEXPORT void render(GameMemory* gameMemory) {

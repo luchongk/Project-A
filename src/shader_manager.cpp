@@ -1,7 +1,8 @@
-#include <new>
 #include <string.h>
 
-#include "shader.cpp"
+#include "utils.h"
+#include "shader_manager.h"
+#include "linear_allocator.h"
 
 unsigned long ShaderManager::hash(char* str) {
     unsigned long hash = 5381;
@@ -13,21 +14,24 @@ unsigned long ShaderManager::hash(char* str) {
     return hash;
 }
 
-ShaderManager::ShaderManager(size_t sizeIn) {
-    this->shaders = (Shader*)(this + 1);
-    this->size = sizeIn * sizeof(Shader);
+ShaderManager::ShaderManager(size_t count, LinearAllocator* allocator) : allocator(allocator) {
+    this->shaders = (Shader**)(this + 1);
+    this->size = count;
 }
 
 void ShaderManager::setShader(char* name, char* vertexSrc, char* fragmentSrc) {
     size_t pos = this->hash(name);
-    const size_t length = this->size / sizeof(Shader);
+    const size_t length = this->size;
     pos = pos % length;
 
     for(int i = 0; i < length; i++) {
-        if(shaders[pos].getId() == 0 || !strcmp(name, shaders[pos].getName())) {
-            new (shaders + pos) Shader{name, vertexSrc, fragmentSrc};
+        if(shaders[pos] == nullptr) {
+            shaders[pos] = allocator->push<Shader>(name, vertexSrc, fragmentSrc);
             return;
         }
+        
+        assert(!strcmp(name, shaders[pos]->getName()) && !"Shader already exists");
+
         pos = (pos + 1) % length;
     }
     
@@ -38,14 +42,14 @@ size_t ShaderManager::getSize() { return this->size; }
 
 Shader* ShaderManager::getShader(char* name) {
     size_t pos = this->hash(name);
-    const size_t length = this->size / sizeof(Shader);
+    const size_t length = this->size;
     pos = pos % length;
 
     for(int i = 0; i < length; i++) {
-        if(shaders[pos].getId() == 0)
-            return nullptr;
-        else if(!strcmp(name, shaders[pos].getName()))
-            return shaders + pos;
+        if(shaders[pos] == nullptr)
+            continue;
+        else if(!strcmp(name, shaders[pos]->getName()))
+            return shaders[pos];
         pos = (pos + 1) % length;
     }
     

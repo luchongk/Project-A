@@ -3,7 +3,6 @@
 
 #include <windows.h>
 
-#include "common.h"
 #include "platform.h"
 
 struct GameCode {

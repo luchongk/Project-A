@@ -1,5 +1,7 @@
 #include <iostream>
 
+#include "shader.h"
+
 Shader::Shader(const char* name, const char* vertexSrc, const char* fragmentSrc) {
     int i = 0;
     while(*name) {
