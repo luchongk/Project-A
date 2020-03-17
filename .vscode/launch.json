@@ -25,9 +25,10 @@
             "program": "${command:cmake.launchTargetPath}",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/bin",
             "environment": [],
-            "externalConsole": false
+            "externalConsole": false,
+            //"symbolSearchPath": "https://msdl.microsoft.com/download/symbols"
         }
     ]
 }
