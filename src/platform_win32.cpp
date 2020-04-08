@@ -52,12 +52,17 @@ static FILETIME getLastWriteTime(char* filename) {
 }
 
 static void reloadGameCode(char* gameDLLPath, GameCode* gameCode, GameMemory* gameMemory) {
-    if(gameCode->dll && !FreeLibrary(gameCode->dll)) {
-        printf("Couldn't free game code DLL");
-        return;
+    if(gameCode->dll) {
+        /*void (*onUnload)(GameMemory*) = (void(*)(GameMemory*))GetProcAddress(gameCode->dll, "onUnload");
+        if(onUnload)
+            onUnload(gameMemory);*/
+
+        if(!FreeLibrary(gameCode->dll)) {
+            printf("Couldn't free game code DLL");
+            return;
+        }
     }
 
-    gameCode->api.start = startStub;
     gameCode->api.update = updateStub;
     gameCode->api.render = renderStub;
 
@@ -80,11 +85,6 @@ static void reloadGameCode(char* gameDLLPath, GameCode* gameCode, GameMemory* ga
         if(onLoad)
             onLoad(gameMemory);
         
-        gameCode->api.start = (startFunction*)GetProcAddress(gameCode->dll, "start");
-        if(!gameCode->api.start) {
-            printf("Failed to load start function\n");
-            gameCode->api.start = startStub;
-        }
         gameCode->api.update = (updateFunction*)GetProcAddress(gameCode->dll, "update");
         if(!gameCode->api.update) {
             printf("Failed to load update function\n");
@@ -181,56 +181,30 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
     
     MSG msg{};
 
-    timeBeginPeriod(1);
-    LARGE_INTEGER frameTime;
-    QueryPerformanceCounter(&frameTime);
-    QueryPerformanceFrequency(&frequency);
-
-    constexpr float maxFrameTime = 0.25f;
-    constexpr float targetFrameRate = 0.0166f;
-    float accum = 0.0f;
-    float deltaTime = 0.0f;
-    float fixedDeltaTime = 0.02f;
-
     GameMemory gameMemory{};
-    gameMemory.totalSize = megabytes(256);
-    void* memoryBase = (void*)VirtualAlloc(0, gameMemory.totalSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-    LinearAllocator lalloc{megabytes(128), memoryBase};
-    
-    gameMemory.shaderManager = lalloc.push<ShaderManager>(100, &lalloc);
-    gameMemory.data = (uint8_t*)lalloc.getBase() + lalloc.getSize() + 1;
-
-    char* vertexShaderSrc = 
-        "#version 460 core\n"
-        "layout (location = 0) in vec3 inPosition;\n"
-        "layout (location = 1) in vec2 inTexCoord;\n"
-        "out vec3 Position;\n"
-        "out vec2 TexCoord;\n\n"
-        "void main() {\n"
-        "    Position = inPosition;\n"
-        "    TexCoord = inTexCoord;\n"
-        "    gl_Position = vec4(inPosition.x, inPosition.y, inPosition.z, 1.0f);\n"
-        "}";
-
-    char* fragmentShaderSrc = 
-        "#version 460 core\n"
-        "in vec3 Position;\n"
-        "in vec2 TexCoord;\n"
-        "out vec4 FragColor;\n"
-        "uniform float Color;\n"
-        "uniform sampler2D s;\n"
-        "void main() {\n"
-        "    FragColor = texture(s, TexCoord) * vec4(Color, 1.0f - Color, Color, 1.0f);\n"
-        "}";
-    
-    gameMemory.shaderManager->setShader("bla", vertexShaderSrc, fragmentShaderSrc);
+    gameMemory.isInitialized = false;
+    gameMemory.totalSize = megabytes(64);  //TODO: Config
+    gameMemory.data[0] = VirtualAlloc(nullptr, gameMemory.totalSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    gameMemory.data[1] = VirtualAlloc(nullptr, gameMemory.totalSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    gameMemory.currentDataIndex = 0;
 
     char* gameDLLPath = ".\\game.dll";
     GameCode gameCode{};
     reloadGameCode(gameDLLPath, &gameCode, &gameMemory);
     assert(gameCode.dll);
-    gameCode.api.start(&gameMemory);
 
+    timeBeginPeriod(1);
+    LARGE_INTEGER frameTime;
+    QueryPerformanceCounter(&frameTime);
+    QueryPerformanceFrequency(&frequency);
+
+    //TODO: Config each of these!
+    constexpr float maxFrameTime = 0.25f;
+    constexpr float targetFrameRate = 0.0166f;
+    float accum = 0.0f;
+    float deltaTime = 0.0f;
+    float fixedDeltaTime = 0.02f;
+    
     bool quit = false;
     while(!quit) {      
         FILETIME lastWriteTime = getLastWriteTime(gameDLLPath);
@@ -269,7 +243,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
         }
         frameTime = workCounter;
         deltaTime = workDelta;
-#if 1
+#if DEBUG
         printf_s("last frame: %f ms\n", deltaTime);
         printf_s("FPS: %f\n", 1 / deltaTime);
         fflush(stdout);

@@ -8,6 +8,7 @@ class Shader {
     
     public:
         Shader(const char* name, const char* vertexSrc, const char* fragmentSrc);
+        ~Shader();
 
         const char* getName();
         unsigned int getId();

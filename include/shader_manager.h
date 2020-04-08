@@ -1,21 +1,29 @@
 #ifndef SHADER_MANAGER_H
 #define SHADER_MANAGER_H
 
-class Shader;
+#include "reflection.h"
+#include "string_map.h"
+#include "shader.h"
+
 class LinearAllocator;
 
 class ShaderManager {
-    size_t size;
-    Shader** shaders;
     LinearAllocator* allocator;
-
-    unsigned long hash(char* str);
+    StringMap<Shader> shaderMap;
 
 public:
-    ShaderManager(size_t size, LinearAllocator* allocator);
+    ShaderManager() = default;
+    ShaderManager(LinearAllocator* allocator);
     void setShader(char* name, char* vertexSrc, char* fragmentSrc);
-    size_t getSize();
     Shader* getShader(char* name);
+    void clear();
+
+    REFLECT()
 };
+
+REFLECTION_REGISTRATION(ShaderManager) {
+    CLASS->addField("allocator", &ShaderManager::allocator)
+        ->addField("shaderMap", &ShaderManager::shaderMap);
+}
 
 #endif

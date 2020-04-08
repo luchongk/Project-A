@@ -1,5 +1,6 @@
 #include <iostream>
 
+#include "glad/glad.h"
 #include "shader.h"
 
 Shader::Shader(const char* name, const char* vertexSrc, const char* fragmentSrc) {
@@ -47,6 +48,10 @@ Shader::Shader(const char* name, const char* vertexSrc, const char* fragmentSrc)
 
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
+}
+
+Shader::~Shader() {
+    glDeleteProgram(this->ID);
 }
 
 const char* Shader::getName() {

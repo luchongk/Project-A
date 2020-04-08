@@ -29,6 +29,7 @@
             "environment": [],
             "externalConsole": false,
             //"symbolSearchPath": "https://msdl.microsoft.com/download/symbols"
+            "requireExactSource": false
         }
     ]
 }

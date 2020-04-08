@@ -4,12 +4,11 @@
 #include <stddef.h>
 #include "glad/glad.h"
 
-class ShaderManager;
-
 struct GameMemory {
+    bool isInitialized;
     size_t totalSize;
-    ShaderManager* shaderManager;
-    void* data;
+    void* data[2];
+    int currentDataIndex;
 };
 
 #endif
