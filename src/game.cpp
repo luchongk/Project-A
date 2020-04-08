@@ -10,9 +10,6 @@
 
 #define DLLEXPORT extern "C" __declspec(dllexport)
 
-//static unsigned int VAO[2];
-//static unsigned int VBO[2];
-
 static float vertices[]{
     -1.0f,
     -0.5f,
@@ -68,7 +65,6 @@ struct GameState
     ShaderManager shaderManager;
     float vertices[15];
     float vertices2[15];
-    float ble;
     unsigned int VAO[2];
     unsigned int VBO[2];
     unsigned int texture;
@@ -89,7 +85,6 @@ REFLECTION_REGISTRATION(GameState)
         ->addField("shaderManager", &GameState::shaderManager)
         ->addField("vertices", &GameState::vertices)
         ->addField("vertices2", &GameState::vertices2)
-        ->addField("ble", &GameState::ble)
         ->addField("VAO", &GameState::VAO)
         ->addField("VBO", &GameState::VBO)
         ->addField("texture", &GameState::texture)
@@ -100,10 +95,6 @@ struct GameData
 {
     Introspection meta;
     GameState state;
-
-    /*GameData() : meta{(uint8_t*)this + sizeof(GameData)},
-                 state{(uint8_t*)this + sizeof(GameData) + meta.alloc.getSize()}
-    {}*/
 };
 
 static void mutateState(void *oldState, void *newState, reflection::Type *oldType, reflection::Type *newType)
@@ -265,6 +256,7 @@ DLLEXPORT void render(GameMemory *gameMemory)
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
+#ifdef DEBUG
     std::cout << "checking for shader programs:\n";
     for(int i = 0; i < 50; i++) {
         if(glIsProgram(i)) {
@@ -276,6 +268,7 @@ DLLEXPORT void render(GameMemory *gameMemory)
         }
     }
     std::cout << std::endl;
+#endif
 
     Shader *bla = data->state.shaderManager.getShader("bla");
     bla->use();
