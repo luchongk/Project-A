@@ -243,7 +243,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
         }
         frameTime = workCounter;
         deltaTime = workDelta;
-#ifdef DEBUG
+#if DEBUG
         printf_s("last frame: %f ms\n", deltaTime);
         printf_s("FPS: %f\n", 1 / deltaTime);
         fflush(stdout);

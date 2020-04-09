@@ -11,39 +11,15 @@
 #define DLLEXPORT extern "C" __declspec(dllexport)
 
 static float vertices[]{
-    -1.0f,
-    -0.5f,
-    0.0f,
-    0.0f,
-    0.0f,
-    -0.5f,
-    -0.5f,
-    0.0f,
-    0.5f,
-    1.0f,
-    -0.75f,
-    0.5f,
-    0.0f,
-    1.0f,
-    0.0f,
+    -0.5f, -0.5f, 0.0f, 0.0f, 0.0f,
+    0.0f, -0.5f, 0.0f, 0.5f, 1.0f,
+    -0.25f, 0.5f, 0.0f, 1.0f, 0.0f,
 };
 
 static float vertices2[]{
-    -0.5f,
-    -0.5f,
-    0.0f,
-    0.0f,
-    0.0f,
-    0.0f,
-    -0.5f,
-    0.0f,
-    0.5f,
-    1.0f,
-    -0.25f,
-    0.5f,
-    0.0f,
-    1.0f,
-    0.0f,
+    0.0f, -0.5f, 0.0f, 0.0f, 0.0f,
+    0.5f, -0.5f, 0.0f, 0.5f, 1.0f,
+    0.25f, 0.5f, 0.0f, 1.0f, 0.0f,
 };
 
 struct Introspection
@@ -68,6 +44,8 @@ struct GameState
     unsigned int VAO[2];
     unsigned int VBO[2];
     unsigned int texture;
+    float color1 = 0.2f;
+    float color2 = 0.7f;
     uint8_t storage[megabytes(4)];
 
     GameState()
@@ -88,6 +66,8 @@ REFLECTION_REGISTRATION(GameState)
         ->addField("VAO", &GameState::VAO)
         ->addField("VBO", &GameState::VBO)
         ->addField("texture", &GameState::texture)
+        ->addField("color1", &GameState::color1)
+        ->addField("color2", &GameState::color2)
         ->addField("storage", &GameState::storage);
 }
 
@@ -214,7 +194,7 @@ DLLEXPORT void onLoad(GameMemory *gameMemory)
         "void main() {\n"
         "    Position = inPosition;\n"
         "    TexCoord = inTexCoord;\n"
-        "    gl_Position = vec4(inPosition.x + 0.001, inPosition.y, inPosition.z, 1.0f);\n"
+        "    gl_Position = vec4(inPosition.x, inPosition.y, inPosition.z, 1.0f);\n"
         "}";
 
     char *fragmentShaderSrc =
@@ -236,16 +216,19 @@ DLLEXPORT void update(GameMemory *gameMemory)
 {
     GameData *data = (GameData *)gameMemory->data[gameMemory->currentDataIndex];
 
+    data->state.color1 = std::fabsf(std::sinf(3.1415f * (data->state.vertices[10] * 0.5f + 0.5f)));
+    data->state.color2 = std::fabsf(std::cosf(3.1415f * (data->state.vertices2[10] * 0.5f + 0.5f)));
+
     for (int i = 0; i < 15; i++)
     {
         if (i % 5 == 0)
-            data->state.vertices[i] += 0.0001f;
+            data->state.vertices[i] += 0.00025f;
     }
 
     for (int i = 0; i < 15; i++)
     {
         if (i % 5 == 0)
-            data->state.vertices2[i] += 0.0f;
+            data->state.vertices2[i] -= 0.00025f;
     }
 }
 
@@ -256,7 +239,7 @@ DLLEXPORT void render(GameMemory *gameMemory)
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-#ifdef DEBUG
+#if 0
     std::cout << "checking for shader programs:\n";
     for(int i = 0; i < 50; i++) {
         if(glIsProgram(i)) {
@@ -272,7 +255,7 @@ DLLEXPORT void render(GameMemory *gameMemory)
 
     Shader *bla = data->state.shaderManager.getShader("bla");
     bla->use();
-    bla->setFloat("Color", 0.2f);
+    bla->setFloat("Color", data->state.color1);
 
     glBindTexture(GL_TEXTURE_2D, data->state.texture);
     glBindVertexArray(data->state.VAO[0]);
@@ -280,7 +263,7 @@ DLLEXPORT void render(GameMemory *gameMemory)
     glBufferData(GL_ARRAY_BUFFER, sizeof(data->state.vertices), data->state.vertices, GL_STATIC_DRAW);
     glDrawArrays(GL_TRIANGLES, 0, 5);
 
-    bla->setFloat("Color", 0.7f);
+    bla->setFloat("Color", data->state.color2);
     glBindVertexArray(data->state.VAO[1]);
     glBindBuffer(GL_ARRAY_BUFFER, data->state.VBO[1]);
     glBufferData(GL_ARRAY_BUFFER, sizeof(data->state.vertices2), data->state.vertices2, GL_STATIC_DRAW);

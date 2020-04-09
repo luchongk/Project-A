@@ -32,7 +32,7 @@ struct Field
 class TypeDB;
 struct Type
 {
-    static const int MAX_FIELD_COUNT = 10;
+    static const int MAX_FIELD_COUNT = 20;
 
     char name[32];
     size_t size;
