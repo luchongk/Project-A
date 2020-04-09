@@ -98,21 +98,24 @@ static void reloadGameCode(char* gameDLLPath, GameCode* gameCode, GameMemory* ga
     }
 }
 
-static void handleEvents(MSG *msg, bool &quit) {
+static void handleEvents(MSG *msg, PlayerInput* input) {
     while(PeekMessage(msg, nullptr, 0, 0, PM_REMOVE)) {
         switch(msg->message) {
             case WM_QUIT: {
-                quit = true;
+                input->quit = true;
             } break;
 
-            case WM_KEYUP: {
-                /*uint32_t VKCode = (uint32_t)msg->wParam;
+            case WM_KEYDOWN: {
+                uint32_t VKCode = (uint32_t)msg->wParam;
+                bool wasDown = msg->lParam & 0x40000000;
 
                 switch(VKCode) {
-                    case 'R':
-                        gameCode = reloadGameCode(&gameCode);
-                        break;
-                }*/
+                    case 'P': {
+                        if(!wasDown) {
+                            input->pause = true;
+                        }
+                    } break;
+                }
             } break;
 
             default: {
@@ -121,6 +124,11 @@ static void handleEvents(MSG *msg, bool &quit) {
             }
         }
     }
+
+    if(GetKeyState(VK_LEFT) & 0x8000)
+        input->horizontal = -1;
+    else if(GetKeyState(VK_RIGHT) & 0x8000)
+        input->horizontal = 1;
 }
 
 inline static float getTimeElapsed(LARGE_INTEGER start, LARGE_INTEGER end) {
@@ -205,22 +213,31 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
     float deltaTime = 0.0f;
     float fixedDeltaTime = 0.02f;
     
+    PlayerInput input{};
+
     bool quit = false;
     while(!quit) {      
         FILETIME lastWriteTime = getLastWriteTime(gameDLLPath);
         if(CompareFileTime(&gameCode.dllLastWriteTime, &lastWriteTime) != 0)
             reloadGameCode(gameDLLPath, &gameCode, &gameMemory);
 
-        handleEvents(&msg, quit);
+        handleEvents(&msg, &input);
+        quit = input.quit;
 
         if(deltaTime > maxFrameTime)
             deltaTime = maxFrameTime;   //Framerate too low, we are falling behind in the simulation! D: Preventing spiral of death.
         
         accum += deltaTime;
         
+        bool updateRan = false;
         while(accum >= fixedDeltaTime) {
-            gameCode.api.update(&gameMemory);
+            gameCode.api.update(&gameMemory, &input);
             accum -= fixedDeltaTime;
+            updateRan = true;
+        }
+
+        if(updateRan) {
+            input = {};
         }
 
         float lerp = (float)(accum / fixedDeltaTime);

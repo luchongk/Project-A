@@ -10,18 +10,6 @@
 
 #define DLLEXPORT extern "C" __declspec(dllexport)
 
-static float vertices[]{
-    -0.5f, -0.5f, 0.0f, 0.0f, 0.0f,
-    0.0f, -0.5f, 0.0f, 0.5f, 1.0f,
-    -0.25f, 0.5f, 0.0f, 1.0f, 0.0f,
-};
-
-static float vertices2[]{
-    0.0f, -0.5f, 0.0f, 0.0f, 0.0f,
-    0.5f, -0.5f, 0.0f, 0.5f, 1.0f,
-    0.25f, 0.5f, 0.0f, 1.0f, 0.0f,
-};
-
 struct Introspection
 {
     LinearAllocator allocator;
@@ -37,20 +25,29 @@ struct Introspection
 
 struct GameState
 {
-    LinearAllocator allocator;
+    LinearAllocator reloadablesAlloc;
     ShaderManager shaderManager;
-    float vertices[15];
-    float vertices2[15];
+    float vertices[15] {
+        -0.5f, -0.5f, 0.0f, 0.0f, 0.0f,
+        0.0f, -0.5f, 0.0f, 0.5f, 1.0f,
+        -0.25f, 0.5f, 0.0f, 1.0f, 0.0f,
+    };
+    float vertices2[15] {
+        0.0f, -0.5f, 0.0f, 0.0f, 0.0f,
+        0.5f, -0.5f, 0.0f, 0.5f, 1.0f,
+        0.25f, 0.5f, 0.0f, 1.0f, 0.0f,
+    };
     unsigned int VAO[2];
     unsigned int VBO[2];
     unsigned int texture;
-    float color1 = 0.2f;
-    float color2 = 0.7f;
-    uint8_t storage[megabytes(4)];
+    int moveDir1 = 1;
+    int moveDir2 = 1;
+    bool paused = false;
+    uint8_t reloadablesMemory[megabytes(4)];
 
     GameState()
-        : allocator{megabytes(4), storage},
-          shaderManager{&allocator}
+        : reloadablesAlloc{megabytes(4), reloadablesMemory},
+          shaderManager{&reloadablesAlloc}
     {
     }
 
@@ -59,16 +56,17 @@ struct GameState
 
 REFLECTION_REGISTRATION(GameState)
 {
-    CLASS->addField("allocator", &GameState::allocator)
+    CLASS->addField("reloadablesAlloc", &GameState::reloadablesAlloc)
         ->addField("shaderManager", &GameState::shaderManager)
         ->addField("vertices", &GameState::vertices)
         ->addField("vertices2", &GameState::vertices2)
         ->addField("VAO", &GameState::VAO)
         ->addField("VBO", &GameState::VBO)
         ->addField("texture", &GameState::texture)
-        ->addField("color1", &GameState::color1)
-        ->addField("color2", &GameState::color2)
-        ->addField("storage", &GameState::storage);
+        ->addField("moveDir1", &GameState::moveDir1)
+        ->addField("moveDir2", &GameState::moveDir2)
+        ->addField("paused", &GameState::paused)
+        ->addField("reloadablesMemory", &GameState::reloadablesMemory);
 }
 
 struct GameData
@@ -110,7 +108,7 @@ DLLEXPORT void onLoad(GameMemory *gameMemory)
 {
     gladLoadGL();
 
-    //TODO: I might be able to hide the swap in the platform layer
+    //TODO: I might be able to hide the swap in the platform layer?
     int prevDataIndex = gameMemory->currentDataIndex;
     if (gameMemory->isInitialized) {
         gameMemory->currentDataIndex = 1 - prevDataIndex;    //Swap memory blocks
@@ -167,12 +165,6 @@ DLLEXPORT void onLoad(GameMemory *gameMemory)
 
         //std::cout << sizeof(gameState->vertices) << std::endl;
 
-        for (int i = 0; i < 15; i++)
-        {
-            data->state.vertices[i] = vertices[i];
-            data->state.vertices2[i] = vertices2[i];
-        }
-
         gameMemory->isInitialized = true;
     }
     else
@@ -182,7 +174,7 @@ DLLEXPORT void onLoad(GameMemory *gameMemory)
         mutateState(&prevData->state, &data->state, oldType, newType);
         prevData->meta.allocator.clear();
 
-        data->state.allocator.clear();
+        data->state.reloadablesAlloc.clear();
     }
 
     char *vertexShaderSrc =
@@ -212,32 +204,58 @@ DLLEXPORT void onLoad(GameMemory *gameMemory)
     data->state.shaderManager.setShader("bla", vertexShaderSrc, fragmentShaderSrc);
 }
 
-DLLEXPORT void update(GameMemory *gameMemory)
+DLLEXPORT void update(GameMemory *gameMemory, PlayerInput* input)
 {
-    GameData *data = (GameData *)gameMemory->data[gameMemory->currentDataIndex];
+    GameState *state = (GameState*)&((GameData *)gameMemory->data[gameMemory->currentDataIndex])->state;
 
-    data->state.color1 = std::fabsf(std::sinf(3.1415f * (data->state.vertices[10] * 0.5f + 0.5f)));
-    data->state.color2 = std::fabsf(std::cosf(3.1415f * (data->state.vertices2[10] * 0.5f + 0.5f)));
+    if(input->pause) {
+        state->paused = !state->paused;
+    }
+
+    if(state->paused) {
+        return;
+    }
+
+    if(state->vertices[5] > 1)
+        state->moveDir1 = -1;
+    else if(state->vertices[0] < -1)
+        state->moveDir1 = 1;
+
+    if(state->vertices2[5] > 1)
+        state->moveDir2 = -1;
+    else if(state->vertices2[0] < -1)
+        state->moveDir2 = 1;
 
     for (int i = 0; i < 15; i++)
     {
-        if (i % 5 == 0)
-            data->state.vertices[i] += 0.00025f;
+        if (i % 5 == 0) {
+            float velocity = state->moveDir1 * 0.005f;
+            if(input->horizontal < 0)
+                velocity *= 0.5f;
+            else if(input->horizontal > 0)
+                velocity *= 2;
+            
+            state->vertices[i] += velocity;
+        }
     }
 
     for (int i = 0; i < 15; i++)
     {
-        if (i % 5 == 0)
-            data->state.vertices2[i] -= 0.00025f;
+        if (i % 5 == 0) {
+            float velocity = state->moveDir2 * 0.005f;
+            if(input->horizontal < 0)
+                velocity *= 0.5f;
+            else if(input->horizontal > 0)
+                velocity *= 2;
+
+            state->vertices2[i] += velocity;
+        }
     }
 }
 
 DLLEXPORT void render(GameMemory *gameMemory)
 {
     GameData *data = (GameData *)gameMemory->data[gameMemory->currentDataIndex];
-
-    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
 
 #if 0
     std::cout << "checking for shader programs:\n";
@@ -253,9 +271,15 @@ DLLEXPORT void render(GameMemory *gameMemory)
     std::cout << std::endl;
 #endif
 
+    float color1 = std::fabsf(std::sinf(3.1415f * (data->state.vertices[10] * 0.5f + 0.5f)));
+    float color2 = std::fabsf(std::cosf(3.1415f * (data->state.vertices2[10] * 0.5f + 0.5f)));
+    
+    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+
     Shader *bla = data->state.shaderManager.getShader("bla");
     bla->use();
-    bla->setFloat("Color", data->state.color1);
+    bla->setFloat("Color", color1);
 
     glBindTexture(GL_TEXTURE_2D, data->state.texture);
     glBindVertexArray(data->state.VAO[0]);
@@ -263,7 +287,7 @@ DLLEXPORT void render(GameMemory *gameMemory)
     glBufferData(GL_ARRAY_BUFFER, sizeof(data->state.vertices), data->state.vertices, GL_STATIC_DRAW);
     glDrawArrays(GL_TRIANGLES, 0, 5);
 
-    bla->setFloat("Color", data->state.color2);
+    bla->setFloat("Color", color2);
     glBindVertexArray(data->state.VAO[1]);
     glBindBuffer(GL_ARRAY_BUFFER, data->state.VBO[1]);
     glBufferData(GL_ARRAY_BUFFER, sizeof(data->state.vertices2), data->state.vertices2, GL_STATIC_DRAW);

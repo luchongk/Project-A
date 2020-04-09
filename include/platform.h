@@ -3,8 +3,8 @@
 
 #include "common.h"
 
-typedef void updateFunction(GameMemory*);
-static void updateStub(GameMemory*) {}
+typedef void updateFunction(GameMemory*, PlayerInput*);
+static void updateStub(GameMemory*, PlayerInput*) {}
 typedef void renderFunction(GameMemory*);
 static void renderStub(GameMemory*) {}
 

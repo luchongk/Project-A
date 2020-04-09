@@ -11,4 +11,10 @@ struct GameMemory {
     int currentDataIndex;
 };
 
+struct PlayerInput {
+    bool quit;
+    bool pause;
+    int horizontal;
+};
+
 #endif
