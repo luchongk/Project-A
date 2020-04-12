@@ -20,6 +20,7 @@ class Shader {
         void setBool(const char* name, bool value);
         void setInt(const char* name, int value);
         void setFloat(const char* name, float value);
+        void setMat4(const char* name, const glm::mat4& value);
 };
 
 #endif

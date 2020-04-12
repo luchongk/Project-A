@@ -2,6 +2,7 @@
 #define UTILS_H
 
 #ifdef DEBUG
+#undef assert
 constexpr void assert(bool condition) { if(!(condition)) (*(int*)nullptr) = 0; }
 #else
 constexpr void assert(bool condition) { }

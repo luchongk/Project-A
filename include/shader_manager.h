@@ -14,7 +14,7 @@ class ShaderManager {
 public:
     ShaderManager() = default;
     ShaderManager(LinearAllocator* allocator);
-    void setShader(char* name, char* vertexSrc, char* fragmentSrc);
+    Shader* setShader(char* name, char* vertexSrc, char* fragmentSrc);
     Shader* getShader(char* name);
     void clear();
 

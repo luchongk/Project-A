@@ -66,7 +66,7 @@ static void reloadGameCode(char* gameDLLPath, GameCode* gameCode, GameMemory* ga
     gameCode->api.update = updateStub;
     gameCode->api.render = renderStub;
 
-    char* DestDLLPath = ".\\game_tmp.dll";
+    char* DestDLLPath = ".\\engine_tmp.dll";
     
     if(CopyFileA(gameDLLPath, DestDLLPath, false))
         gameCode->dll = LoadLibraryA(DestDLLPath);
@@ -196,7 +196,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
     gameMemory.data[1] = VirtualAlloc(nullptr, gameMemory.totalSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
     gameMemory.currentDataIndex = 0;
 
-    char* gameDLLPath = ".\\game.dll";
+    char* gameDLLPath = ".\\engine.dll";
     GameCode gameCode{};
     reloadGameCode(gameDLLPath, &gameCode, &gameMemory);
     assert(gameCode.dll);
@@ -245,10 +245,11 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
         //* RENDERING *//
         gameCode.api.render(&gameMemory);
 
-        //TODO Implement Vsync switch
-        //! This should only happen if VSync is off
         LARGE_INTEGER workCounter = getWallClock();
         float workDelta = getTimeElapsed(frameTime, workCounter);
+//TODO: Implement Vsync switch
+//! This should only happen if VSync is off
+#if 1
         if(workDelta < targetFrameRate) {
             Sleep((int)((targetFrameRate - workDelta) * 1000 - 1));
             workCounter = getWallClock();
@@ -258,6 +259,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
             workCounter = getWallClock();
             workDelta = getTimeElapsed(frameTime, workCounter);
         }
+#endif
         frameTime = workCounter;
         deltaTime = workDelta;
 #if DEBUG

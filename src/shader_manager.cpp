@@ -11,7 +11,7 @@ ShaderManager::ShaderManager(LinearAllocator* allocator)
       shaderMap(allocator)
 { }
 
-void ShaderManager::setShader(char* name, char* vertexSrc, char* fragmentSrc) {
+Shader* ShaderManager::setShader(char* name, char* vertexSrc, char* fragmentSrc) {
     Shader* stored = shaderMap.get(name);
     if(stored) {
         destroy(stored, *allocator);
@@ -19,6 +19,7 @@ void ShaderManager::setShader(char* name, char* vertexSrc, char* fragmentSrc) {
 
     Shader* shader = new(*allocator) Shader(name, vertexSrc, fragmentSrc);
     shaderMap.set(name, shader);
+    return shader;
 }
 
 Shader* ShaderManager::getShader(char* name) {
