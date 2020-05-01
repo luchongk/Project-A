@@ -12,9 +12,11 @@ struct GameMemory {
 };
 
 struct PlayerInput {
-    bool quit;
     bool pause;
     int horizontal;
+    int vertical;
+    int mouseDeltaX;
+    int mouseDeltaY;
 };
 
 #endif

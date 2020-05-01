@@ -5,6 +5,7 @@
 #undef assert
 constexpr void assert(bool condition) { if(!(condition)) (*(int*)nullptr) = 0; }
 #else
+#undef assert
 constexpr void assert(bool condition) { }
 #endif
 

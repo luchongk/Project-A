@@ -6,7 +6,7 @@
 #include "shader.cpp"
 #include "shader_manager.cpp"
 
-static LARGE_INTEGER frequency;     //TODO: Think of a way to unglobalize this
+static bool interpFrames = false;
 
 static bool initOpenGL(HDC dc) {
     PIXELFORMATDESCRIPTOR pfd{};
@@ -32,8 +32,6 @@ static bool initOpenGL(HDC dc) {
         OutputDebugString(L"Couldn't load Glad");
         return false;
     }
-
-    glViewport(0, 0, 800, 600);
 
     return true;
 }
@@ -98,51 +96,44 @@ static void reloadGameCode(char* gameDLLPath, GameCode* gameCode, GameMemory* ga
     }
 }
 
-static void handleEvents(MSG *msg, PlayerInput* input) {
-    while(PeekMessage(msg, nullptr, 0, 0, PM_REMOVE)) {
-        switch(msg->message) {
-            case WM_QUIT: {
-                input->quit = true;
-            } break;
+static bool pollEvents(PlayerInput* input) {
+    MSG msg{};
 
-            case WM_KEYDOWN: {
-                uint32_t VKCode = (uint32_t)msg->wParam;
-                bool wasDown = msg->lParam & 0x40000000;
-
-                switch(VKCode) {
-                    case 'P': {
-                        if(!wasDown) {
-                            input->pause = true;
-                        }
-                    } break;
-                }
-            } break;
-
-            default: {
-                TranslateMessage(msg);
-                DispatchMessage(msg);
-            }
+    while(PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+        if(msg.message == WM_QUIT) {
+            return true;
         }
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
     }
 
-    if(GetKeyState(VK_LEFT) & 0x8000)
+    if(GetKeyState('A') & 0x8000)
         input->horizontal = -1;
-    else if(GetKeyState(VK_RIGHT) & 0x8000)
+    else if(GetKeyState('D') & 0x8000)
         input->horizontal = 1;
+    
+    if(GetKeyState('S') & 0x8000)
+        input->vertical = -1;
+    else if(GetKeyState('W') & 0x8000)
+        input->vertical = 1;
+
+    return false;
 }
 
-inline static float getTimeElapsed(LARGE_INTEGER start, LARGE_INTEGER end) {
+inline static double getTimeElapsed(LARGE_INTEGER start, LARGE_INTEGER end, LARGE_INTEGER freq) {
     assert(start.QuadPart < end.QuadPart);
-    return (end.QuadPart - start.QuadPart) / (float)frequency.QuadPart;
+    return (end.QuadPart - start.QuadPart) / (double)freq.QuadPart;
 }
 
-inline static LARGE_INTEGER getWallClock() {
+inline static LARGE_INTEGER getTimestamp() {
     LARGE_INTEGER current;
     QueryPerformanceCounter(&current);
     return current;
 }
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    Win32State* platform = (Win32State*)GetProp(hwnd, L"GainWin32State");
+    
     switch(uMsg) {
         case WM_DESTROY: {
             PostQuitMessage(0);
@@ -151,6 +142,95 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         case WM_SIZE: {
             glViewport(0, 0, LOWORD(lParam), HIWORD(lParam));
         } break;
+
+        case WM_KEYDOWN: {
+            uint32_t VKCode = (uint32_t)wParam;
+            bool wasDown = lParam & 0x40000000;
+
+            switch(VKCode) {
+                case 'P': {
+                    if(!wasDown) {
+                        platform->input.pause = true;
+                    }
+                } break;
+
+                case VK_F11: {
+                    DWORD dwStyle = GetWindowLong(hwnd, GWL_STYLE);
+                    if (dwStyle & WS_OVERLAPPEDWINDOW)
+                    {
+                        MONITORINFOEX mi;
+                        mi.cbSize = sizeof(mi);
+                        if (GetWindowPlacement(hwnd, &platform->windowPlacement) &&
+                            GetMonitorInfo(MonitorFromWindow(hwnd, MONITOR_DEFAULTTOPRIMARY), &mi))
+                        {
+                            ShowCursor(false);
+                            SetWindowLong(hwnd, GWL_STYLE,
+                                            dwStyle & ~WS_OVERLAPPEDWINDOW);
+                            
+                            SetWindowPos(hwnd, platform->borderlessFullscreen ? HWND_TOP : HWND_TOPMOST,
+                                        mi.rcMonitor.left, mi.rcMonitor.top,
+                                        mi.rcMonitor.right - mi.rcMonitor.left,
+                                        mi.rcMonitor.bottom - mi.rcMonitor.top,
+                                        SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+                        }
+                    } else {
+                        ShowCursor(true);
+                        SetWindowLong(hwnd, GWL_STYLE,
+                                    dwStyle | WS_OVERLAPPEDWINDOW);
+
+                        SetWindowPlacement(hwnd, &platform->windowPlacement);
+                        SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
+                                    SWP_NOMOVE | SWP_NOSIZE |
+                                    SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+                    }    
+                } break;
+
+                case 'F': {
+                    platform->borderlessFullscreen = !platform->borderlessFullscreen;
+                } break;
+
+                case 'L': {
+                    interpFrames = !interpFrames;
+                }
+            }
+        } break;
+
+#if HIDEF_MOUSE
+        case WM_INPUT: {
+            UINT dwSize = sizeof(RAWINPUT);
+            RAWINPUT raw;
+            GetRawInputData((HRAWINPUT)lParam, RID_INPUT, &raw, &dwSize, sizeof(RAWINPUTHEADER));
+
+            if (raw.header.dwType == RIM_TYPEMOUSE) 
+            {
+                platform->input.mouseDeltaX += raw.data.mouse.lLastX;
+                platform->input.mouseDeltaY += raw.data.mouse.lLastY;
+            }
+
+            /*RECT rect;
+            GetClientRect(hwnd, &rect);
+
+            POINT center;
+            center.x = rect.right / 2;
+            center.y = rect.bottom / 2;
+            ClientToScreen(hwnd, &center);
+            SetCursorPos(center.x, center.y);*/
+        } break;
+#else
+        case WM_MOUSEMOVE: {
+            RECT rect;
+            GetClientRect(hwnd, &rect);
+            
+            platform->input.mouseDeltaX += (lParam & 0xFFFF) - rect.right / 2;
+            platform->input.mouseDeltaY += ((lParam >> 16) & 0xFFFF) - rect.bottom / 2;
+
+            POINT center;
+            center.x = rect.right / 2;
+            center.y = rect.bottom / 2;
+            ClientToScreen(hwnd, &center);
+            SetCursorPos(center.x, center.y);
+        } break;
+#endif
 
         default:
             return DefWindowProc(hwnd, uMsg, wParam, lParam);
@@ -174,100 +254,113 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
         return 1;
 
     HWND hwnd = CreateWindowW(CLASS_NAME, L"Gain", WS_OVERLAPPEDWINDOW,
-                                CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
+                                200, 100, 1600, 800,
                                 nullptr, nullptr, hInstance, nullptr);
 
     if(!hwnd)
         return 1;
 
+    Win32State platform{}; 
+    SetProp(hwnd, L"GainWin32State", &platform);
+
     HDC dc = GetDC(hwnd);
+    platform.borderlessFullscreen = false;
 
     if(!initOpenGL(dc))
         return 1;
 
     ShowWindow(hwnd, nCmdShow);
-    
-    MSG msg{};
+    SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
+    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
 
-    GameMemory gameMemory{};
-    gameMemory.isInitialized = false;
-    gameMemory.totalSize = megabytes(64);  //TODO: Config
-    gameMemory.data[0] = VirtualAlloc(nullptr, gameMemory.totalSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-    gameMemory.data[1] = VirtualAlloc(nullptr, gameMemory.totalSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-    gameMemory.currentDataIndex = 0;
+#if HIDEF_MOUSE   
+    RAWINPUTDEVICE Rid;
+    Rid.usUsagePage = 0x01; 
+    Rid.usUsage = 0x02; 
+    Rid.dwFlags = 0; //RIDEV_NOLEGACY   // adds HID mouse and also ignores legacy mouse messages
+    Rid.hwndTarget = 0;    
+
+    if (RegisterRawInputDevices(&Rid, 1, sizeof(RAWINPUTDEVICE)) == FALSE) {
+        /* ERROR */
+    }
+#endif
+    GameMemory memory;
+    memory.isInitialized = false;
+    memory.totalSize = megabytes(64);  //TODO: Config
+    memory.data[0] = VirtualAlloc(nullptr, memory.totalSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    memory.data[1] = VirtualAlloc(nullptr, memory.totalSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    memory.currentDataIndex = 0;
 
     char* gameDLLPath = ".\\engine.dll";
     GameCode gameCode{};
-    reloadGameCode(gameDLLPath, &gameCode, &gameMemory);
+    reloadGameCode(gameDLLPath, &gameCode, &memory);
     assert(gameCode.dll);
-
-    timeBeginPeriod(1);
-    LARGE_INTEGER frameTime;
-    QueryPerformanceCounter(&frameTime);
-    QueryPerformanceFrequency(&frequency);
 
     //TODO: Config each of these!
     constexpr float maxFrameTime = 0.25f;
-    constexpr float targetFrameRate = 0.0166f;
-    float accum = 0.0f;
-    float deltaTime = 0.0f;
-    float fixedDeltaTime = 0.02f;
-    
-    PlayerInput input{};
+    constexpr float targetFrameTime = (float)1/60;
+    assert(targetFrameTime < maxFrameTime);
+
+    double accum = 0;
+    double deltaTime = 0;
+    float fixedDeltaTime = 0.0166f;
+
+    timeBeginPeriod(1);
+    LARGE_INTEGER frameTime;
+    QueryPerformanceFrequency(&platform.timerFrequency);
+    QueryPerformanceCounter(&frameTime);
+    platform.startTimestamp = frameTime;
 
     bool quit = false;
-    while(!quit) {      
+    while(!quit) {
         FILETIME lastWriteTime = getLastWriteTime(gameDLLPath);
         if(CompareFileTime(&gameCode.dllLastWriteTime, &lastWriteTime) != 0)
-            reloadGameCode(gameDLLPath, &gameCode, &gameMemory);
+            reloadGameCode(gameDLLPath, &gameCode, &memory);
 
-        handleEvents(&msg, &input);
-        quit = input.quit;
+        quit = pollEvents(&platform.input);
 
         if(deltaTime > maxFrameTime)
             deltaTime = maxFrameTime;   //Framerate too low, we are falling behind in the simulation! D: Preventing spiral of death.
         
         accum += deltaTime;
-        
-        bool updateRan = false;
+        bool updateRan = true;
         while(accum >= fixedDeltaTime) {
-            gameCode.api.update(&gameMemory, &input);
+            gameCode.api.update(&memory, &platform.input, fixedDeltaTime, 0);
             accum -= fixedDeltaTime;
             updateRan = true;
         }
 
-        if(updateRan) {
-            input = {};
-        }
-
-        float lerp = (float)(accum / fixedDeltaTime);
-
         //* RENDERING *//
-        gameCode.api.render(&gameMemory);
+        double lerp = accum / fixedDeltaTime;
+        std::cout << lerp << std::endl;
+        gameCode.api.render(&memory, &platform.input, (interpFrames) ? lerp : 1);
 
-        LARGE_INTEGER workCounter = getWallClock();
-        float workDelta = getTimeElapsed(frameTime, workCounter);
-//TODO: Implement Vsync switch
-//! This should only happen if VSync is off
-#if 1
-        if(workDelta < targetFrameRate) {
-            Sleep((int)((targetFrameRate - workDelta) * 1000 - 1));
-            workCounter = getWallClock();
-            workDelta = getTimeElapsed(frameTime, workCounter);
+        if(updateRan) {
+            platform.input = {};
         }
-        while(workDelta < targetFrameRate) {
-            workCounter = getWallClock();
-            workDelta = getTimeElapsed(frameTime, workCounter);
+
+        LARGE_INTEGER workCounter = getTimestamp();
+        double workDelta = getTimeElapsed(frameTime, workCounter, platform.timerFrequency);
+#if 0
+        //TODO: Implement Vsync switch
+        //! This should only happen if VSync is off
+        if(workDelta < targetFrameTime) {
+            Sleep((int)((targetFrameTime - workDelta) * 1000 - 1));
+        }
+        while(workDelta < targetFrameTime) {
+            workCounter = getTimestamp();
+            workDelta = getTimeElapsed(frameTime, workCounter, platform.timerFrequency);
         }
 #endif
         frameTime = workCounter;
         deltaTime = workDelta;
-#if DEBUG
+#if 1
         printf_s("last frame: %f ms\n", deltaTime);
         printf_s("FPS: %f\n", 1 / deltaTime);
         fflush(stdout);
 #endif
         SwapBuffers(dc);
+        
     }
 
     return 0;

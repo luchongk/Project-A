@@ -3,10 +3,10 @@
 
 #include "common.h"
 
-typedef void updateFunction(GameMemory*, PlayerInput*);
-static void updateStub(GameMemory*, PlayerInput*) {}
-typedef void renderFunction(GameMemory*);
-static void renderStub(GameMemory*) {}
+typedef void updateFunction(GameMemory*, PlayerInput*, float, float);
+static void updateStub(GameMemory*, PlayerInput*, float, float) {}
+typedef void renderFunction(GameMemory*, PlayerInput*, float);
+static void renderStub(GameMemory*, PlayerInput*, float) {}
 
 struct GameAPI {
     updateFunction* update;

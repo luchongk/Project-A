@@ -1,4 +1,5 @@
 #include <iostream>
+#include <iomanip>
 
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
@@ -34,15 +35,27 @@ struct GameState
     unsigned int VAO;
     unsigned int VBO;
     unsigned int texture;
-    int moveDir1;
-    float rotation;
+    glm::vec3 cameraPos;
+    glm::vec3 cameraForward;
+    float cameraYaw;
+    float cameraPitch;
+    glm::vec3 prevCameraPos;
+    float prevCameraYaw;
+    float prevCameraPitch;
+    float moveDir1;
+    float cubesRotation;
+    float prevCubesRotation;
     bool paused = false;
     uint8_t reloadablesMemory[megabytes(4)];
 
     GameState()
         : reloadablesAlloc{megabytes(4), reloadablesMemory},
           shaderManager{&reloadablesAlloc},
-          moveDir1{1}
+          moveDir1{1},
+          cameraPos{glm::vec3{-1,0,0}},
+          cameraForward{glm::vec3{0,0,-1}},
+          cameraYaw{-90.0f},
+          cameraPitch{0.0f}
     {
     }
 
@@ -56,8 +69,12 @@ REFLECTION_REGISTRATION(GameState)
         ->addField("VAO", &GameState::VAO)
         ->addField("VBO", &GameState::VBO)
         ->addField("texture", &GameState::texture)
+        ->addField("cameraPos", &GameState::cameraPos)
+        ->addField("cameraForward", &GameState::cameraForward)
+        ->addField("cameraYaw", &GameState::cameraYaw)
+        ->addField("cameraPitch", &GameState::cameraPitch)
         ->addField("moveDir1", &GameState::moveDir1)
-        ->addField("rotation", &GameState::rotation)
+        ->addField("rotation", &GameState::cubesRotation)
         ->addField("paused", &GameState::paused)
         ->addField("reloadablesMemory", &GameState::reloadablesMemory);
 }
@@ -185,7 +202,7 @@ DLLEXPORT void onLoad(GameMemory *gameMemory)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
 
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         // load and generate the texture
         int width, height, nrChannels;
@@ -246,7 +263,7 @@ DLLEXPORT void onLoad(GameMemory *gameMemory)
     bla->use();
 }
 
-DLLEXPORT void update(GameMemory *gameMemory, PlayerInput* input)
+DLLEXPORT void update(GameMemory *gameMemory, PlayerInput* input, float dt, float time)
 {
     GameState *state = (GameState*)&((GameData *)gameMemory->data[gameMemory->currentDataIndex])->state;
 
@@ -255,26 +272,52 @@ DLLEXPORT void update(GameMemory *gameMemory, PlayerInput* input)
     }
 
     if(state->paused) {
-        return;
+        dt = 0;
     }
 
-    /*if(state->vertices[5] > 1)
-        state->moveDir1 = -1;
-    else if(state->vertices[0] < -1)
-        state->moveDir1 = 1;*/
+    state->prevCameraPitch = state->cameraPitch;
+    state->prevCameraYaw = state->cameraYaw;
+    state->prevCameraPos = state->cameraPos;
+    state->prevCubesRotation = state->cubesRotation;
 
-    float velocity = state->moveDir1 * 0.005f;
-    if(input->horizontal < 0)
-        velocity *= 0.5f;
-    else if(input->horizontal > 0)
-        velocity *= 2;
+    state->cameraYaw += input->mouseDeltaX * 2.0f * dt;
+    /*if(state->cameraYaw > 360) {
+        state->cameraYaw -= 360;
+    }
+    else if(state->cameraYaw < 0) {
+        state->cameraYaw += 360;
+    }*/
+    state->cameraPitch += -input->mouseDeltaY * 2.0f * dt;
+    /*if(state->cameraPitch > 360) {
+        state->cameraPitch -= 360;
+    }
+    else if(state->cameraPitch < 0) {
+        state->cameraPitch += 360;
+    }*/
+    state->cameraForward.x = glm::cos(glm::radians(state->cameraYaw)) * glm::cos(glm::radians(state->cameraPitch));
+    state->cameraForward.y = glm::sin(glm::radians(state->cameraPitch));
+    state->cameraForward.z = glm::sin(glm::radians(state->cameraYaw)) * glm::cos(glm::radians(state->cameraPitch));
+    state->cameraForward = glm::normalize(state->cameraForward);
+
+    if(input->horizontal != 0) {
+        state->cameraPos += glm::cross(state->cameraForward, glm::vec3{0,1,0}) * 3.0f * (float)input->horizontal * dt;;
+    }
+
+    if(input->vertical != 0)
+        state->cameraPos += state->cameraForward * 3.0f * (float)input->vertical * dt;
     
-    state->rotation += velocity;
+    /*if(input->horizontal * state->moveDir1 < 0)
+        state->moveDir1 += 10 * (state->moveDir1 >= 0 ? -dt : dt);
+    else if(input->horizontal * state->moveDir1 > 0 || input->horizontal != 0 && state->moveDir1 == 0)
+        state->moveDir1 -= 2 * (state->moveDir1 >= 0 ? -dt : dt);*/
+    
+    state->cubesRotation += 0.0f * state->moveDir1 * dt;
+    //std::cout << "time: " << time << std::endl;
 }
 
-DLLEXPORT void render(GameMemory *gameMemory)
+DLLEXPORT void render(GameMemory *gameMemory, PlayerInput* input, float deltaInterpolation)
 {
-    GameData *data = (GameData *)gameMemory->data[gameMemory->currentDataIndex];
+    GameState *state = (GameState*)&((GameData *)gameMemory->data[gameMemory->currentDataIndex])->state;
 
 #if 0
     std::cout << "checking for shader programs:\n";
@@ -289,24 +332,31 @@ DLLEXPORT void render(GameMemory *gameMemory)
     }
     std::cout << std::endl;
 #endif
+    float cameraYaw = state->cameraYaw * deltaInterpolation + state->prevCameraYaw * (1 - deltaInterpolation);
+    float cameraPitch = state->cameraPitch * deltaInterpolation + state->prevCameraPitch * (1 - deltaInterpolation);
+    glm::vec3 cameraForward;
+    cameraForward.x = glm::cos(glm::radians(cameraYaw)) * glm::cos(glm::radians(cameraPitch));
+    cameraForward.y = glm::sin(glm::radians(cameraPitch));
+    cameraForward.z = glm::sin(glm::radians(cameraYaw)) * glm::cos(glm::radians(cameraPitch));
+    cameraForward = glm::normalize(cameraForward);
+    
+    glm::vec3 cameraPos = state->cameraPos * deltaInterpolation + state->prevCameraPos * (1 - deltaInterpolation);
+    float cubesRotation = state->cubesRotation * deltaInterpolation + state->prevCubesRotation * (1 - deltaInterpolation);
 
-    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    glm::mat4 worldToCamera = glm::mat4(1.0f);
-    worldToCamera = glm::translate(worldToCamera, glm::vec3(0.0f, 0.0f, -3.0f)); 
 
     glm::mat4 projection;
     projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
 
-    Shader* bla = data->state.shaderManager.getShader("bla");
+    Shader* bla = state->shaderManager.getShader("bla");
     bla->use();
-    bla->setMat4("view", worldToCamera);
+    bla->setMat4("view", glm::lookAt(cameraPos, cameraPos + cameraForward, glm::vec3{0,1,0}));
     bla->setMat4("projection", projection);
 
-    //float color1 = std::fabsf(std::sinf(3.1415f * (data->state.rotation * 0.5f + 0.5f)));
+    float color1 = std::fabsf(std::sinf(3.1415f * (cubesRotation * 0.5f + 0.5f)));
 
-    bla->setFloat("Color", 0.7f);
+    bla->setFloat("Color", color1);
 
     glm::vec3 cubePositions[] {
         glm::vec3{0.0f, 0.0f, 0.0f},
@@ -316,12 +366,12 @@ DLLEXPORT void render(GameMemory *gameMemory)
         glm::vec3{2.4f, -0.4f, -3.5f},
     };
 
-    glBindVertexArray(data->state.VAO);
+    glBindVertexArray(state->VAO);
     for(int i = 0; i < 5; i++) {
         glm::mat4 localToWorld = glm::mat4{1.0f};
         localToWorld = glm::translate(localToWorld, cubePositions[i]);
-        float angle = 21.0f * (i+1);
-        localToWorld = glm::rotate(localToWorld, data->state.rotation + glm::radians(angle), glm::vec3(0.5f, 1.0f, 0.0f));
+        float angle = 50.0f * (i+1);
+        localToWorld = glm::rotate(localToWorld, cubesRotation * glm::radians(angle), glm::vec3(0.5f, 1.0f, 0.0f));
         bla->setMat4("model", localToWorld);
         glDrawArrays(GL_TRIANGLES, 0, 36);
     }
