@@ -298,12 +298,12 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
 
     //TODO: Config each of these!
     constexpr float maxFrameTime = 0.25f;
-    constexpr float targetFrameTime = (float)1/60;
+    constexpr float targetFrameTime = 1.0f/60;
     assert(targetFrameTime < maxFrameTime);
 
     double accum = 0;
     double deltaTime = 0;
-    float fixedDeltaTime = 0.0166f;
+    float fixedDeltaTime = 1.0f/50;
 
     timeBeginPeriod(1);
     LARGE_INTEGER frameTime;
@@ -331,7 +331,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
         }
 
         //* RENDERING *//
-        double lerp = accum / fixedDeltaTime;
+        float lerp = (float)(accum / fixedDeltaTime);
         std::cout << lerp << std::endl;
         gameCode.api.render(&memory, &platform.input, (interpFrames) ? lerp : 1);
 
@@ -341,7 +341,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
 
         LARGE_INTEGER workCounter = getTimestamp();
         double workDelta = getTimeElapsed(frameTime, workCounter, platform.timerFrequency);
-#if 0
+#if 1
         //TODO: Implement Vsync switch
         //! This should only happen if VSync is off
         if(workDelta < targetFrameTime) {
