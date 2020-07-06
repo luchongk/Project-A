@@ -51,16 +51,13 @@ static FILETIME getLastWriteTime(char* filename) {
 
 static void reloadGameCode(char* gameDLLPath, GameCode* gameCode, GameMemory* gameMemory) {
     if(gameCode->dll) {
-        /*void (*onUnload)(GameMemory*) = (void(*)(GameMemory*))GetProcAddress(gameCode->dll, "onUnload");
-        if(onUnload)
-            onUnload(gameMemory);*/
-
         if(!FreeLibrary(gameCode->dll)) {
             printf("Couldn't free game code DLL");
             return;
         }
     }
 
+    gameCode->api.onLoad = onLoadStub;
     gameCode->api.update = updateStub;
     gameCode->api.render = renderStub;
 
@@ -79,15 +76,15 @@ static void reloadGameCode(char* gameDLLPath, GameCode* gameCode, GameMemory* ga
     if(!gameCode->dll)
         printf("Failed to load game code DLL\n");
     else {
-        void (*onLoad)(GameMemory*) = (void(*)(GameMemory*))GetProcAddress(gameCode->dll, "onLoad");
-        if(onLoad)
-            onLoad(gameMemory);
+        gameCode->api.onLoad = (onLoadFunction*)GetProcAddress(gameCode->dll, "onLoad");
+        assert(gameCode->api.onLoad);
         
         gameCode->api.update = (updateFunction*)GetProcAddress(gameCode->dll, "update");
         if(!gameCode->api.update) {
-            printf("Failed to load update function\n");
+            printf("Failed to load render function\n");
             gameCode->api.update = updateStub;
         }
+        
         gameCode->api.render = (renderFunction*)GetProcAddress(gameCode->dll, "render");
         if(!gameCode->api.render) {
             printf("Failed to load render function\n");
@@ -121,7 +118,7 @@ static bool pollEvents(PlayerInput* input) {
 }
 
 inline static double getTimeElapsed(LARGE_INTEGER start, LARGE_INTEGER end, LARGE_INTEGER freq) {
-    assert(start.QuadPart < end.QuadPart);
+    assert(start.QuadPart <= end.QuadPart);
     return (end.QuadPart - start.QuadPart) / (double)freq.QuadPart;
 }
 
@@ -285,7 +282,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
     }
 #endif
     GameMemory memory;
-    memory.isInitialized = false;
     memory.totalSize = megabytes(64);  //TODO: Config
     memory.data[0] = VirtualAlloc(nullptr, memory.totalSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
     memory.data[1] = VirtualAlloc(nullptr, memory.totalSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
@@ -295,15 +291,17 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
     GameCode gameCode{};
     reloadGameCode(gameDLLPath, &gameCode, &memory);
     assert(gameCode.dll);
+    gameCode.api.onLoad(true, &memory);
 
     //TODO: Config each of these!
     constexpr float maxFrameTime = 0.25f;
     constexpr float targetFrameTime = 1.0f/60;
     assert(targetFrameTime < maxFrameTime);
+    bool capFramerate = false;
 
     double accum = 0;
     double deltaTime = 0;
-    float fixedDeltaTime = 1.0f/50;
+    float fixedDeltaTime = 1.0f/60;
 
     timeBeginPeriod(1);
     LARGE_INTEGER frameTime;
@@ -313,14 +311,22 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
 
     bool quit = false;
     while(!quit) {
+        LARGE_INTEGER newFrameTime = getTimestamp();
+        deltaTime = getTimeElapsed(frameTime, newFrameTime, platform.timerFrequency);
+        frameTime = newFrameTime;
+        
         FILETIME lastWriteTime = getLastWriteTime(gameDLLPath);
-        if(CompareFileTime(&gameCode.dllLastWriteTime, &lastWriteTime) != 0)
+        if(CompareFileTime(&gameCode.dllLastWriteTime, &lastWriteTime) != 0) {
             reloadGameCode(gameDLLPath, &gameCode, &memory);
+            if(gameCode.api.onLoad)
+                gameCode.api.onLoad(false, &memory);
+        }
 
         quit = pollEvents(&platform.input);
 
-        if(deltaTime > maxFrameTime)
+        if(deltaTime > maxFrameTime) {
             deltaTime = maxFrameTime;   //Framerate too low, we are falling behind in the simulation! D: Preventing spiral of death.
+        }
         
         accum += deltaTime;
         bool updateRan = true;
@@ -331,36 +337,34 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
         }
 
         //* RENDERING *//
-        float lerp = (float)(accum / fixedDeltaTime);
-        std::cout << lerp << std::endl;
+        float lerp = (float)(accum / fixedDeltaTime);   //TODO: implement position/rotation interpolation
         gameCode.api.render(&memory, &platform.input, (interpFrames) ? lerp : 1);
 
         if(updateRan) {
             platform.input = {};
         }
 
-        LARGE_INTEGER workCounter = getTimestamp();
-        double workDelta = getTimeElapsed(frameTime, workCounter, platform.timerFrequency);
-#if 1
-        //TODO: Implement Vsync switch
-        //! This should only happen if VSync is off
-        if(workDelta < targetFrameTime) {
-            Sleep((int)((targetFrameTime - workDelta) * 1000 - 1));
+        if(capFramerate) {
+            LARGE_INTEGER workCounter = getTimestamp();
+            double workDelta = getTimeElapsed(frameTime, workCounter, platform.timerFrequency);
+
+            //TODO: Implement Vsync switch
+            //! This should only happen if VSync is off
+            if(workDelta < targetFrameTime) {
+                Sleep((int)((targetFrameTime - workDelta) * 1000 - 1));
+            }
+            while(workDelta < targetFrameTime) {
+                workCounter = getTimestamp();
+                workDelta = getTimeElapsed(frameTime, workCounter, platform.timerFrequency);
+            }
         }
-        while(workDelta < targetFrameTime) {
-            workCounter = getTimestamp();
-            workDelta = getTimeElapsed(frameTime, workCounter, platform.timerFrequency);
-        }
-#endif
-        frameTime = workCounter;
-        deltaTime = workDelta;
-#if 1
+
+#if 0
         printf_s("last frame: %f ms\n", deltaTime);
         printf_s("FPS: %f\n", 1 / deltaTime);
         fflush(stdout);
 #endif
         SwapBuffers(dc);
-        
     }
 
     return 0;

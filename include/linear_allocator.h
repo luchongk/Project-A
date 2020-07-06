@@ -1,3 +1,10 @@
+/** 
+ * TODO: WE NEED A WAY TO MANAGE ALLOCATION CONTEXT.
+ * REMEMBER https://www.youtube.com/watch?time_continue=4&v=ciGQCP6HgqI&feature=emb_title
+ * AND ALSO Game Engine Architecture, the way Naughty Dog do it
+ */
+
+
 #ifndef LINEAR_ALLOCATOR_H
 #define LINEAR_ALLOCATOR_H
 

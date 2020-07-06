@@ -5,7 +5,7 @@
 #include "glad/glad.h"
 
 struct GameMemory {
-    bool isInitialized;
+    //bool isInitialized;
     size_t totalSize;
     void* data[2];
     int currentDataIndex;
