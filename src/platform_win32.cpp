@@ -300,6 +300,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
     bool capFramerate = false;
 
     double accum = 0;
+    float timeSinceStart = 0;
     double deltaTime = 0;
     float fixedDeltaTime = 1.0f/60;
 
@@ -313,6 +314,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
     while(!quit) {
         LARGE_INTEGER newFrameTime = getTimestamp();
         deltaTime = getTimeElapsed(frameTime, newFrameTime, platform.timerFrequency);
+        timeSinceStart = (float)getTimeElapsed(platform.startTimestamp, newFrameTime, platform.timerFrequency);
         frameTime = newFrameTime;
         
         FILETIME lastWriteTime = getLastWriteTime(gameDLLPath);
@@ -329,9 +331,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
         }
         
         accum += deltaTime;
-        bool updateRan = true;
+        bool updateRan = false;
         while(accum >= fixedDeltaTime) {
-            gameCode.api.update(&memory, &platform.input, fixedDeltaTime, 0);
+            gameCode.api.update(&memory, &platform.input, fixedDeltaTime, timeSinceStart);
             accum -= fixedDeltaTime;
             updateRan = true;
         }
