@@ -1,10 +1,7 @@
 #include "common.h"
 #include "reflection.h"
-#include "game_state.h"
 
 #include "linear_allocator.cpp"
-#include "shader.cpp"
-#include "shader_manager.cpp"
 #include "game.cpp"
 
 #define DLLEXPORT extern "C" __declspec(dllexport)
@@ -29,6 +26,10 @@ struct EngineData
 };
     
 static void mutateFromIntrospectionInfo(void *oldObject, void *newObject, reflection::Type *oldType, reflection::Type *newType) {
+    /**
+     * ! BUG: If a class doesn't have fields but has vtable, the code goes into this if and the memcpy breaks the vtable.
+     * ! We need a way to distinguish a class with no fields from a primitive type
+    */
     if (newType->fieldCount == 0)
     {
         memcpy(newObject, oldObject, newType->size);
@@ -51,8 +52,6 @@ static void mutateFromIntrospectionInfo(void *oldObject, void *newObject, reflec
                         newFields[i].type);
             continue;
         }
-
-        newFields[i].type->constructor((uint8_t *)newObject + newFields[i].offset);
     }
 }
 
@@ -68,6 +67,7 @@ DLLEXPORT void onLoad(bool isInit, GameMemory *gameMemory)
 
     //! This constructor initializes everything, even fields that will be replaced during mutation.
     //TODO: Find a way to only initialize new fields with default values, leaving old fields intact.
+    //EDIT: After giving it some thought, maybe we DO want to re-initialize everything, because that might fix vtable problems after hot reloading.
     EngineData *data = new (gameMemory->data[gameMemory->currentDataIndex]) EngineData{};
     reflection::Type *newType = data->meta.types.create<GameState>();
 

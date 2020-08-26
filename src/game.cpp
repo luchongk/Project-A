@@ -5,9 +5,104 @@
 #include "glm/gtc/type_ptr.hpp"
 
 #include "common.h"
-#include "game_state.h"
+#include "linear_allocator.h"
+#include "shader_manager.h"
 
+#include "shader.cpp"
+#include "shader_manager.cpp"
 #include "stb_image.cpp"
+
+class A {
+public:
+    int ala;
+
+    virtual int some() {
+        return 1;
+    }
+    
+    virtual void say() {
+        std::cout << "I say A" << std::endl;
+    }
+
+    REFLECT()
+};
+
+REFLECTION_REGISTRATION(A)
+{
+    CLASS->addField("ala", &A::ala);
+}
+
+class B : public A {
+public:
+    int bla;
+
+    virtual int some() {
+        return 4;
+    }
+
+    virtual void say() {
+        std::cout << "I say B" << std::endl;
+    }
+
+    REFLECT()
+};
+
+REFLECTION_REGISTRATION(B)
+{
+    CLASS->addField("ala", &B::ala)
+        ->addField("bla", &B::bla);
+}
+
+struct GameState
+{
+    LinearAllocator reloadablesAlloc;
+    ShaderManager shaderManager;
+    unsigned int VAO;
+    unsigned int VBO;
+    unsigned int texture;
+    glm::vec3 cameraPos;
+    glm::vec3 cameraForward;
+    float cameraYaw;
+    float cameraPitch;
+    float cubesRotationDir;
+    float cubesRotation;
+    bool paused = false;
+    A a;
+    B b;
+
+    GameState()
+        : reloadablesAlloc{megabytes(4), this + sizeof(this)},
+          shaderManager{&reloadablesAlloc},
+          cubesRotationDir{1},
+          cameraPos{glm::vec3{-1,0,0}},
+          cameraForward{glm::vec3{0,0,-1}},
+          cameraYaw{-90.0f},
+          cameraPitch{0.0f},
+          a{},
+          b{}
+    {
+    }
+
+    REFLECT()
+};
+
+REFLECTION_REGISTRATION(GameState)
+{
+    CLASS->addField("reloadablesAlloc", &GameState::reloadablesAlloc)
+        ->addField("shaderManager", &GameState::shaderManager)
+        ->addField("VAO", &GameState::VAO)
+        ->addField("VBO", &GameState::VBO)
+        ->addField("texture", &GameState::texture)
+        ->addField("cameraPos", &GameState::cameraPos)
+        ->addField("cameraForward", &GameState::cameraForward)
+        ->addField("cameraYaw", &GameState::cameraYaw)
+        ->addField("cameraPitch", &GameState::cameraPitch)
+        ->addField("cubesRotationDir", &GameState::cubesRotationDir)
+        ->addField("cubesRotation", &GameState::cubesRotation)
+        ->addField("paused", &GameState::paused)
+        ->addField("a", &GameState::a)
+        ->addField("b", &GameState::b);
+}
 
 static void init(GameState *state) {
     glEnable(GL_DEPTH_TEST);
@@ -132,42 +227,49 @@ static void update(GameState *state, PlayerInput* input, float dt, float time) {
     }
 
     if(state->paused) {
-        dt = 0;
+        return;
     }
 
     state->cameraYaw += input->mouseDeltaX * 2.0f * dt;
-    /*if(state->cameraYaw > 360) {
+    if(state->cameraYaw > 360) {
         state->cameraYaw -= 360;
     }
     else if(state->cameraYaw < 0) {
         state->cameraYaw += 360;
-    }*/
+    }
     state->cameraPitch += -input->mouseDeltaY * 2.0f * dt;
-    /*if(state->cameraPitch > 360) {
+    if(state->cameraPitch > 360) {
         state->cameraPitch -= 360;
     }
     else if(state->cameraPitch < 0) {
         state->cameraPitch += 360;
-    }*/
+    }
     state->cameraForward.x = glm::cos(glm::radians(state->cameraYaw)) * glm::cos(glm::radians(state->cameraPitch));
     state->cameraForward.y = glm::sin(glm::radians(state->cameraPitch));
     state->cameraForward.z = glm::sin(glm::radians(state->cameraYaw)) * glm::cos(glm::radians(state->cameraPitch));
     state->cameraForward = glm::normalize(state->cameraForward);
 
     if(input->horizontal != 0) {
-        state->cameraPos += glm::cross(state->cameraForward, glm::vec3{0,1,0}) * 3.0f * (float)input->horizontal * dt;;
+        state->cameraPos += glm::cross(state->cameraForward, glm::vec3{0,1,0}) * 3.0f * (float)input->horizontal * dt;
+        state->a.say();
+        std::cout << state->a.some();
+        state->b.say();
+        std::cout << state->b.some();
+        A* reallyB = &state->b;
+        reallyB->say();
+        std::cout << reallyB->some();
+        std::cout << "\n-------\n";
     }
 
     if(input->vertical != 0)
-        state->cameraPos += state->cameraForward * 3.0f * (float)input->vertical * dt;
+        state->cameraPos += state->cameraForward * 4.0f * (float)input->vertical * dt;
     
-    /*if(input->horizontal * state->moveDir1 < 0)
-        state->moveDir1 += 10 * (state->moveDir1 >= 0 ? -dt : dt);
-    else if(input->horizontal * state->moveDir1 > 0 || input->horizontal != 0 && state->moveDir1 == 0)
-        state->moveDir1 -= 2 * (state->moveDir1 >= 0 ? -dt : dt);*/
+    /*if(input->horizontal * state->cubesRotationDir < 0)
+        state->cubesRotationDir += 10 * (state->cubesRotationDir >= 0 ? -dt : dt);
+    else if(input->horizontal * state->cubesRotationDir > 0 || input->horizontal != 0 && state->cubesRotationDir == 0)
+        state->cubesRotationDir -= 2 * (state->cubesRotationDir >= 0 ? -dt : dt);*/
     
-    state->cubesRotation += state->pos * state->moveDir1 * dt;
-    //std::cout << "time: " << time << std::endl;
+    state->cubesRotation += 5 * glm::sin(10 * glm::radians(time)) * state->cubesRotationDir * dt;
 }
 
 static void render(GameState *state, float deltaInterpolation) {
@@ -184,7 +286,6 @@ static void render(GameState *state, float deltaInterpolation) {
     }
     std::cout << std::endl;
 #endif
-
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 

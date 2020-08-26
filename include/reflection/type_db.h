@@ -85,11 +85,9 @@ public:
     }
 };
 
-#include "linear_allocator.h"
-
 TypeDB::TypeDB(LinearAllocator *allocator)
     : allocator(allocator),
-      types(StringMap<Type>{allocator})
+      types(allocator)
 {
     //Initialize all builtin types 
 }
