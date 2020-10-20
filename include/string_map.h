@@ -5,15 +5,18 @@ class LinearAllocator;
 
 template<typename T>
 class StringMap {
+    REFLECT
+
     static const int maxKeyLength = 64;
     static const int capacity = 64;
 
-    struct Entry {
+    class Entry {
+        REFLECT
+
+    public:
         char key[maxKeyLength];
         T* value;
         Entry* next;
-
-        REFLECT()
     };
 
     Entry buckets[capacity];
@@ -31,11 +34,9 @@ public:
     void set(char* key, T* value);
     void clear();
     //void freeAndClear();
-
-    REFLECT()
 };
 
-template<typename T>
+/* template<typename T>
 REFLECTION_REGISTRATION(StringMap<T>) {
     CLASS->addField("buckets", &StringMap<T>::buckets)
         ->addField("allocator", &StringMap<T>::allocator);
@@ -46,7 +47,7 @@ REFLECTION_REGISTRATION(StringMap<T>::Entry) {
     CLASS->addField("key", &Entry::key)
         ->addField("value", &Entry::value)
         ->addField("next", &Entry::next);
-}
+} */
 
 #include "linear_allocator.h"
 

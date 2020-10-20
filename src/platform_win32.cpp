@@ -66,7 +66,6 @@ static void reloadGameCode(char* gameDLLPath, GameCode* gameCode, GameMemory* ga
     if(CopyFileA(gameDLLPath, DestDLLPath, false))
         gameCode->dll = LoadLibraryA(DestDLLPath);
     else {
-        DWORD err = GetLastError();
         gameCode->dll = nullptr;
         return;
     }

@@ -42,8 +42,6 @@ class TypeDB
     template <typename T, typename std::enable_if<!IsReflected<T>::value, int>::type = 0>
     static void registerFields(Type *t)
     {
-        //TODO: Find a way to check if what comes in here is a class
-        //assert(strncmp("class ", typeid(T).name(), 6));
     }
 
 public:
@@ -56,12 +54,12 @@ public:
     }
 
     template <typename T>
-    Type *get(bool shouldCreate = false)
+    Type *get(bool createIfMissing = false)
     {
         char *name = (char *)typeid(T).name();
 
         Type *t = types.get(name);
-        if (shouldCreate && !t)
+        if (createIfMissing && !t)
         {
             t = create<T>();
         }
@@ -70,7 +68,19 @@ public:
     }
 
     template <typename T>
-    Type *create();
+    Type *create() {
+        //TODO: This currently creates different types for arrays of different length. Make this better.
+        char *name = (char *)typeid(T).name();
+
+        Type *t = new (*allocator) Type(name, sizeof(T), this);
+        t->constructor = constructObject<T>;
+        t->destructor = destructObject<T>;
+        t->isClass = std::is_class<T>::value;
+        registerFields<T>(t);
+
+        types.set(name, t);
+        return t;
+    }
 
     template <typename TYPE>
     static void constructObject(void* object)
@@ -90,20 +100,6 @@ TypeDB::TypeDB(LinearAllocator *allocator)
       types(allocator)
 {
     //Initialize all builtin types 
-}
-
-template <typename T>
-inline Type *TypeDB::create()
-{
-    char *name = (char *)typeid(T).name();
-
-    Type *t = new (*allocator) Type(name, sizeof(T), this);
-    t->constructor = constructObject<T>;
-    t->destructor = destructObject<T>;
-    registerFields<T>(t);
-
-    types.set(name, t);
-    return t;
 }
 
 };

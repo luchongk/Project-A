@@ -2,7 +2,6 @@
 #define SHADER_H
 
 class Shader {
-
     unsigned int ID;
     char name[64];
     

@@ -36,18 +36,30 @@ struct Type
 
     char name[32];
     size_t size;
-    void (*constructor)(void*);
-    void (*destructor)(void*);
     int fieldCount = 0;
     Field fields[MAX_FIELD_COUNT];
+    void (*constructor)(void*);
+    void (*destructor)(void*);
+    bool isClass;
+    Type* baseClass;
     TypeDB *db;
 
-public:
     Type(const Type &) = delete;
 
     Type(char *name, size_t size, TypeDB *db) : size{size}, db(db)
     {
         strncpy_s(this->name, name, 31);
+    }
+
+    template<typename T>
+    Type* setBase() {
+        this->baseClass = this->db->get<T>(true);
+        for(int i = 0; i < this->baseClass->fieldCount; i++) {
+            fields[fieldCount] = this->baseClass->fields[i];
+            ++fieldCount;
+        }
+
+        return this;
     }
 
     template <typename T, typename U>

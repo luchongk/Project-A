@@ -3,6 +3,7 @@
 
 #include "linear_allocator.cpp"
 #include "game.cpp"
+#include "generated.cpp"
 
 #define DLLEXPORT extern "C" __declspec(dllexport)
 
@@ -26,11 +27,7 @@ struct EngineData
 };
     
 static void mutateFromIntrospectionInfo(void *oldObject, void *newObject, reflection::Type *oldType, reflection::Type *newType) {
-    /**
-     * ! BUG: If a class doesn't have fields but has vtable, the code goes into this if and the memcpy breaks the vtable.
-     * ! We need a way to distinguish a class with no fields from a primitive type
-    */
-    if (newType->fieldCount == 0)
+    if (!newType->isClass && newType->fieldCount == 0)
     {
         memcpy(newObject, oldObject, newType->size);
         return;

@@ -15,6 +15,8 @@
 #include "IAllocator.h"
 
 class LinearAllocator /*: public IAllocator*/ {
+    REFLECT
+
     size_t size;
     size_t used;
     void* base;
@@ -29,15 +31,13 @@ public:
     void* getBase();
     size_t getUsed();
     size_t getSize();
-
-    REFLECT()
 };
 
-REFLECTION_REGISTRATION(LinearAllocator) {
+/* REFLECTION_REGISTRATION(LinearAllocator) {
     CLASS->addField("size", &LinearAllocator::size)
         ->addField("used", &LinearAllocator::used)
         ->addField("base", &LinearAllocator::base);
-}
+} */
 
 //* Placement new overload: This lets us do new(allocator) T(arg1, arg2, ...)
 inline void* operator new(size_t objectSize, LinearAllocator& alloc) {

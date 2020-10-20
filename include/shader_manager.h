@@ -8,6 +8,8 @@
 class LinearAllocator;
 
 class ShaderManager {
+    REFLECT
+    
     LinearAllocator* allocator;
     StringMap<Shader> shaderMap;
 
@@ -17,13 +19,11 @@ public:
     Shader* setShader(char* name, char* vertexSrc, char* fragmentSrc);
     Shader* getShader(char* name);
     void clear();
-
-    REFLECT()
 };
 
-REFLECTION_REGISTRATION(ShaderManager) {
+/* REFLECTION_REGISTRATION(ShaderManager) {
     CLASS->addField("allocator", &ShaderManager::allocator)
         ->addField("shaderMap", &ShaderManager::shaderMap);
-}
+} */
 
 #endif
