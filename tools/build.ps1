@@ -65,5 +65,3 @@ tools\reflection_parser.exe src\generated.cpp include\
 rm bin\Debug\engine-*.pdb -ErrorAction SilentlyContinue
 cl.exe $compileExeOpts -LD -Febin\Debug\ src\engine.cpp $linkOpts -PDB:bin\Debug\engine-$(get-date -Format FileDateTime).pdb
 cl.exe $compileExeOpts "-Febin\Debug\Project_A.exe" src\platform_win32.cpp $linkOpts
-
-#cl.exe $compileExeOpts -std:c++17 -Fetools\parser\ tools\parser\parser.cpp -Itools\parser\
