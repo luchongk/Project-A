@@ -17,6 +17,8 @@
 static void init(GameState *state) {
     glEnable(GL_DEPTH_TEST);
 
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+
     float cubeModel[] {
         -0.5f, -0.5f, -0.5f,  0.4f, 0.4f,
         0.5f, -0.5f, -0.5f,  0.6f, 0.4f,
@@ -86,7 +88,7 @@ static void init(GameState *state) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     // load and generate the texture
     int width, height, nrChannels;
-    unsigned char *image_data = stbi_load("..\\..\\Untitled.png", &width, &height, &nrChannels, 0);
+    unsigned char *image_data = stbi_load("..\\..\\assets\\Untitled.png", &width, &height, &nrChannels, 0);
     if (image_data)
     {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image_data);
@@ -127,8 +129,7 @@ static void init(GameState *state) {
         "}";
 
 
-    Shader *bla = state->shaderManager.setShader("bla", vertexShaderSrc, fragmentShaderSrc);
-    bla->use();
+    state->shaderManager.setShader("bla", vertexShaderSrc, fragmentShaderSrc);
 }
 
 static void update(GameState *state, PlayerInput* input, float dt, float time) {
@@ -140,6 +141,10 @@ static void update(GameState *state, PlayerInput* input, float dt, float time) {
         return;
     }
 
+    if(input->reset) {
+        state->Reset();
+    }
+
     state->cameraYaw += input->mouseDeltaX * 2.0f * dt;
     if(state->cameraYaw > 360) {
         state->cameraYaw -= 360;
@@ -148,11 +153,11 @@ static void update(GameState *state, PlayerInput* input, float dt, float time) {
         state->cameraYaw += 360;
     }
     state->cameraPitch += -input->mouseDeltaY * 2.0f * dt;
-    if(state->cameraPitch > 360) {
-        state->cameraPitch -= 360;
+    if(state->cameraPitch > 80) {
+        state->cameraPitch = 80;
     }
-    else if(state->cameraPitch < 0) {
-        state->cameraPitch += 360;
+    else if(state->cameraPitch < -80) {
+        state->cameraPitch = -80;
     }
     state->cameraForward.x = glm::cos(glm::radians(state->cameraYaw)) * glm::cos(glm::radians(state->cameraPitch));
     state->cameraForward.y = glm::sin(glm::radians(state->cameraPitch));
@@ -160,16 +165,12 @@ static void update(GameState *state, PlayerInput* input, float dt, float time) {
     state->cameraForward.normalize();
 
     if(input->horizontal != 0) {
-        state->cameraPos += state->cameraForward.cross(Vector3{0,1,0}) * 3.0f * (float)input->horizontal * dt;
+        state->cameraPos += state->cameraForward.cross({0,1,0}) * 3.0f * (float)input->horizontal * dt;
     }
 
-    if(input->vertical != 0)
+    if(input->vertical != 0) {
         state->cameraPos += state->cameraForward * 3.0f * (float)input->vertical * dt;
-    
-    /*if(input->horizontal * state->cubesRotationDir < 0)
-        state->cubesRotationDir += 10 * (state->cubesRotationDir >= 0 ? -dt : dt);
-    else if(input->horizontal * state->cubesRotationDir > 0 || input->horizontal != 0 && state->cubesRotationDir == 0)
-        state->cubesRotationDir -= 2 * (state->cubesRotationDir >= 0 ? -dt : dt);*/
+    }
     
     state->cubesRotation += 5 * glm::sin(10 * glm::radians(time)) * state->cubesRotationDir * dt;
 }
@@ -188,7 +189,6 @@ static void render(GameState *state, float deltaInterpolation) {
     }
     std::cout << std::endl;
 #endif
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glm::mat4 projection;

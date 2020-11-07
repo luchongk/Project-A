@@ -26,12 +26,15 @@ struct GameState
     GameState()
         : reloadablesAlloc{megabytes(4), this + sizeof(this)},
           shaderManager{&reloadablesAlloc},
-          cubesRotationDir{1},
-          cameraPos{-1,0,0},
-          cameraForward{0,0,-1},
-          cameraYaw{-90.0f},
-          cameraPitch{0.0f}
+          cubesRotationDir{1}
     {
+        Reset();
+    }
+
+    void Reset() {
+        cameraPos = {0,0,0};
+        cameraYaw = -90.0f;
+        cameraPitch = 0.0f;
     }
 };
 

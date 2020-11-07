@@ -150,6 +150,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                     }
                 } break;
 
+                case 'R': {
+                    if(!wasDown) {
+                        platform->input.reset = true;
+                    }
+                } break;
+
                 case VK_F11: {
                     DWORD dwStyle = GetWindowLong(hwnd, GWL_STYLE);
                     if (dwStyle & WS_OVERLAPPEDWINDOW)

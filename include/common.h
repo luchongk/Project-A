@@ -13,6 +13,7 @@ struct GameMemory {
 
 struct PlayerInput {
     bool pause;
+    bool reset;
     int horizontal;
     int vertical;
     int mouseDeltaX;
