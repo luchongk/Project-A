@@ -6,7 +6,6 @@
 
 #include "common.h"
 #include "linear_allocator.h"
-#include "shader_manager.h"
 #include "vector.h"
 #include "game_state.h"
 

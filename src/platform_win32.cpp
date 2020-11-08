@@ -17,7 +17,6 @@ static bool initOpenGL(HDC dc) {
     pfd.cColorBits = 32;
     pfd.cDepthBits = 24;
     pfd.cStencilBits = 10;
-    pfd.iLayerType = PFD_MAIN_PLANE;
 
     int pixelFormat = ChoosePixelFormat(dc, &pfd);
     if(!SetPixelFormat(dc, pixelFormat, &pfd)) {
