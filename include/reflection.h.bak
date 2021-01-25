@@ -1,0 +1,17 @@
+#ifndef REFLECTION_H
+#define REFLECTION_H
+
+struct TypeInfo;
+
+struct Field {
+	char name[32];
+	TypeInfo* type;
+};
+
+struct TypeInfo {
+	char name[32];
+	int field_count;
+	Field fields[16];
+};
+
+#endif

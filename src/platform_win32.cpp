@@ -1,12 +1,7 @@
 #include <cstdio>
 
 #include "platform_win32.h"
-
-#include "linear_allocator.cpp"
-#include "shader.cpp"
-#include "shader_manager.cpp"
-
-static bool interpFrames = false;
+#include "glad/glad.h"
 
 static bool initOpenGL(HDC dc) {
     PIXELFORMATDESCRIPTOR pfd{};
@@ -28,7 +23,7 @@ static bool initOpenGL(HDC dc) {
     wglMakeCurrent(dc, glContext);
 
     if(!gladLoadGL()) {
-        OutputDebugString(L"Couldn't load Glad");
+        OutputDebugString(L"Couldn't load glad");
         return false;
     }
 
@@ -60,13 +55,17 @@ static void reloadGameCode(char* gameDLLPath, GameCode* gameCode, GameMemory* ga
     gameCode->api.update = updateStub;
     gameCode->api.render = renderStub;
 
-    char* DestDLLPath = ".\\engine_tmp.dll";
+    char* DestDLLPath = "bin\\Debug\\game_tmp.dll";
     
-    if(CopyFileA(gameDLLPath, DestDLLPath, false))
-        gameCode->dll = LoadLibraryA(DestDLLPath);
-    else {
-        gameCode->dll = nullptr;
-        return;
+    while(true) {
+        if(CopyFileA(gameDLLPath, DestDLLPath, false)) {
+            gameCode->dll = LoadLibraryA(DestDLLPath);
+            break;
+        }
+        else if(GetLastError() != ERROR_SHARING_VIOLATION) {
+            gameCode->dll = nullptr;
+            return;
+        }
     }
 
     gameCode->dllLastWriteTime = getLastWriteTime(gameDLLPath);
@@ -115,9 +114,9 @@ static bool pollEvents(PlayerInput* input) {
     return false;
 }
 
-inline static double getTimeElapsed(LARGE_INTEGER start, LARGE_INTEGER end, LARGE_INTEGER freq) {
+inline static float getTimeElapsed(LARGE_INTEGER start, LARGE_INTEGER end, LARGE_INTEGER freq) {
     assert(start.QuadPart <= end.QuadPart);
-    return (end.QuadPart - start.QuadPart) / (double)freq.QuadPart;
+    return (end.QuadPart - start.QuadPart) / (float)freq.QuadPart;
 }
 
 inline static LARGE_INTEGER getTimestamp() {
@@ -126,8 +125,33 @@ inline static LARGE_INTEGER getTimestamp() {
     return current;
 }
 
+static size_t get_file_size(const char* path) {
+    WIN32_FILE_ATTRIBUTE_DATA file_info;
+    assert(GetFileAttributesExA(path, GetFileExInfoStandard, &file_info));
+    
+    return ((size_t)file_info.nFileSizeHigh << 32) + file_info.nFileSizeLow;
+}
+
+static void read_entire_file(const char* path, size_t file_size, void* file_data) {
+    HANDLE file = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
+    assert(file != INVALID_HANDLE_VALUE);
+
+    DWORD bytesRead;
+    assert(ReadFile(file, file_data, (DWORD)file_size, &bytesRead, nullptr));
+    assert(file_size == bytesRead);
+
+    CloseHandle(file);
+
+    ((uint8_t*)file_data)[file_size] = '\0';
+}
+
+static void set_platform_api(PlatformAPI* platform) {
+    platform->get_file_size     = get_file_size;
+    platform->read_entire_file  = read_entire_file;
+}
+
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    Win32State* platform = (Win32State*)GetProp(hwnd, L"GainWin32State");
+    Win32State* platform = (Win32State*)GetProp(hwnd, L"ProjectAWin32State");
     
     switch(uMsg) {
         case WM_DESTROY: {
@@ -183,14 +207,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 case 'F': {
                     platform->borderlessFullscreen = !platform->borderlessFullscreen;
                 } break;
-
-                case 'L': {
-                    interpFrames = !interpFrames;
-                }
             }
         } break;
 
-#if HIDEF_MOUSE
+#if 1
+        /* Mouse detection via driver */
         case WM_INPUT: {
             UINT dwSize = sizeof(RAWINPUT);
             RAWINPUT raw;
@@ -212,6 +233,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             SetCursorPos(center.x, center.y);*/
         } break;
 #else
+        /* Mouse detection via the screen */
         case WM_MOUSEMOVE: {
             RECT rect;
             GetClientRect(hwnd, &rect);
@@ -235,7 +257,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 }
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow) {
-    const wchar_t CLASS_NAME[] = L"Gain";
+    const wchar_t CLASS_NAME[] = L"ProjectA";
 
     WNDCLASS wc{};
     wc.hInstance = hInstance;
@@ -248,7 +270,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
     if(!RegisterClass(&wc))
         return 1;
 
-    HWND hwnd = CreateWindowW(CLASS_NAME, L"Gain", WS_OVERLAPPEDWINDOW,
+    HWND hwnd = CreateWindowW(CLASS_NAME, L"ProjectA", WS_OVERLAPPEDWINDOW,
                                 200, 100, 1600, 800,
                                 nullptr, nullptr, hInstance, nullptr);
 
@@ -256,7 +278,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
         return 1;
 
     Win32State platform{}; 
-    SetProp(hwnd, L"GainWin32State", &platform);
+    SetProp(hwnd, L"ProjectAWin32State", &platform);
 
     HDC dc = GetDC(hwnd);
     platform.borderlessFullscreen = false;
@@ -265,31 +287,32 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
         return 1;
 
     ShowWindow(hwnd, nCmdShow);
-    SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
-    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
+    /*SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
+    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);*/
 
-#if HIDEF_MOUSE   
+#if 1
     RAWINPUTDEVICE Rid;
     Rid.usUsagePage = 0x01; 
     Rid.usUsage = 0x02; 
     Rid.dwFlags = 0; //RIDEV_NOLEGACY   // adds HID mouse and also ignores legacy mouse messages
     Rid.hwndTarget = 0;    
 
-    if (RegisterRawInputDevices(&Rid, 1, sizeof(RAWINPUTDEVICE)) == FALSE) {
+    if (!RegisterRawInputDevices(&Rid, 1, sizeof(RAWINPUTDEVICE))) {
         /* ERROR */
     }
 #endif
     GameMemory memory;
-    memory.totalSize = megabytes(64);  //TODO: Config
-    memory.data[0] = VirtualAlloc(nullptr, memory.totalSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-    memory.data[1] = VirtualAlloc(nullptr, memory.totalSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-    memory.currentDataIndex = 0;
+    memory.data_size = megabytes(64);  //TODO: Config
+    memory.data = VirtualAlloc(nullptr, memory.data_size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 
-    char* gameDLLPath = ".\\engine.dll";
+    PlatformAPI platform_api;
+    set_platform_api(&platform_api);
+
+    char* gameDLLPath = "bin\\Debug\\game.dll";
     GameCode gameCode{};
     reloadGameCode(gameDLLPath, &gameCode, &memory);
     assert(gameCode.dll);
-    gameCode.api.onLoad(true, &memory);
+    gameCode.api.onLoad(true, &memory, &platform_api);
 
     //TODO: Config each of these!
     constexpr float maxFrameTime = 0.25f;
@@ -297,9 +320,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
     assert(targetFrameTime < maxFrameTime);
     bool capFramerate = false;
 
-    double accum = 0;
+    float accum = 0;
     float timeSinceStart = 0;
-    double deltaTime = 0;
+    float deltaTime = 0;
     float fixedDeltaTime = 1.0f/60;
 
     timeBeginPeriod(1);
@@ -319,13 +342,17 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
         if(CompareFileTime(&gameCode.dllLastWriteTime, &lastWriteTime) != 0) {
             reloadGameCode(gameDLLPath, &gameCode, &memory);
             if(gameCode.api.onLoad)
-                gameCode.api.onLoad(false, &memory);
+                gameCode.api.onLoad(false, &memory, &platform_api);
+            
+            //We need dont want the time we took to reload to count as game_time, so we skip it.
+            frameTime = getTimestamp();
         }
 
         quit = pollEvents(&platform.input);
 
         if(deltaTime > maxFrameTime) {
-            deltaTime = maxFrameTime;   //Framerate too low, we are falling behind in the simulation! D: Preventing spiral of death.
+            //Framerate too low, we are falling behind in the simulation! D: Preventing spiral of death.
+            deltaTime = maxFrameTime;
         }
         
         accum += deltaTime;
@@ -335,10 +362,11 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
             accum -= fixedDeltaTime;
             updateRan = true;
         }
-
+        
         //* RENDERING *//
-        float lerp = (float)(accum / fixedDeltaTime);   //TODO: implement position/rotation interpolation
-        gameCode.api.render(&memory, &platform.input, (interpFrames) ? lerp : 1);
+        //TODO: Stuttering comes from not doing position/rotation interpolation. Do that.
+        //float lerp = accum / fixedDeltaTime;
+        gameCode.api.render(&memory, 1);
 
         if(updateRan) {
             platform.input = {};
@@ -359,12 +387,13 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
             }
         }
 
+        SwapBuffers(dc);
+
 #if 0
-        printf_s("last frame: %f ms\n", deltaTime);
+        printf_s("last frame: %f ms\n", deltaTime * 1000);
         printf_s("FPS: %f\n", 1 / deltaTime);
         fflush(stdout);
 #endif
-        SwapBuffers(dc);
     }
 
     return 0;

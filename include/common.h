@@ -2,13 +2,17 @@
 #define COMMON_H
 
 #include <stddef.h>
-#include "glad/glad.h"
+#include <stdint.h>
+#include "utils.h"
+
+struct PlatformAPI {
+    size_t (*get_file_size)(const char* path);
+    void (*read_entire_file)(const char* path, size_t file_size, void* file_data);
+};
 
 struct GameMemory {
-    //bool isInitialized;
-    size_t totalSize;
-    void* data[2];
-    int currentDataIndex;
+    void* data;
+    size_t data_size;
 };
 
 struct PlayerInput {

@@ -30,7 +30,8 @@ tools\faster-vcvars.ps1 $platform
 
 $includes = "include", "include\3rdParty"
 $libraries = "user32.lib", "winmm.lib", "gdi32.lib", "glad64_d.lib", "opengl32.lib"
-$ignored_warnings = "4100", "4127", "4201", "4458", "4706" #"4189", "4505"
+$ignored_warnings = "4100", "4127", "4201", "4458", "4706", "4505" #"4189"
+$execFolder = if($release) { "bin\Release" } else { "bin\Debug" }
 
 $compileExeOpts = 
 	"-nologo", 
@@ -41,15 +42,15 @@ $compileExeOpts =
 #	"-WX",
 	"-W4" +
 	$(foreach($warning in $ignored_warnings) { "-wd$warning" }) +
-	$(if($release) { "-MT" } else { "-MTd", "-Od" }) +
-	"-Oi",
+	$(if($release) { "-MTd", "-O2" } else { "-MTd", "-Od" }) +
     "-GR-" +
 	$(foreach($inc in $includes) { "-I$inc" }) +
 	"-Fobin\Debug\",
 	"-Fdbin\Debug\",
 #	"-Faasm\",
 	"-DUNICODE",
-	"-D_UNICODE"
+	"-D_UNICODE" +
+	$(if($release) { } else { "-DDEBUG" })
 
 $linkOpts = 
 	"-link",
@@ -59,14 +60,13 @@ $linkOpts =
 	"-OPT:REF" +
 	$libraries
 	
-rm src\generated.cpp -ErrorAction SilentlyContinue
+#rm src\generated.cpp -ErrorAction SilentlyContinue
 #cl.exe $compileExeOpts -std:c++17 -Fetools\parser\ tools\parser\parser.cpp -Itools\parser\
-tools\reflection_parser.exe src\generated.cpp include\
+#tools\reflection_parser.exe src\generated.cpp include\
 
-rm bin\Debug\engine-*.pdb -ErrorAction SilentlyContinue
+rm "$execFolder\game-*.pdb" -ErrorAction SilentlyContinue
 
-cl.exe $compileExeOpts -LD -Febin\Debug\ src\engine.cpp $linkOpts -PDB:bin\Debug\engine-$(get-date -Format FileDateTime).pdb
-if($LASTEXITCODE -ne 0) { exit 1; }
+cl.exe $compileExeOpts -LD "-Fe$execFolder\" src\game.cpp $linkOpts -PDB:bin\Debug\game-$(get-date -Format FileDateTime).pdb
+if($LASTEXITCODE -ne 0) { exit 1 }
 
-cl.exe $compileExeOpts "-Febin\Debug\Project_A.exe" src\platform_win32.cpp $linkOpts
-if($LASTEXITCODE -ne 0) { exit 1; }
+cl.exe $compileExeOpts "-Fe$execFolder\Project_A.exe" src\platform_win32.cpp $linkOpts

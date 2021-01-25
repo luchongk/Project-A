@@ -1,7 +1,6 @@
 #ifndef VECTOR_H
 #define VECTOR_H
 
-#include "reflection.h"
 #include "glm/vec3.hpp"
 
 /*struct Vector2 {
@@ -16,7 +15,7 @@ REFLECTION_REGISTRATION(Vector2) {
 }*/
 
 struct Vector3 {
-    REFLECT
+    //REFLECT
     
     float x;
     float y;

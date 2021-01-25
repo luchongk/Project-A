@@ -3,9 +3,9 @@
         {
             "name": "Win32",
             "includePath": [
-                "${workspaceFolder}/src/**",
-                "${workspaceFolder}/include/*",
-                "${workspaceFolder}/include/3rdParty/*"
+                "${workspaceFolder}/src",
+                "${workspaceFolder}/include",
+                "${workspaceFolder}/include/3rdParty"
             ],
             "defines": [
                 "DEBUG",
