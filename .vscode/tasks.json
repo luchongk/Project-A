@@ -7,11 +7,33 @@
             "type": "shell",
             "label": "Win64 Debug",
             "command": ".\\tools\\build.ps1",
+            "presentation": {
+                "reveal": "silent",
+            },
             "args": [],
             "group": {
                 "kind": "build",
                 "isDefault": true
-            }
+            },
+            /*"problemMatcher": [
+                "$msCompile"
+            ]*/
+        },
+        {
+            "type": "shell",
+            "label": "Win64 Release",
+            "command": ".\\tools\\build.ps1",
+            "presentation": {
+                "reveal": "silent",
+            },
+            "args": [
+                "64",
+                "$true"
+            ],
+            "group": "build",
+            /*"problemMatcher": [
+                "$msCompile"
+            ]*/
         }
     ]
 }

@@ -1,0 +1,35 @@
+
+#include "memory.h"
+#include "reflection.h"
+
+const int NUM_OF_TYPES = 2;
+
+TypeInfo Pointer_info = {"Pointer", 0, {}};
+
+struct GlobalState;
+TypeInfo GameState_info = {"GameState", 1, {{"permanent_memory", &Pointer_info}}};
+
+TypeInfo typeDB[NUM_OF_TYPES] = {
+	Pointer_info,
+	GameState_info
+};
+
+static void copyTypes(Field* fields, int count) {
+	for(int i = 0; i < count; i++) {
+
+	}
+}
+
+void initIntrospection(MemoryArena* arena) {
+	TypeInfo* types = pushArray<TypeInfo>(arena, NUM_OF_TYPES);
+
+	for(int i = 0; i < NUM_OF_TYPES; i++) {
+		char* src = typeDB[i].name;
+		char* dest = types[i].name;
+		while ((*dest++ = *src++) != '\0');
+
+		for(int j = 0; j < typeDB[i].field_count; j++) {
+			copyTypes()
+		}
+	}
+}

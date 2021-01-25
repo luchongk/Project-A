@@ -5,28 +5,30 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Game",
+            "name": "Game (Debug)",
             "type": "cppvsdbg",
             "request": "launch",
-            "preLaunchTask": "${defaultBuildTask}",
+            "preLaunchTask": "Win64 Debug",
+            "internalConsoleOptions": "openOnSessionStart",
             "program": "${workspaceFolder}/bin/Debug/Project_A.exe",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/bin/Debug",
+            "cwd": "${workspaceFolder}",
             "environment": [],
             "requireExactSource": false
         },
         {
-            "name": "Reflection parser",
+            "name": "Game (Release)",
             "type": "cppvsdbg",
             "request": "launch",
-            "preLaunchTask": "${defaultBuildTask}",
-            "program": "${workspaceFolder}/tools/parser/parser.exe",
-            "args": ["src/generated.cpp", "include\\"],
+            "preLaunchTask": "Win64 Release",
+            "internalConsoleOptions": "openOnSessionStart",
+            "program": "${workspaceFolder}/bin/Release/Project_A.exe",
+            "args": [],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/",
+            "cwd": "${workspaceFolder}",
             "environment": [],
             "requireExactSource": false
-        }
+        },
     ]
 }

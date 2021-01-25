@@ -3,14 +3,14 @@
 
 #include "common.h"
 
-typedef void onLoadFunction(bool, GameMemory*);
-static void onLoadStub(bool, GameMemory*) {}
+typedef void onLoadFunction(bool, GameMemory*, PlatformAPI*);
+static void onLoadStub(bool, GameMemory*, PlatformAPI*) {}
 
 typedef void updateFunction(GameMemory*, PlayerInput*, float, float);
 static void updateStub(GameMemory*, PlayerInput*, float, float) {}
 
-typedef void renderFunction(GameMemory*, PlayerInput*, float);
-static void renderStub(GameMemory*, PlayerInput*, float) {}
+typedef void renderFunction(GameMemory*, float);
+static void renderStub(GameMemory*, float) {}
 
 struct GameAPI {
     onLoadFunction* onLoad;
