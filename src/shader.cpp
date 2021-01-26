@@ -13,9 +13,9 @@ static void compile_shader(Shader* shader, const char* name, const char* vertex_
     }
     shader->name[i] = '\0';
 
-    size_t vertex_file_size = platform->get_file_size(vertex_path);
-    char* vertex_src = (char*)alloc_size(vertex_file_size + 1);
-    platform->read_entire_file(vertex_path, vertex_file_size, vertex_src);
+    int file_size = (int)platform->get_file_size(vertex_path);
+    char* vertex_src = alloc<char>(file_size + 1);
+    platform->read_entire_file(vertex_path, file_size, vertex_src);
 
     unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertexShader, 1, &vertex_src, nullptr);
@@ -30,9 +30,9 @@ static void compile_shader(Shader* shader, const char* name, const char* vertex_
         return;
     }
 
-    size_t fragment_file_size = platform->get_file_size(fragment_path);
-    char* fragment_src = (char*)alloc_size(fragment_file_size + 1);
-    platform->read_entire_file(fragment_path, fragment_file_size, fragment_src);
+    file_size = (int)platform->get_file_size(fragment_path);
+    char* fragment_src = alloc<char>(file_size + 1);
+    platform->read_entire_file(fragment_path, file_size, fragment_src);
 
     unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(fragmentShader, 1, &fragment_src, nullptr);
@@ -79,6 +79,11 @@ static void set_shader_uniform(Shader* shader, const char* name, int value) {
 
 static void set_shader_uniform(Shader* shader, const char* name, float value) {
     glUniform1f(glGetUniformLocation(shader->ID, name), value);
+}
+
+static void set_shader_uniform(Shader* shader, const char* name, const glm::vec3 &vec)
+{
+    glUniform3fv(glGetUniformLocation(shader->ID, name), 1, &vec[0]);
 }
 
 static void set_shader_uniform(Shader* shader, const char* name, const glm::mat4 &mat)

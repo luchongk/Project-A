@@ -350,7 +350,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
             if(gameCode.api.onLoad)
                 gameCode.api.onLoad(false, &memory, &platform_api);
             
-            //We need dont want the time we took to reload to count as game_time, so we skip it.
+            //We dont want the time we took to reload to count as game_time, so we skip it.
             frameTime = getTimestamp();
         }
 

@@ -1,5 +1,5 @@
 /** 
- * TODO: WE NEED A WAY TO MANAGE ALLOCATION CONTEXT.
+ * TODO: WE MAY NEED A WAY TO MANAGE ALLOCATION CONTEXT.
  * REMEMBER https://www.youtube.com/watch?time_continue=4&v=ciGQCP6HgqI&feature=emb_title
  * AND ALSO Game Engine Architecture, the way Naughty Dog do it
  */
@@ -51,19 +51,13 @@ static void* linear_allocator(void* old_pointer, size_t old_size, size_t new_siz
     return nullptr; //Unreachable
 }
 
-Allocator default_allocator = linear_allocator;
-void* default_allocator_data = nullptr;
-
-inline static void* alloc_size(size_t size) {
-    //TODO: Think about alignment!
-    auto result = default_allocator(nullptr, 0, size, false, default_allocator_data);
-    return result;
-}
+Allocator default_allocator;
+void* default_allocator_data;
 
 template<typename T>
-inline static T* alloc() {
+inline static T* alloc(int count = 0) {
     //TODO: Think about alignment!
-    auto result = (T*)alloc_size(sizeof(T));
+    auto result = (T*)default_allocator(nullptr, 0, sizeof(T) * count, false, default_allocator_data);
     return result;
 }
 

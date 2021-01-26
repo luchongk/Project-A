@@ -28,6 +28,7 @@ tools\faster-vcvars.ps1 $platform
 # -INCREMENTAL:NO               Disable incremental linking
 # -OPT:REF                      Linker optimizations
 
+$project = "Project_A"
 $includes = "include", "include\3rdParty"
 $libraries = "user32.lib", "winmm.lib", "gdi32.lib", "glad64_d.lib", "opengl32.lib"
 $ignored_warnings = "4100", "4127", "4201", "4458", "4706", "4505" #"4189"
@@ -69,4 +70,7 @@ rm "$execFolder\game-*.pdb" -ErrorAction SilentlyContinue
 cl.exe $compileExeOpts -LD "-Fe$execFolder\" src\game.cpp $linkOpts -PDB:bin\Debug\game-$(get-date -Format FileDateTime).pdb
 if($LASTEXITCODE -ne 0) { exit 1 }
 
-cl.exe $compileExeOpts "-Fe$execFolder\Project_A.exe" src\platform_win32.cpp $linkOpts
+cl.exe $compileExeOpts "-Fe$execFolder\$project.exe" src\platform_win32.cpp $linkOpts
+# Only return the error if we are not running the game,
+# cause compilation of the .exe always fails when we are running
+if(($LASTEXITCODE -ne 0) -and !(Get-Process $project -ErrorAction SilentlyContinue)) { exit 1 }

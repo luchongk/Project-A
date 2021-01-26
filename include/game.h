@@ -1,3 +1,6 @@
+#ifndef GAME_H
+#define GAME_H
+
 #include "common.h"
 #include "vector.h"
 #include "memory.h"
@@ -6,7 +9,9 @@
 struct GlobalState {
     LinearArena temporary_memory;
     
+    Shader light_shader;
     Shader shader;
+    unsigned int lightVAO;
     unsigned int VAO;
     unsigned int VBO;
     unsigned int texture;
@@ -22,3 +27,5 @@ struct GlobalState {
 
 GlobalState* game_state;
 PlatformAPI* platform;
+
+#endif
