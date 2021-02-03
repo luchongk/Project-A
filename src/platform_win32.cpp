@@ -90,30 +90,6 @@ static void reloadGameCode(char* gameDLLPath, GameCode* gameCode, GameMemory* ga
     }
 }
 
-static bool pollEvents(PlayerInput* input) {
-    MSG msg{};
-
-    while(PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
-        if(msg.message == WM_QUIT) {
-            return true;
-        }
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
-    }
-
-    if(GetKeyState('A') & 0x8000)
-        input->horizontal = -1;
-    else if(GetKeyState('D') & 0x8000)
-        input->horizontal = 1;
-    
-    if(GetKeyState('S') & 0x8000)
-        input->vertical = -1;
-    else if(GetKeyState('W') & 0x8000)
-        input->vertical = 1;
-
-    return false;
-}
-
 inline static float getTimeElapsed(LARGE_INTEGER start, LARGE_INTEGER end, LARGE_INTEGER freq) {
     assert(start.QuadPart <= end.QuadPart);
     return (end.QuadPart - start.QuadPart) / (float)freq.QuadPart;
@@ -148,6 +124,30 @@ static void read_entire_file(const char* path, size_t file_size, void* file_data
 static void set_platform_api(PlatformAPI* platform) {
     platform->get_file_size     = get_file_size;
     platform->read_entire_file  = read_entire_file;
+}
+
+static bool pollEvents(PlayerInput* input) {
+    MSG msg{};
+
+    while(PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+        if(msg.message == WM_QUIT) {
+            return false;
+        }
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    if(GetKeyState('A') & 0x8000)
+        input->horizontal = -1;
+    else if(GetKeyState('D') & 0x8000)
+        input->horizontal = 1;
+    
+    if(GetKeyState('S') & 0x8000)
+        input->vertical = -1;
+    else if(GetKeyState('W') & 0x8000)
+        input->vertical = 1;
+
+    return true;
 }
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
@@ -354,7 +354,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
             frameTime = getTimestamp();
         }
 
-        quit = pollEvents(&platform.input);
+        quit = !pollEvents(&platform.input);
 
         if(deltaTime > maxFrameTime) {
             //Framerate too low, we are falling behind in the simulation! D: Preventing spiral of death.

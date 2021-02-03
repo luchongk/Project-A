@@ -1,6 +1,8 @@
 #include "iostream"
 #include "glad/glad.h"
 
+#ifdef DEBUG
+
 static void printGLIDs() {
     std::cout << "checking for GL IDs:\n";
     for(int i = 0; i < 50; i++) {
@@ -23,3 +25,5 @@ static void printGLIDs() {
             std::cout << i << " is buffer! " << std::endl;
     }
 }
+
+#endif

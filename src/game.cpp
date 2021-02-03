@@ -5,48 +5,36 @@
 
 #include "game.h"
 
-#ifdef DEBUG
 #include "debug.cpp"
-#endif
-
 #include "shader.cpp"
 #include "stb_image.cpp"
 
-/**
- * TODO:
- * * Clean up vector.h
- * * Array type
- * * LearnOpengl
- * * Make Debug UI
- * * Physics
- */
-
-static void update_camera(GlobalState* game_state, PlayerInput* input, float dt) {
-    game_state->cameraYaw += input->mouseDeltaX * 2.0f * dt;
-    if(game_state->cameraYaw > 360) {
-        game_state->cameraYaw -= 360;
+static void update_camera(Camera* camera, PlayerInput* input, float dt) {
+    camera->yaw += input->mouseDeltaX * 2.0f * dt;
+    if(camera->yaw > 360) {
+        camera->yaw -= 360;
     }
-    else if(game_state->cameraYaw < 0) {
-        game_state->cameraYaw += 360;
+    else if(camera->yaw < 0) {
+        camera->yaw += 360;
     }
-    game_state->cameraPitch += -input->mouseDeltaY * 2.0f * dt;
-    if(game_state->cameraPitch > 360) {
-        game_state->cameraPitch -= 360;
+    camera->pitch += -input->mouseDeltaY * 2.0f * dt;
+    if(camera->pitch > 360) {
+        camera->pitch -= 360;
     }
-    else if(game_state->cameraPitch < 0) {
-        game_state->cameraPitch += 360;
+    else if(camera->pitch < 0) {
+        camera->pitch += 360;
     }
-    game_state->cameraForward.x = glm::cos(glm::radians(game_state->cameraYaw)) * glm::cos(glm::radians(game_state->cameraPitch));
-    game_state->cameraForward.y = glm::sin(glm::radians(game_state->cameraPitch));
-    game_state->cameraForward.z = glm::sin(glm::radians(game_state->cameraYaw)) * glm::cos(glm::radians(game_state->cameraPitch));
-    game_state->cameraForward.normalize();
+    camera->forward.x = glm::cos(glm::radians(camera->yaw)) * glm::cos(glm::radians(camera->pitch));
+    camera->forward.y = glm::sin(glm::radians(camera->pitch));
+    camera->forward.z = glm::sin(glm::radians(camera->yaw)) * glm::cos(glm::radians(camera->pitch));
+    camera->forward.normalize();
 
     if(input->horizontal != 0) {
-        game_state->cameraPos += game_state->cameraForward.cross(Vector3{0,1,0}) * 3.0f * (float)input->horizontal * dt;
+        camera->position += camera->forward.cross(Vector3{0,1,0}) * 3.0f * (float)input->horizontal * dt;
     }
 
     if(input->vertical != 0) {
-        game_state->cameraPos += game_state->cameraForward * 2.0f * (float)input->vertical * dt;
+        camera->position += camera->forward * 2.0f * (float)input->vertical * dt;
     }
 }
 
@@ -66,47 +54,47 @@ DLLEXPORT void onLoad(bool is_init, GameMemory *game_memory, PlatformAPI* platfo
         glEnable(GL_DEPTH_TEST);
 
         float cubeModel[] {
-            -0.5f, -0.5f, -0.5f,  0.4f, 0.4f,
-            0.5f, -0.5f, -0.5f,  0.6f, 0.4f,
-            0.5f,  0.5f, -0.5f,  0.6f, 0.6f,
-            0.5f,  0.5f, -0.5f,  0.6f, 0.6f,
-            -0.5f,  0.5f, -0.5f,  0.4f, 0.6f,
-            -0.5f, -0.5f, -0.5f,  0.4f, 0.4f,
+            -0.5f, -0.5f, -0.5f,  0.0f, 0.0f, -1.0f,  0.4f, 0.4f,
+            0.5f, -0.5f, -0.5f,  0.0f, 0.0f, -1.0f,  0.6f, 0.4f,
+            0.5f,  0.5f, -0.5f,  0.0f, 0.0f, -1.0f,  0.6f, 0.6f,
+            0.5f,  0.5f, -0.5f,  0.0f, 0.0f, -1.0f,  0.6f, 0.6f,
+            -0.5f,  0.5f, -0.5f,  0.0f, 0.0f, -1.0f,  0.4f, 0.6f,
+            -0.5f, -0.5f, -0.5f,  0.0f, 0.0f, -1.0f,  0.4f, 0.4f,
 
-            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-            0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-            0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-            0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
-            -0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
-            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f, 1.0f,  0.0f, 0.0f,
+            0.5f, -0.5f,  0.5f,  0.0f, 0.0f, 1.0f,  1.0f, 0.0f,
+            0.5f,  0.5f,  0.5f,  0.0f, 0.0f, 1.0f,  1.0f, 1.0f,
+            0.5f,  0.5f,  0.5f,  0.0f, 0.0f, 1.0f,  1.0f, 1.0f,
+            -0.5f,  0.5f,  0.5f,  0.0f, 0.0f, 1.0f,  0.0f, 1.0f,
+            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f, 1.0f,  0.0f, 0.0f,
 
-            -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-            -0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-            -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-            -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-            -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+            -0.5f,  0.5f,  0.5f,  -1.0f, 0.0f, 0.0f,  1.0f, 0.0f,
+            -0.5f,  0.5f, -0.5f,  -1.0f, 0.0f, 0.0f,  1.0f, 1.0f,
+            -0.5f, -0.5f, -0.5f,  -1.0f, 0.0f, 0.0f,  0.0f, 1.0f,
+            -0.5f, -0.5f, -0.5f,  -1.0f, 0.0f, 0.0f,  0.0f, 1.0f,
+            -0.5f, -0.5f,  0.5f,  -1.0f, 0.0f, 0.0f,  0.0f, 0.0f,
+            -0.5f,  0.5f,  0.5f,  -1.0f, 0.0f, 0.0f,  1.0f, 0.0f,
 
-            0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-            0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-            0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-            0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-            0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-            0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+            0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.0f,  1.0f, 0.0f,
+            0.5f,  0.5f, -0.5f,  1.0f, 0.0f, 0.0f,  1.0f, 1.0f,
+            0.5f, -0.5f, -0.5f,  1.0f, 0.0f, 0.0f,  0.0f, 1.0f,
+            0.5f, -0.5f, -0.5f,  1.0f, 0.0f, 0.0f,  0.0f, 1.0f,
+            0.5f, -0.5f,  0.5f,  1.0f, 0.0f, 0.0f,  0.0f, 0.0f,
+            0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.0f,  1.0f, 0.0f,
 
-            -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
-            0.5f, -0.5f, -0.5f,  1.0f, 1.0f,
-            0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-            0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
-            -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
-            -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+            -0.5f, -0.5f, -0.5f,  0.0f, -1.0f, 0.0f,  0.0f, 1.0f,
+            0.5f, -0.5f, -0.5f,  0.0f, -1.0f, 0.0f,  1.0f, 1.0f,
+            0.5f, -0.5f,  0.5f,  0.0f, -1.0f, 0.0f,  1.0f, 0.0f,
+            0.5f, -0.5f,  0.5f,  0.0f, -1.0f, 0.0f,  1.0f, 0.0f,
+            -0.5f, -0.5f,  0.5f,  0.0f, -1.0f, 0.0f,  0.0f, 0.0f,
+            -0.5f, -0.5f, -0.5f,  0.0f, -1.0f, 0.0f,  0.0f, 1.0f,
 
-            -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
-            0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
-            0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-            0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
-            -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
-            -0.5f,  0.5f, -0.5f,  0.0f, 1.0f
+            -0.5f,  0.5f, -0.5f,  0.0f, 1.0f, 0.0f,  0.0f, 1.0f,
+            0.5f,  0.5f, -0.5f,  0.0f, 1.0f, 0.0f,  1.0f, 1.0f,
+            0.5f,  0.5f,  0.5f,  0.0f, 1.0f, 0.0f,  1.0f, 0.0f,
+            0.5f,  0.5f,  0.5f,  0.0f, 1.0f, 0.0f,  1.0f, 0.0f,
+            -0.5f,  0.5f,  0.5f,  0.0f, 1.0f, 0.0f,  0.0f, 0.0f,
+            -0.5f,  0.5f, -0.5f,  0.0f, 1.0f, 0.0f,  0.0f, 1.0f
         };
 
         glGenBuffers(1, &game_state->VBO);
@@ -118,11 +106,14 @@ DLLEXPORT void onLoad(bool is_init, GameMemory *game_memory, PlatformAPI* platfo
         glBindBuffer(GL_ARRAY_BUFFER, game_state->VBO);
         glBufferData(GL_ARRAY_BUFFER, sizeof(cubeModel), cubeModel, GL_STATIC_DRAW);
 
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)0);
         glEnableVertexAttribArray(0);
 
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)(3 * sizeof(float)));
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)(3 * sizeof(float)));
         glEnableVertexAttribArray(1);
+
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)(6 * sizeof(float)));
+        glEnableVertexAttribArray(2);
 
         //Create light VAO
         glGenVertexArrays(1, &game_state->lightVAO);
@@ -130,7 +121,7 @@ DLLEXPORT void onLoad(bool is_init, GameMemory *game_memory, PlatformAPI* platfo
 
         glBindBuffer(GL_ARRAY_BUFFER, game_state->VBO);
 
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
         glEnableVertexAttribArray(0);
 
         /*glGenTextures(1, &game_state->texture);
@@ -176,7 +167,9 @@ DLLEXPORT void update(GameMemory *game_memory, PlayerInput* input, float dt, flo
         return;
     }
 
-    update_camera(game_state, input, dt);
+    update_camera(&game_state->camera, input, dt);
+    
+    game_state->light_pos = {glm::cos(time * 0.75f) * 2, glm::sin(time * 0.75f) * 2, -6.0f};
     
     game_state->cubesRotation += 2 * glm::sin(10 * glm::radians(time)) * game_state->cubesRotationDir * dt;
 }
@@ -186,14 +179,14 @@ DLLEXPORT void render(GameMemory *game_memory, float deltaInterpolation) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
-    glm::mat4 view = glm::lookAt(game_state->cameraPos.toGLM(), (game_state->cameraPos + game_state->cameraForward).toGLM(), glm::vec3{0,1,0});
+    glm::mat4 view = glm::lookAt(game_state->camera.position.toGLM(), (game_state->camera.position + game_state->camera.forward).toGLM(), glm::vec3{0,1,0});
 
     // LIGHT DRAW
     use_shader(&game_state->light_shader);
     set_shader_uniform(&game_state->light_shader, "view", view);
     set_shader_uniform(&game_state->light_shader, "projection", projection);
 
-    glm::mat4 localToWorld = glm::translate(glm::mat4{1.0f}, glm::vec3{1.0, 1.0, -6.0});
+    glm::mat4 localToWorld = glm::translate(glm::mat4{1.0f}, game_state->light_pos.toGLM());
     localToWorld = glm::scale(localToWorld, glm::vec3(0.2f));
     set_shader_uniform(&game_state->light_shader, "model", localToWorld);
 
@@ -205,10 +198,12 @@ DLLEXPORT void render(GameMemory *game_memory, float deltaInterpolation) {
     use_shader(&game_state->shader);
     set_shader_uniform(&game_state->shader, "view", view);
     set_shader_uniform(&game_state->shader, "projection", projection);
-    set_shader_uniform(&game_state->shader, "objectColor", glm::vec3{1.0f, 0.5f, 0.31f});
+    set_shader_uniform(&game_state->shader, "objectColor", glm::vec3{0.2f, 0.3f, 0.8f});
     set_shader_uniform(&game_state->shader, "lightColor",  glm::vec3{1.0f, 1.0f, 1.0f});
+    set_shader_uniform(&game_state->shader, "lightPos", game_state->light_pos.toGLM());
+    set_shader_uniform(&game_state->shader, "viewPos", game_state->camera.position.toGLM());
 
-    glm::vec3 cubePositions[] {
+    glm::vec3 cubepositionitions[] {
         glm::vec3{2.0f, 0.0f, 0.0f},
         glm::vec3{2.0f, 5.0f, -15.0f},
         glm::vec3{-1.5f, -2.2f, -2.5f},
@@ -218,7 +213,7 @@ DLLEXPORT void render(GameMemory *game_memory, float deltaInterpolation) {
 
     glBindVertexArray(game_state->VAO);
     for(int i = 0; i < 5; i++) {
-        glm::mat4 localToWorld = glm::translate(glm::mat4{1.0f}, cubePositions[i]);
+        localToWorld = glm::translate(glm::mat4{1.0f}, cubepositionitions[i]);
         float angle = 50.0f * (i+1);
         localToWorld = glm::rotate(localToWorld, game_state->cubesRotation * glm::radians(angle), glm::vec3(0.5f, 1.0f, 0.0f));
         set_shader_uniform(&game_state->shader, "model", localToWorld);

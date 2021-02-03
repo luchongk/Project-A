@@ -6,6 +6,13 @@
 #include "memory.h"
 #include "shader.h"
 
+struct Camera {
+    Vector3 position;
+    Vector3 forward;
+    float yaw = -90;
+    float pitch;
+};
+
 struct GlobalState {
     LinearArena temporary_memory;
     
@@ -15,11 +22,8 @@ struct GlobalState {
     unsigned int VAO;
     unsigned int VBO;
     unsigned int texture;
-    Vector3 lastCameraPos;
-    Vector3 cameraPos;
-    Vector3 cameraForward;
-    float cameraYaw = -90;
-    float cameraPitch;
+    Camera camera;
+    Vector3 light_pos = {1.0f, 1.0f, -6.0f};
     float cubesRotationDir = 1;
     float cubesRotation;
     bool paused = false;
