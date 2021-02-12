@@ -8,15 +8,72 @@
 #ifndef MEMORY_H
 #define MEMORY_H
 
-typedef void* (*Allocator)(void* old_pointer, size_t old_size, size_t new_size, bool free_all, void* allocator_data);
+#include <cstdlib>
+#include <cstring>
+
+#include "types.h"
+#include "utils.h"
+
+// Allocator interface //
+
+typedef void* (*Allocator)(void* old_pointer, u64 old_size, u64 new_size, void* allocator_data);
+
+template<typename T>
+inline static T* alloc_(u64 count = 1) {
+    //TODO: Think about alignment!
+    auto result = (T*)default_allocator(nullptr, 0, sizeof(T) * count, default_allocator_data);
+    return result;
+}
+
+template<typename T>
+inline static T* realloc_(T* oldPointer, u64 oldCount, u64 newCount) {
+    auto result = (T*)default_allocator(oldPointer, sizeof(T) * oldCount, sizeof(T) * newCount, default_allocator_data);
+    return result;
+}
+
+template<typename T>
+inline static void free_(T* pointer) {
+    default_allocator(pointer, sizeof(T), 0, default_allocator_data);
+}
+
+// Global default allocator //
+
+Allocator default_allocator;
+void* default_allocator_data;
+
+// malloc allocator //
+
+static void* malloc_allocator(void* old_pointer, u64 old_size, u64 new_size, void* allocator_data) {
+    if(old_size == 0) {
+        //ALLOC
+        assert(new_size);
+        return malloc(new_size);
+    }
+    else if(new_size == 0) {
+        //FREE
+        assert(old_pointer);
+        free(old_pointer);
+        return nullptr;
+    }
+    else {
+        //RESIZE
+        assert(new_size);
+        assert(old_pointer);
+        return realloc(old_pointer, new_size);
+    }
+
+    //Unreachable
+}
+
+// Linear Arena allocator //
 
 struct LinearArena {
     void* base;
-    size_t size;
-    size_t used;
+    u64 size;
+    u64 used;
 };
 
-static void init_arena(LinearArena* arena, size_t size, void* base) {
+static void init_arena(LinearArena* arena, u64 size, void* base) {
     assert(base && size);
     
     arena->base = base;
@@ -24,50 +81,40 @@ static void init_arena(LinearArena* arena, size_t size, void* base) {
     arena->used = 0;
 }
 
-static void* linear_allocator(void* old_pointer, size_t old_size, size_t new_size, bool free_all, void* allocator_data) {
-    auto arena = (LinearArena*)allocator_data;
+static void reset(LinearArena* arena) {
+    arena->used = 0;
+}
 
-    if(free_all) {
-        arena->used = 0;
-    }
-    else if(old_size == 0) {
-        //Alloc
+static void* linear_allocator(void* old_pointer, u64 old_size, u64 new_size, void* allocator_data) {
+    auto arena = (LinearArena*)allocator_data;
+    assert(arena);
+
+    if(old_size == 0) {
+        //ALLOC
         assert(new_size);
         assert(arena->used + new_size <= arena->size);
-        void* result = (uint8_t*)arena->base + arena->used;
+        void* result = (u8*)arena->base + arena->used;
         arena->used += new_size;
         
         return result;
     }
     else if(new_size == 0) {
-        //Free: Not supported
+        //FREE: Not supported.
         assert(false);
     }
     else {
-        //Resize: Not supported
-        assert(false);
+        //RESIZE: We just copy the old data, we never deallocate.
+        assert(new_size);
+        assert(arena->used + new_size <= arena->size);
+        void* result = (u8*)arena->base + arena->used;
+        arena->used += new_size;
+
+        assert(old_pointer);
+        memcpy(result, old_pointer, old_size);
+        return result;
     }
 
     return nullptr; //Unreachable
-}
-
-Allocator default_allocator;
-void* default_allocator_data;
-
-template<typename T>
-inline static T* alloc(int count = 0) {
-    //TODO: Think about alignment!
-    auto result = (T*)default_allocator(nullptr, 0, sizeof(T) * count, false, default_allocator_data);
-    return result;
-}
-
-template<typename T>
-inline static void _free(T* pointer) {
-    default_allocator(pointer, sizeof(T), 0, false, default_allocator_data);
-}
-
-inline static void freeAll() {
-    default_allocator(nullptr, 0, 0, true, default_allocator_data);
 }
 
 #endif

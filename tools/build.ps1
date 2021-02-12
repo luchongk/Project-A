@@ -55,6 +55,7 @@ $compileExeOpts =
 
 $linkOpts = 
 	"-link",
+	"-SUBSYSTEM:WINDOWS",
 	"-MACHINE:X$platform",
 	"-LIBPATH:lib",
 	"-INCREMENTAL:NO",
@@ -67,10 +68,10 @@ $linkOpts =
 
 rm "$execFolder\game-*.pdb" -ErrorAction SilentlyContinue
 
-cl.exe $compileExeOpts -LD "-Fe$execFolder\" src\game.cpp $linkOpts -PDB:bin\Debug\game-$(get-date -Format FileDateTime).pdb
-if($LASTEXITCODE -ne 0) { exit 1 }
+#cl.exe $compileExeOpts -LD "-Fe$execFolder\" src\game.cpp $linkOpts -PDB:bin\Debug\game-$(get-date -Format FileDateTime).pdb
+#if($LASTEXITCODE -ne 0) { exit 1 }
 
-cl.exe $compileExeOpts "-Fe$execFolder\$project.exe" src\platform_win32.cpp $linkOpts
+cl.exe $compileExeOpts "-Fe$execFolder\$project.exe" src\main.cpp $linkOpts
 # Only return the error if we are not running the game,
 # cause compilation of the .exe always fails when we are running
 if(($LASTEXITCODE -ne 0) -and !(Get-Process $project -ErrorAction SilentlyContinue)) { exit 1 }

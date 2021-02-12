@@ -1,21 +1,25 @@
 #ifndef PLATFORM_H
 #define PLATFORM_H
 
-#include "common.h"
+#include "array.h"
+#include "vector.h"
 
-typedef void onLoadFunction(bool, GameMemory*, PlatformAPI*);
-static void onLoadStub(bool, GameMemory*, PlatformAPI*) {}
+struct OSWindow;
 
-typedef void updateFunction(GameMemory*, PlayerInput*, float, float);
-static void updateStub(GameMemory*, PlayerInput*, float, float) {}
+struct OSKeyboardEvent {
+    u32 code;       //@Temporary: We are currently using windows key codes. Make codes cross platform!
+    bool pressed;
+    bool wasDown;
+};
 
-typedef void renderFunction(GameMemory*, float);
-static void renderStub(GameMemory*, float) {}
+struct OSTextEvent {
 
-struct GameAPI {
-    onLoadFunction* onLoad;
-    updateFunction* update;
-    renderFunction* render;
+};
+
+struct OSEvents {
+    Array<OSKeyboardEvent> keyboard;
+    Array<OSTextEvent> chars;
+    Vector2 mouse_delta;
 };
 
 #endif

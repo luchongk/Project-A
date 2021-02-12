@@ -3,6 +3,8 @@
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/type_ptr.hpp"
 
+#include "types.h"
+#include "array.h"
 #include "game.h"
 
 #include "debug.cpp"
@@ -124,7 +126,7 @@ DLLEXPORT void onLoad(bool is_init, GameMemory *game_memory, PlatformAPI* platfo
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
         glEnableVertexAttribArray(0);
 
-        /*glGenTextures(1, &game_state->texture);
+        glGenTextures(1, &game_state->texture);
         //glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, game_state->texture);
         // set the texture wrapping/filtering options (on the currently bound texture object)
@@ -146,10 +148,9 @@ DLLEXPORT void onLoad(bool is_init, GameMemory *game_memory, PlatformAPI* platfo
             printf("Failed to load texture\n");
             fflush(stdout);
         }
-        stbi_image_free(image_data);*/
+        stbi_image_free(image_data);
     }
-
-    if(!is_init) {
+    else {
         delete_shader(&game_state->shader);
         delete_shader(&game_state->light_shader);
     }
@@ -158,7 +159,16 @@ DLLEXPORT void onLoad(bool is_init, GameMemory *game_memory, PlatformAPI* platfo
     compile_shader(&game_state->light_shader, "light_shader", "assets/shaders/basic.vert", "assets/shaders/light_cube.frag");
 }
 
-DLLEXPORT void update(GameMemory *game_memory, PlayerInput* input, float dt, float time) {
+DLLEXPORT void update(GameMemory* game_memory, PlayerInput* input, float dt, float time) {
+    Array<int> my_array{};
+    array_add(&my_array, 31);
+    array_add(&my_array, 25);
+    array_add(&my_array, 21);
+
+    For(my_array) {
+        printf("%d\n", *it);
+    }
+    
     if(input->pause) {
         game_state->paused = !game_state->paused;
     }
@@ -169,7 +179,10 @@ DLLEXPORT void update(GameMemory *game_memory, PlayerInput* input, float dt, flo
 
     update_camera(&game_state->camera, input, dt);
     
-    game_state->light_pos = {glm::cos(time * 0.75f) * 2, glm::sin(time * 0.75f) * 2, -6.0f};
+    game_state->light_pos = {
+        glm::cos(time * 0.75f) * 2,
+        glm::sin(time * 0.75f) * 2, -6.0f
+    };
     
     game_state->cubesRotation += 2 * glm::sin(10 * glm::radians(time)) * game_state->cubesRotationDir * dt;
 }
@@ -179,7 +192,11 @@ DLLEXPORT void render(GameMemory *game_memory, float deltaInterpolation) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glm::mat4 projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
-    glm::mat4 view = glm::lookAt(game_state->camera.position.toGLM(), (game_state->camera.position + game_state->camera.forward).toGLM(), glm::vec3{0,1,0});
+    glm::mat4 view = glm::lookAt(
+        game_state->camera.position.toGLM(),
+        (game_state->camera.position + game_state->camera.forward).toGLM(),
+        glm::vec3{0,1,0}
+    );
 
     // LIGHT DRAW
     use_shader(&game_state->light_shader);
@@ -198,7 +215,7 @@ DLLEXPORT void render(GameMemory *game_memory, float deltaInterpolation) {
     use_shader(&game_state->shader);
     set_shader_uniform(&game_state->shader, "view", view);
     set_shader_uniform(&game_state->shader, "projection", projection);
-    set_shader_uniform(&game_state->shader, "objectColor", glm::vec3{0.2f, 0.3f, 0.8f});
+    set_shader_uniform(&game_state->shader, "objectColor", glm::vec3{0.0f, 0.3f, 0.5f});
     set_shader_uniform(&game_state->shader, "lightColor",  glm::vec3{1.0f, 1.0f, 1.0f});
     set_shader_uniform(&game_state->shader, "lightPos", game_state->light_pos.toGLM());
     set_shader_uniform(&game_state->shader, "viewPos", game_state->camera.position.toGLM());
@@ -221,6 +238,5 @@ DLLEXPORT void render(GameMemory *game_memory, float deltaInterpolation) {
         glDrawArrays(GL_TRIANGLES, 0, 36);
     }
 
-    //Free temporary memory
-    freeAll();
+    reset(&game_state->temporary_memory);
 }

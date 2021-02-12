@@ -1,7 +1,57 @@
 #include <cstdio>
+#include "Windows.h"
 
-#include "platform_win32.h"
+#include "types.h"
 #include "glad/glad.h"
+
+/*static FILETIME getLastWriteTime(char* filename) {
+    FILETIME lastWriteTime{};
+
+    WIN32_FIND_DATAA fileData;
+    HANDLE findHandle = FindFirstFileA(filename, &fileData);
+    if(findHandle != INVALID_HANDLE_VALUE) {
+        FindClose(findHandle);
+        lastWriteTime = fileData.ftLastWriteTime;
+    }
+
+    return lastWriteTime;
+}*/
+
+/*static size_t get_file_size(const char* path) {
+    WIN32_FILE_ATTRIBUTE_DATA file_info;
+    assert(GetFileAttributesExA(path, GetFileExInfoStandard, &file_info));
+    
+    return ((size_t)file_info.nFileSizeHigh << 32) + file_info.nFileSizeLow;
+}*/
+
+static char* os_read_entire_file(const char* path) {
+    HANDLE file = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
+    assert(file != INVALID_HANDLE_VALUE);
+
+    uint file_size = GetFileSize(file, nullptr);
+    char* file_data = alloc_<char>(file_size + 1);
+
+    DWORD bytesRead;
+    assert(ReadFile(file, file_data, (DWORD)file_size, &bytesRead, nullptr));
+    assert(file_size == bytesRead);
+
+    CloseHandle(file);
+
+    ((uint8_t*)file_data)[file_size] = '\0';
+
+    return file_data;
+}
+
+struct OSWindow {
+    HWND handle;
+    HDC device;
+    WINDOWPLACEMENT placement;
+};
+
+static HINSTANCE app_instance;
+static wchar_t window_class_name[] = L"Project_A";
+
+static OSEvents os_events;
 
 static bool initOpenGL(HDC dc) {
     PIXELFORMATDESCRIPTOR pfd{};
@@ -30,129 +80,100 @@ static bool initOpenGL(HDC dc) {
     return true;
 }
 
-static FILETIME getLastWriteTime(char* filename) {
-    FILETIME lastWriteTime{};
+static OSWindow* os_create_window() {
+    HWND hwnd = CreateWindow(window_class_name, L"Project_A", WS_OVERLAPPEDWINDOW,
+                                200, 100, 1600, 800,
+                                nullptr, nullptr, app_instance, nullptr);
+                                
+    if(!hwnd)
+        return nullptr;
 
-    WIN32_FIND_DATAA fileData;
-    HANDLE findHandle = FindFirstFileA(filename, &fileData);
-    if(findHandle != INVALID_HANDLE_VALUE) {
-        FindClose(findHandle);
-        lastWriteTime = fileData.ftLastWriteTime;
-    }
+    HDC dc = GetDC(hwnd);
 
-    return lastWriteTime;
+    if(!initOpenGL(dc))
+        return nullptr;
+
+    ShowWindow(hwnd, 5);
+
+    OSWindow* window = alloc_<OSWindow>();
+    window->handle = hwnd;
+    window->device = dc;
+    window->placement.length = sizeof(WINDOWPLACEMENT);
+    return window;
 }
 
-static void reloadGameCode(char* gameDLLPath, GameCode* gameCode, GameMemory* gameMemory) {
-    if(gameCode->dll) {
-        if(!FreeLibrary(gameCode->dll)) {
-            printf("Couldn't free game code DLL");
-            return;
-        }
-    }
-
-    gameCode->api.onLoad = onLoadStub;
-    gameCode->api.update = updateStub;
-    gameCode->api.render = renderStub;
-
-    char* DestDLLPath = "bin\\Debug\\game_tmp.dll";
+inline static s64 os_get_timestamp() {
+    LARGE_INTEGER timestamp;
+    QueryPerformanceCounter(&timestamp);
     
-    while(true) {
-        if(CopyFileA(gameDLLPath, DestDLLPath, false)) {
-            gameCode->dll = LoadLibraryA(DestDLLPath);
-            break;
-        }
-        else if(GetLastError() != ERROR_SHARING_VIOLATION) {
-            gameCode->dll = nullptr;
-            return;
-        }
-    }
-
-    gameCode->dllLastWriteTime = getLastWriteTime(gameDLLPath);
-
-    if(!gameCode->dll)
-        printf("Failed to load game code DLL\n");
-    else {
-        gameCode->api.onLoad = (onLoadFunction*)GetProcAddress(gameCode->dll, "onLoad");
-        assert(gameCode->api.onLoad);
-        
-        gameCode->api.update = (updateFunction*)GetProcAddress(gameCode->dll, "update");
-        if(!gameCode->api.update) {
-            printf("Failed to load render function\n");
-            gameCode->api.update = updateStub;
-        }
-        
-        gameCode->api.render = (renderFunction*)GetProcAddress(gameCode->dll, "render");
-        if(!gameCode->api.render) {
-            printf("Failed to load render function\n");
-            gameCode->api.render = renderStub;
-        }
-    }
+    return timestamp.QuadPart;
 }
 
-inline static float getTimeElapsed(LARGE_INTEGER start, LARGE_INTEGER end, LARGE_INTEGER freq) {
-    assert(start.QuadPart <= end.QuadPart);
-    return (end.QuadPart - start.QuadPart) / (float)freq.QuadPart;
+inline static s64 os_get_timer_frequency() {
+    LARGE_INTEGER frequency;
+    QueryPerformanceFrequency(&frequency);
+
+    return frequency.QuadPart;
 }
 
-inline static LARGE_INTEGER getTimestamp() {
-    LARGE_INTEGER current;
-    QueryPerformanceCounter(&current);
-    return current;
+static void clear_event_queue() {
+    os_events.keyboard.count = 0;
+    os_events.mouse_delta = {0,0};
 }
 
-static size_t get_file_size(const char* path) {
-    WIN32_FILE_ATTRIBUTE_DATA file_info;
-    assert(GetFileAttributesExA(path, GetFileExInfoStandard, &file_info));
-    
-    return ((size_t)file_info.nFileSizeHigh << 32) + file_info.nFileSizeLow;
-}
+static bool os_poll_events() {
+    clear_event_queue();
 
-static void read_entire_file(const char* path, size_t file_size, void* file_data) {
-    HANDLE file = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
-    assert(file != INVALID_HANDLE_VALUE);
-
-    DWORD bytesRead;
-    assert(ReadFile(file, file_data, (DWORD)file_size, &bytesRead, nullptr));
-    assert(file_size == bytesRead);
-
-    CloseHandle(file);
-
-    ((uint8_t*)file_data)[file_size] = '\0';
-}
-
-static void set_platform_api(PlatformAPI* platform) {
-    platform->get_file_size     = get_file_size;
-    platform->read_entire_file  = read_entire_file;
-}
-
-static bool pollEvents(PlayerInput* input) {
     MSG msg{};
-
     while(PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
         if(msg.message == WM_QUIT) {
-            return false;
+            return true;
         }
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
 
-    if(GetKeyState('A') & 0x8000)
-        input->horizontal = -1;
-    else if(GetKeyState('D') & 0x8000)
-        input->horizontal = 1;
-    
-    if(GetKeyState('S') & 0x8000)
-        input->vertical = -1;
-    else if(GetKeyState('W') & 0x8000)
-        input->vertical = 1;
+    return false;
+}
 
-    return true;
+static void os_toggle_fullscreen(OSWindow* window, bool borderless) {
+    HWND hwnd = window->handle;
+
+    DWORD dwStyle = GetWindowLong(hwnd, GWL_STYLE);
+    if (dwStyle & WS_OVERLAPPEDWINDOW)
+    {
+        MONITORINFOEX mi;
+        mi.cbSize = sizeof(mi);
+        if (GetWindowPlacement(hwnd, &window->placement) &&
+            GetMonitorInfo(MonitorFromWindow(hwnd, MONITOR_DEFAULTTOPRIMARY), &mi))
+        {
+            ShowCursor(false);
+            SetWindowLong(hwnd, GWL_STYLE,
+                            dwStyle & ~WS_OVERLAPPEDWINDOW);
+            
+            SetWindowPos(hwnd, borderless ? HWND_TOP : HWND_TOPMOST,
+                        mi.rcMonitor.left, mi.rcMonitor.top,
+                        mi.rcMonitor.right - mi.rcMonitor.left,
+                        mi.rcMonitor.bottom - mi.rcMonitor.top,
+                        SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+        }
+    } else {
+        ShowCursor(true);
+        SetWindowLong(hwnd, GWL_STYLE,
+                    dwStyle | WS_OVERLAPPEDWINDOW);
+
+        SetWindowPlacement(hwnd, &window->placement);
+        SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
+                    SWP_NOMOVE | SWP_NOSIZE |
+                    SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+    }
+}
+
+static void os_swap_buffers(OSWindow* window) {
+    SwapBuffers(window->device);
 }
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    Win32State* platform = (Win32State*)GetProp(hwnd, L"ProjectAWin32State");
-    
     switch(uMsg) {
         case WM_DESTROY: {
             PostQuitMessage(0);
@@ -162,58 +183,20 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             glViewport(0, 0, LOWORD(lParam), HIWORD(lParam));
         } break;
 
+        case WM_KEYUP: {
+            uint32_t VKCode = (uint32_t)wParam;
+            bool wasDown = lParam & 0x40000000;
+
+            OSKeyboardEvent event{VKCode, false, wasDown};
+            array_add(&os_events.keyboard, event);
+        } break;
+
         case WM_KEYDOWN: {
             uint32_t VKCode = (uint32_t)wParam;
             bool wasDown = lParam & 0x40000000;
 
-            switch(VKCode) {
-                case 'P': {
-                    if(!wasDown) {
-                        platform->input.pause = true;
-                    }
-                } break;
-
-                case 'R': {
-                    if(!wasDown) {
-                        platform->input.reset = true;
-                    }
-                } break;
-
-                case VK_F11: {
-                    DWORD dwStyle = GetWindowLong(hwnd, GWL_STYLE);
-                    if (dwStyle & WS_OVERLAPPEDWINDOW)
-                    {
-                        MONITORINFOEX mi;
-                        mi.cbSize = sizeof(mi);
-                        if (GetWindowPlacement(hwnd, &platform->windowPlacement) &&
-                            GetMonitorInfo(MonitorFromWindow(hwnd, MONITOR_DEFAULTTOPRIMARY), &mi))
-                        {
-                            ShowCursor(false);
-                            SetWindowLong(hwnd, GWL_STYLE,
-                                            dwStyle & ~WS_OVERLAPPEDWINDOW);
-                            
-                            SetWindowPos(hwnd, platform->borderlessFullscreen ? HWND_TOP : HWND_TOPMOST,
-                                        mi.rcMonitor.left, mi.rcMonitor.top,
-                                        mi.rcMonitor.right - mi.rcMonitor.left,
-                                        mi.rcMonitor.bottom - mi.rcMonitor.top,
-                                        SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
-                        }
-                    } else {
-                        ShowCursor(true);
-                        SetWindowLong(hwnd, GWL_STYLE,
-                                    dwStyle | WS_OVERLAPPEDWINDOW);
-
-                        SetWindowPlacement(hwnd, &platform->windowPlacement);
-                        SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
-                                    SWP_NOMOVE | SWP_NOSIZE |
-                                    SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
-                    }    
-                } break;
-
-                case 'F': {
-                    platform->borderlessFullscreen = !platform->borderlessFullscreen;
-                } break;
-            }
+            OSKeyboardEvent event{VKCode, true, wasDown};
+            array_add(&os_events.keyboard, event);
         } break;
 
 #if 1
@@ -225,18 +208,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
             if (raw.header.dwType == RIM_TYPEMOUSE) 
             {
-                platform->input.mouseDeltaX += raw.data.mouse.lLastX;
-                platform->input.mouseDeltaY += raw.data.mouse.lLastY;
+                os_events.mouse_delta.x += raw.data.mouse.lLastX;
+                os_events.mouse_delta.y += raw.data.mouse.lLastY;
             }
 
-            /*RECT rect;
-            GetClientRect(hwnd, &rect);
-
-            POINT center;
-            center.x = rect.right / 2;
-            center.y = rect.bottom / 2;
-            ClientToScreen(hwnd, &center);
-            SetCursorPos(center.x, center.y);*/
         } break;
 #else
         /* Mouse detection via the screen */
@@ -262,13 +237,15 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     return 0;
 }
 
-int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow) {
-    const wchar_t CLASS_NAME[] = L"ProjectA";
+void main();
 
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR lpCmdLine, int nCmdShow) {
+    app_instance = hInstance;
+    
     WNDCLASS wc{};
     wc.hInstance = hInstance;
     wc.lpfnWndProc = WindowProc;
-    wc.lpszClassName = CLASS_NAME;
+    wc.lpszClassName = window_class_name;
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     SetCursor(wc.hCursor);
     wc.style = CS_OWNDC;
@@ -276,23 +253,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
     if(!RegisterClass(&wc))
         return 1;
 
-    HWND hwnd = CreateWindowW(CLASS_NAME, L"ProjectA", WS_OVERLAPPEDWINDOW,
-                                200, 100, 1600, 800,
-                                nullptr, nullptr, hInstance, nullptr);
-
-    if(!hwnd)
-        return 1;
-
-    Win32State platform{}; 
-    SetProp(hwnd, L"ProjectAWin32State", &platform);
-
-    HDC dc = GetDC(hwnd);
-    platform.borderlessFullscreen = false;
-
-    if(!initOpenGL(dc))
-        return 1;
-
-    ShowWindow(hwnd, nCmdShow);
     /*SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);*/
 
@@ -307,19 +267,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
         /* ERROR */
     }
 #endif
-    GameMemory memory;
-    memory.data_size = megabytes(64);  //TODO: Config
-    memory.data = VirtualAlloc(nullptr, memory.data_size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 
-    PlatformAPI platform_api;
-    set_platform_api(&platform_api);
-
-    char* gameDLLPath = "bin\\Debug\\game.dll";
-    GameCode gameCode{};
-    reloadGameCode(gameDLLPath, &gameCode, &memory);
-    assert(gameCode.dll);
-    gameCode.api.onLoad(true, &memory, &platform_api);
-
+    main();
+    
+/*
     //TODO: Config each of these!
     constexpr float maxFrameTime = 0.25f;
     constexpr float targetFrameTime = 1.0f/60;
@@ -369,7 +320,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
             updateRan = true;
         }
         
-        //* RENDERING *//
+        //* RENDERING 
         //TODO: Stuttering comes from not doing position/rotation interpolation. Do that.
         //float lerp = accum / fixedDeltaTime;
         gameCode.api.render(&memory, 1);
@@ -378,14 +329,13 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
             platform.input = {};
         }
 
+        LARGE_INTEGER workCounter = getTimestamp();
+        double workDelta = getTimeElapsed(frameTime, workCounter, platform.timerFrequency);
         if(capFramerate) {
-            LARGE_INTEGER workCounter = getTimestamp();
-            double workDelta = getTimeElapsed(frameTime, workCounter, platform.timerFrequency);
-
             //TODO: Implement Vsync switch
             //! This should only happen if VSync is off
             if(workDelta < targetFrameTime) {
-                Sleep((int)((targetFrameTime - workDelta) * 1000 - 1));
+                Sleep((int)((targetFrameTime - workDelta) * 1000) - 1);
             }
             while(workDelta < targetFrameTime) {
                 workCounter = getTimestamp();
@@ -396,11 +346,12 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow
         SwapBuffers(dc);
 
 #if 0
+        printf_s("work delta: %f ms\n", workDelta);
         printf_s("last frame: %f ms\n", deltaTime * 1000);
         printf_s("FPS: %f\n", 1 / deltaTime);
-        fflush(stdout);
+        //fflush(stdout);   CPU usage goes x10 and my laptops fan starts going crazy if we do this every frame. WTF!
 #endif
     }
-
+*/
     return 0;
 }

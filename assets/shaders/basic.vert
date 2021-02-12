@@ -15,6 +15,6 @@ out vec2 TexCoord;
 void main() {
     FragPos = vec3(model * vec4(inPosition, 1.0));
     Normal = vec3(model * vec4(inNormal, 0.0));
-    //TexCoord = inTexCoord;
+    TexCoord = inTexCoord;
     gl_Position = projection * view * vec4(FragPos, 1.0);
 }

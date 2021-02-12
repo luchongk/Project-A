@@ -3,16 +3,10 @@
 
 #include "glm/vec3.hpp"
 
-/*struct Vector2 {
-
+struct Vector2 {
     float x;
     float y;
 };
-
-REFLECTION_REGISTRATION(Vector2) {
-    CLASS->addField("x", &Vector2::x)
-        ->addField("y", &Vector2::y);
-}*/
 
 struct Vector3 {
     //REFLECT
@@ -68,7 +62,7 @@ struct Vector3 {
     }
     
     inline Vector3 normalized() {
-        return Vector3{*this / sqrt(this->dot(*this))};
+        return Vector3{*this / (float)sqrt(this->dot(*this))};
     }
 
     inline glm::vec3 toGLM() {
