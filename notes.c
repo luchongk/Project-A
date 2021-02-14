@@ -2,8 +2,15 @@
  * TODO:
  * ✓
  * * [] Clean up vector.h
- * * [] Array type
+ * 
+ * * [] Math functions
+ * 
+ * * [✓] Array type
+ * 
  * * [] LearnOpengl
+ * 
  * * [] Make Debug UI
+ * 
  * * [] Physics
+ * 
  */

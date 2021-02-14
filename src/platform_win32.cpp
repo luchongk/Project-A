@@ -4,44 +4,6 @@
 #include "types.h"
 #include "glad/glad.h"
 
-/*static FILETIME getLastWriteTime(char* filename) {
-    FILETIME lastWriteTime{};
-
-    WIN32_FIND_DATAA fileData;
-    HANDLE findHandle = FindFirstFileA(filename, &fileData);
-    if(findHandle != INVALID_HANDLE_VALUE) {
-        FindClose(findHandle);
-        lastWriteTime = fileData.ftLastWriteTime;
-    }
-
-    return lastWriteTime;
-}*/
-
-/*static size_t get_file_size(const char* path) {
-    WIN32_FILE_ATTRIBUTE_DATA file_info;
-    assert(GetFileAttributesExA(path, GetFileExInfoStandard, &file_info));
-    
-    return ((size_t)file_info.nFileSizeHigh << 32) + file_info.nFileSizeLow;
-}*/
-
-static char* os_read_entire_file(const char* path) {
-    HANDLE file = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
-    assert(file != INVALID_HANDLE_VALUE);
-
-    uint file_size = GetFileSize(file, nullptr);
-    char* file_data = alloc_<char>(file_size + 1);
-
-    DWORD bytesRead;
-    assert(ReadFile(file, file_data, (DWORD)file_size, &bytesRead, nullptr));
-    assert(file_size == bytesRead);
-
-    CloseHandle(file);
-
-    ((uint8_t*)file_data)[file_size] = '\0';
-
-    return file_data;
-}
-
 struct OSWindow {
     HWND handle;
     HDC device;
@@ -50,7 +12,6 @@ struct OSWindow {
 
 static HINSTANCE app_instance;
 static wchar_t window_class_name[] = L"Project_A";
-
 static OSEvents os_events;
 
 static bool initOpenGL(HDC dc) {
@@ -173,6 +134,24 @@ static void os_swap_buffers(OSWindow* window) {
     SwapBuffers(window->device);
 }
 
+static char* os_read_entire_file(const char* path) {
+    HANDLE file = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
+    assert(file != INVALID_HANDLE_VALUE);
+
+    uint file_size = GetFileSize(file, nullptr);
+    char* file_data = alloc_<char>(file_size + 1);
+
+    DWORD bytesRead;
+    assert(ReadFile(file, file_data, (DWORD)file_size, &bytesRead, nullptr));
+    assert(file_size == bytesRead);
+
+    CloseHandle(file);
+
+    ((uint8_t*)file_data)[file_size] = '\0';
+
+    return file_data;
+}
+
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch(uMsg) {
         case WM_DESTROY: {
@@ -269,6 +248,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR lpCmdLine, int nCmdSho
 #endif
 
     main();
+
+    return 0;
     
 /*
     //TODO: Config each of these!
@@ -344,14 +325,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR lpCmdLine, int nCmdSho
         }
 
         SwapBuffers(dc);
-
-#if 0
-        printf_s("work delta: %f ms\n", workDelta);
-        printf_s("last frame: %f ms\n", deltaTime * 1000);
-        printf_s("FPS: %f\n", 1 / deltaTime);
-        //fflush(stdout);   CPU usage goes x10 and my laptops fan starts going crazy if we do this every frame. WTF!
-#endif
     }
 */
-    return 0;
 }
