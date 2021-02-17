@@ -3,7 +3,7 @@
  * ✓
  * * [] Clean up vector.h
  * 
- * * [] Math functions
+ * * [✓] Math file
  * 
  * * [✓] Array type
  * 

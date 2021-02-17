@@ -8,6 +8,7 @@
                 "${workspaceFolder}/include/3rdParty"
             ],
             "defines": [
+                "NOMINMAX",
                 "DEBUG",
                 "_DEBUG",
                 "UNICODE",

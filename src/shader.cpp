@@ -1,12 +1,8 @@
 #include <iostream>
-
-#include "glm/glm.hpp"
-#include "glm/gtc/type_ptr.hpp"
-
 #include "glad/glad.h"
 #include "shader.h"
 
-static void compile_shader(Shader* shader, const char* name, const char* vertex_path, const char* fragment_path) {
+void compile_shader(Shader* shader, const char* name, const char* vertex_path, const char* fragment_path) {
     int i = 0;
     while(*name) {
         shader->name[i++] = *name++;
@@ -57,32 +53,32 @@ static void compile_shader(Shader* shader, const char* name, const char* vertex_
     glDeleteShader(fragmentShader);
 }
 
-static void delete_shader(Shader* shader) {
+void delete_shader(Shader* shader) {
     glDeleteProgram(shader->ID);
 }
 
-static void use_shader(Shader* shader) {
+void use_shader(Shader* shader) {
     glUseProgram(shader->ID);
 }
 
-static void set_shader_uniform(Shader* shader, const char* name, bool value) {
+void set_shader_uniform(Shader* shader, const char* name, bool value) {
     glUniform1ui(glGetUniformLocation(shader->ID, name), value);
 }
 
-static void set_shader_uniform(Shader* shader, const char* name, int value) {
+void set_shader_uniform(Shader* shader, const char* name, int value) {
     glUniform1i(glGetUniformLocation(shader->ID, name), value);
 }
 
-static void set_shader_uniform(Shader* shader, const char* name, float value) {
+void set_shader_uniform(Shader* shader, const char* name, float value) {
     glUniform1f(glGetUniformLocation(shader->ID, name), value);
 }
 
-static void set_shader_uniform(Shader* shader, const char* name, const glm::vec3 &vec)
+void set_shader_uniform(Shader* shader, const char* name, const glm::vec3 &vec)
 {
     glUniform3fv(glGetUniformLocation(shader->ID, name), 1, &vec[0]);
 }
 
-static void set_shader_uniform(Shader* shader, const char* name, const glm::mat4 &mat)
+void set_shader_uniform(Shader* shader, const char* name, const glm::mat4 &mat)
 {
     glUniformMatrix4fv(glGetUniformLocation(shader->ID, name), 1, GL_FALSE, &mat[0][0]);
 }

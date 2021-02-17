@@ -15,9 +15,9 @@
                 "kind": "build",
                 "isDefault": true
             },
-            /*"problemMatcher": [
+            "problemMatcher": [
                 "$msCompile"
-            ]*/
+            ]
         },
         {
             "type": "shell",

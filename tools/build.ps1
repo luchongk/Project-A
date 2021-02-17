@@ -49,6 +49,7 @@ $compileExeOpts =
 	"-Fobin\Debug\",
 	"-Fdbin\Debug\",
 #	"-Faasm\",
+	"-DNOMINMAX",
 	"-DUNICODE",
 	"-D_UNICODE" +
 	$(if($release) { } else { "-DDEBUG" })
