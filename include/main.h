@@ -8,6 +8,7 @@ struct Time {
     float since_start;
     float delta;
     float simulation_delta;
+    float modifier;
 };
 
 extern Time time;

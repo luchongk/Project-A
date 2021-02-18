@@ -15,7 +15,8 @@
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
-            "requireExactSource": false
+            "requireExactSource": false,
+            "logging": {"moduleLoad": false}
         },
         {
             "name": "Game (Release)",
@@ -28,7 +29,8 @@
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
-            "requireExactSource": false
+            "requireExactSource": false,
+            "logging": {"moduleLoad": false}
         },
     ]
 }

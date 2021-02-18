@@ -1,4 +1,5 @@
 #include <iostream>
+#include "platform.h"
 #include "glad/glad.h"
 #include "shader.h"
 

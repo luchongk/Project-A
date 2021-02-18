@@ -1,5 +1,5 @@
 /**
- * TODO:
+ * TODO: No particular order
  * ✓
  * * [] Clean up vector.h
  * 
@@ -13,4 +13,5 @@
  * 
  * * [] Physics
  * 
+ * * [] Get rid of GLM
  */

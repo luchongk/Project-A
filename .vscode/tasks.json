@@ -31,9 +31,9 @@
                 "$true"
             ],
             "group": "build",
-            /*"problemMatcher": [
+            "problemMatcher": [
                 "$msCompile"
-            ]*/
+            ]
         }
     ]
 }

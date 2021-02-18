@@ -126,9 +126,13 @@ void render(OSWindow* window) {
         -6.0f
     };
 
+    glm::vec3 light_color = {0.2f, 0.5f, 0.9f};
+    glm::vec3 light_ambient = light_color * glm::vec3{0.4f};
+
     use_shader(&light_shader);
     set_shader_uniform(&light_shader, "view", view);
     set_shader_uniform(&light_shader, "projection", projection);
+    set_shader_uniform(&light_shader, "color", light_color);
 
     glm::mat4 localToWorld = glm::translate(glm::mat4{1.0f}, light_pos.toGLM());
     localToWorld = glm::scale(localToWorld, glm::vec3(0.2f));
@@ -142,10 +146,15 @@ void render(OSWindow* window) {
     use_shader(&shader);
     set_shader_uniform(&shader, "view", view);
     set_shader_uniform(&shader, "projection", projection);
-    set_shader_uniform(&shader, "objectColor", glm::vec3{0.0f, 0.3f, 0.5f});
-    set_shader_uniform(&shader, "lightColor",  glm::vec3{1.0f, 1.0f, 1.0f});
-    set_shader_uniform(&shader, "lightPos", light_pos.toGLM());
-    set_shader_uniform(&shader, "viewPos", camera.position.toGLM());
+    set_shader_uniform(&shader, "material.ambient", glm::vec3{0.2f, 0.5f, 0.2f});
+    set_shader_uniform(&shader, "material.diffuse", glm::vec3{0.2f, 0.5f, 0.8});
+    set_shader_uniform(&shader, "material.specular", glm::vec3{1.0f, 0.0f, 0.8f});
+    set_shader_uniform(&shader, "material.shininess", 32.0f);
+    set_shader_uniform(&shader, "light.position", light_pos.toGLM());
+    set_shader_uniform(&shader, "light.ambient",  light_ambient);
+    set_shader_uniform(&shader, "light.diffuse",  light_color);
+    set_shader_uniform(&shader, "light.specular",  glm::vec3{1.0f, 1.0f, 1.0f});
+    set_shader_uniform(&shader, "view_pos", camera.position.toGLM());
 
     glm::vec3 cubepositionitions[] {
         glm::vec3{2.0f, 0.0f, 0.0f},

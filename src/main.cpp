@@ -5,6 +5,7 @@
     #include "platform_win32.cpp"
 #endif
 
+#define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.cpp"
 #include "shader.cpp"
 #include "input.cpp"
@@ -37,6 +38,7 @@ void main() {
     time.start_stamp = os_get_timestamp();
     time.frequency = os_get_timer_frequency();
     time.simulation_delta = 1.0f/60;
+    time.modifier = 1.0f;
     maxFrameTime = 0.25f;
 
     float accum = 0;

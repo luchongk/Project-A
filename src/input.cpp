@@ -1,5 +1,6 @@
 #include "input.h"
 #include "simulation.h"
+#include "platform.h"
 
 void handle_events(OSWindow* window, PlayerInput* input) {
     if(!window->focused) return;
@@ -18,6 +19,16 @@ void handle_events(OSWindow* window, PlayerInput* input) {
                     camera = {};
                     cubes_rotation = 0;
                     light_time_accum = 0;
+                    continue;
+                }
+
+                case VK_LEFT: {
+                    time.modifier *= 0.5f;
+                    continue;
+                }
+
+                case VK_RIGHT: {
+                    time.modifier *= 2.0f;
                     continue;
                 }
 
