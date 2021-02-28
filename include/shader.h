@@ -9,7 +9,7 @@ struct Shader {
     char name[64];
 };
 
-void compile_shader(Shader* shader, const char* name, const char* vertex_path, const char* fragment_path);
+void compile_shader(Shader* shader, String vertex_path, String fragment_path);
 void delete_shader(Shader* shader);
 
 void use_shader(Shader* shader);

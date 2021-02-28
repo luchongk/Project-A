@@ -8,6 +8,56 @@ struct Vector2 {
     float y;
 };
 
+struct Vector3I {
+    //REFLECT
+    
+    int x;
+    int y;
+    int z;
+
+    Vector3I() = default;
+    Vector3I(int x, int y, int z) : x{x}, y{y}, z{z} {
+
+    }
+
+    inline Vector3I operator*(const int& scalar) const {
+        return Vector3I{this->x * scalar, this->y * scalar, this->z * scalar};
+    }
+
+    inline Vector3I operator/(const int& scalar) const {
+        return Vector3I{this->x / scalar, this->y / scalar, this->z / scalar};
+    }
+
+    inline Vector3I operator+=(const Vector3I& other) {
+        this->x += other.x;
+        this->y += other.y;
+        this->z += other.z;
+
+        return *this;
+    }
+    
+    inline Vector3I operator+(const Vector3I& other) const {
+        Vector3I temp{*this};
+        return temp += other;
+    }
+
+    inline int dot(const Vector3I& other) {
+        return this->x * other.x + this->y * other.y + this->z * other.z;
+    }
+
+    inline glm::ivec3 toGLM() {
+        return glm::ivec3{this->x, this->y, this->z};
+    }
+};
+
+inline Vector3I operator*(const int& scalar, const Vector3I& vec) {
+    return vec * scalar;
+}
+
+inline Vector3I operator/(const int& scalar, const Vector3I& vec) {
+    return vec / scalar;
+}
+
 struct Vector3 {
     //REFLECT
     
@@ -16,9 +66,8 @@ struct Vector3 {
     float z;
 
     Vector3() = default;
-    Vector3(float x, float y, float z) : x{x}, y{y}, z{z} {
-
-    }
+    Vector3(float x, float y, float z) : x{x}, y{y}, z{z} { }
+    Vector3(Vector3I v) : x{(float)v.x}, y{(float)v.y}, z{(float)v.z} { }
 
     inline Vector3 operator*(const float& scalar) const {
         return Vector3{this->x * scalar, this->y * scalar, this->z * scalar};
@@ -78,10 +127,26 @@ inline Vector3 operator/(const float& scalar, const Vector3& vec) {
     return vec / scalar;
 }
 
-/*REFLECTION_REGISTRATION(Vector3) {
-    CLASS->addField("x", &Vector3::x)
-        ->addField("y", &Vector3::y)
-        ->addField("z", &Vector3::z);
-}*/
+//-----------------------------
+
+Vector2 vec2_parse(String s) {
+    Vector2 v;
+    v.x = (float)atof((const char*)eat_until(' ', &s).data);
+    s = advance(s, 1);
+    v.y = (float)atof((const char*)eat_until(' ', &s).data);
+
+    return v;
+}
+
+Vector3 vec3_parse(String s) {
+    Vector3 v;
+    v.x = (float)atof((const char*)eat_until(' ', &s).data);
+    s = advance(s, 1);
+    v.y = (float)atof((const char*)eat_until(' ', &s).data);
+    s = advance(s, 1);
+    v.z = (float)atof((const char*)eat_until(' ', &s).data);
+
+    return v;
+}
 
 #endif

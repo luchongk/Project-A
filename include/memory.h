@@ -14,7 +14,7 @@
 #include "types.h"
 #include "utils.h"
 
-// Allocator interface //
+// Default allocator interface //
 
 typedef void* (*Allocator)(void* old_pointer, u64 old_size, u64 new_size, void* allocator_data);
 
@@ -38,8 +38,8 @@ inline static void free_(T* pointer) {
 
 // Global default allocator //
 
-Allocator default_allocator;
-void* default_allocator_data;
+extern Allocator default_allocator;
+extern void* default_allocator_data;
 
 // malloc allocator //
 

@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cstdio>
+#include "strings.h"
 
 #include "glad/glad.h"
 
@@ -144,22 +145,25 @@ void os_swap_buffers(OSWindow* window) {
     SwapBuffers(window_data->device);
 }
 
-char* os_read_entire_file(const char* path) {
-    HANDLE file = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
+String os_read_entire_file(String path, bool null_terminated) {
+    HANDLE file = CreateFileA((char*)path.data, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
     assert(file != INVALID_HANDLE_VALUE);
 
-    uint file_size = GetFileSize(file, nullptr);
-    char* file_data = alloc_<char>(file_size + 1);
+    uint size = GetFileSize(file, nullptr);
+    
+    uint alloc_size = size;
+    if(null_terminated) alloc_size++;
+    String content = new_string(alloc_size);
 
     DWORD bytesRead;
-    assert(ReadFile(file, file_data, (DWORD)file_size, &bytesRead, nullptr));
-    assert(file_size == bytesRead);
+    assert(ReadFile(file, content.data, (DWORD)size, &bytesRead, nullptr));
+    assert(size == bytesRead);
 
     CloseHandle(file);
 
-    ((uint8_t*)file_data)[file_size] = '\0';
+    if(null_terminated) content.data[size] = '\0';
 
-    return file_data;
+    return content;
 }
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {

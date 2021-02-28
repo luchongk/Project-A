@@ -1,17 +1,43 @@
 #ifndef ARRAY_H
 #define ARRAY_H
 
+#include <initializer_list>
 #include "memory.h"
 #include "types.h"
 
 template<typename T>
-struct Array {
+struct ArrayView {
     T* data = nullptr;
     s64 count = 0;
+};
+
+template<typename T>
+inline ArrayView<T> make_view(T array[], int count) {
+    ArrayView<T> view;
+    view.data = array;
+    view.count = count;
+
+    return view;
+}
+
+template<typename T>
+struct Array : public ArrayView<T> {
     s64 allocated = 0;
 
     Allocator allocator = nullptr;
     void* allocator_data = nullptr;
+
+    Array() = default;
+    
+    Array(std::initializer_list<T> init) {
+        for(auto it = init.begin(); it != init.end(); it++) {
+            array_add(this, *it);
+        }
+    }
+
+    T& operator[](int i) {
+        return this->data[i];
+    }
 };
 
 template<typename T>
@@ -32,6 +58,6 @@ void array_add(Array<T>* array, T toAdd) {
     array->data[array->count++] = toAdd;
 }
 
-#define For(array) for(auto it = &array.data[0]; it < &array.data[array.count]; it++)
+#define For(array) for(auto it = &(array).data[0]; it < &(array).data[(array).count]; it++)
 
 #endif

@@ -1,58 +1,32 @@
 
+#include "render.h"
+#include "obj_loader.h"
+
 static uint VAO;
 static uint light_VAO;
 static uint VBO;
+static uint EBO;
 static uint texture;
 static Shader shader;
 static Shader light_shader;
+static Mesh mesh;
+
+struct VertexXNU {
+    Vector3 position;
+    Vector3 normal;
+    Vector2 uv;
+};
 
 void init() {
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClearColor(0.9f, 0.9f, 0.9f, 1.0f);
     glEnable(GL_DEPTH_TEST);
 
-    float cubeModel[] {
-        -0.5f, -0.5f, -0.5f,  0.0f, 0.0f, -1.0f,  0.4f, 0.4f,
-        0.5f, -0.5f, -0.5f,  0.0f, 0.0f, -1.0f,  0.6f, 0.4f,
-        0.5f,  0.5f, -0.5f,  0.0f, 0.0f, -1.0f,  0.6f, 0.6f,
-        0.5f,  0.5f, -0.5f,  0.0f, 0.0f, -1.0f,  0.6f, 0.6f,
-        -0.5f,  0.5f, -0.5f,  0.0f, 0.0f, -1.0f,  0.4f, 0.6f,
-        -0.5f, -0.5f, -0.5f,  0.0f, 0.0f, -1.0f,  0.4f, 0.4f,
+    load_obj("assets\\models\\weirdchamp.obj"_s, &mesh);
 
-        -0.5f, -0.5f,  0.5f,  0.0f, 0.0f, 1.0f,  0.0f, 0.0f,
-        0.5f, -0.5f,  0.5f,  0.0f, 0.0f, 1.0f,  1.0f, 0.0f,
-        0.5f,  0.5f,  0.5f,  0.0f, 0.0f, 1.0f,  1.0f, 1.0f,
-        0.5f,  0.5f,  0.5f,  0.0f, 0.0f, 1.0f,  1.0f, 1.0f,
-        -0.5f,  0.5f,  0.5f,  0.0f, 0.0f, 1.0f,  0.0f, 1.0f,
-        -0.5f, -0.5f,  0.5f,  0.0f, 0.0f, 1.0f,  0.0f, 0.0f,
-
-        -0.5f,  0.5f,  0.5f,  -1.0f, 0.0f, 0.0f,  1.0f, 0.0f,
-        -0.5f,  0.5f, -0.5f,  -1.0f, 0.0f, 0.0f,  1.0f, 1.0f,
-        -0.5f, -0.5f, -0.5f,  -1.0f, 0.0f, 0.0f,  0.0f, 1.0f,
-        -0.5f, -0.5f, -0.5f,  -1.0f, 0.0f, 0.0f,  0.0f, 1.0f,
-        -0.5f, -0.5f,  0.5f,  -1.0f, 0.0f, 0.0f,  0.0f, 0.0f,
-        -0.5f,  0.5f,  0.5f,  -1.0f, 0.0f, 0.0f,  1.0f, 0.0f,
-
-        0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.0f,  1.0f, 0.0f,
-        0.5f,  0.5f, -0.5f,  1.0f, 0.0f, 0.0f,  1.0f, 1.0f,
-        0.5f, -0.5f, -0.5f,  1.0f, 0.0f, 0.0f,  0.0f, 1.0f,
-        0.5f, -0.5f, -0.5f,  1.0f, 0.0f, 0.0f,  0.0f, 1.0f,
-        0.5f, -0.5f,  0.5f,  1.0f, 0.0f, 0.0f,  0.0f, 0.0f,
-        0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.0f,  1.0f, 0.0f,
-
-        -0.5f, -0.5f, -0.5f,  0.0f, -1.0f, 0.0f,  0.0f, 1.0f,
-        0.5f, -0.5f, -0.5f,  0.0f, -1.0f, 0.0f,  1.0f, 1.0f,
-        0.5f, -0.5f,  0.5f,  0.0f, -1.0f, 0.0f,  1.0f, 0.0f,
-        0.5f, -0.5f,  0.5f,  0.0f, -1.0f, 0.0f,  1.0f, 0.0f,
-        -0.5f, -0.5f,  0.5f,  0.0f, -1.0f, 0.0f,  0.0f, 0.0f,
-        -0.5f, -0.5f, -0.5f,  0.0f, -1.0f, 0.0f,  0.0f, 1.0f,
-
-        -0.5f,  0.5f, -0.5f,  0.0f, 1.0f, 0.0f,  0.0f, 1.0f,
-        0.5f,  0.5f, -0.5f,  0.0f, 1.0f, 0.0f,  1.0f, 1.0f,
-        0.5f,  0.5f,  0.5f,  0.0f, 1.0f, 0.0f,  1.0f, 0.0f,
-        0.5f,  0.5f,  0.5f,  0.0f, 1.0f, 0.0f,  1.0f, 0.0f,
-        -0.5f,  0.5f,  0.5f,  0.0f, 1.0f, 0.0f,  0.0f, 0.0f,
-        -0.5f,  0.5f, -0.5f,  0.0f, 1.0f, 0.0f,  0.0f, 1.0f
-    };
+    Array<VertexXNU> vbo_buffer;
+    for(int i = 0; i < mesh.vertices.count; i++) {
+        array_add(&vbo_buffer, {mesh.vertices[i], mesh.normals[i], mesh.uvs[i]});
+    }
 
     glGenBuffers(1, &VBO);
 
@@ -61,22 +35,27 @@ void init() {
     glBindVertexArray(VAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeModel), cubeModel, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, vbo_buffer.count * sizeof(VertexXNU), vbo_buffer.data, GL_STATIC_DRAW);
 
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(VertexXNU), (void *)offsetof(VertexXNU, position));
     glEnableVertexAttribArray(0);
 
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)(3 * sizeof(float)));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(VertexXNU), (void *)offsetof(VertexXNU, normal));
     glEnableVertexAttribArray(1);
 
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)(6 * sizeof(float)));
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(VertexXNU), (void *)offsetof(VertexXNU, uv));
     glEnableVertexAttribArray(2);
+    
+    glGenBuffers(1, &EBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh.indices.count * sizeof(uint), mesh.indices.data, GL_STATIC_DRAW);
 
     //Create light VAO
     glGenVertexArrays(1, &light_VAO);
     glBindVertexArray(light_VAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
@@ -90,12 +69,14 @@ void init() {
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    stbi_set_flip_vertically_on_load(true);  
     // load and generate the texture
     int width, height, nrChannels;
-    unsigned char *image_data = stbi_load("assets\\textures\\Untitled.png", &width, &height, &nrChannels, 0);
+    unsigned char *image_data = stbi_load("assets\\textures\\uv_grid.png", &width, &height, &nrChannels, 0);
     if (image_data)
     {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, image_data);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data);
         glGenerateMipmap(GL_TEXTURE_2D);
     }
     else
@@ -105,8 +86,8 @@ void init() {
     }
     stbi_image_free(image_data);
 
-    compile_shader(&shader, "basic", "assets/shaders/basic.vert", "assets/shaders/basic.frag");
-    compile_shader(&light_shader, "light_shader", "assets/shaders/basic.vert", "assets/shaders/light_cube.frag");
+    compile_shader(&shader, "assets/shaders/basic.vert"_s, "assets/shaders/basic.frag"_s);
+    compile_shader(&light_shader, "assets/shaders/basic.vert"_s, "assets/shaders/light_cube.frag"_s);
 }
 
 void render(OSWindow* window) {
@@ -139,7 +120,7 @@ void render(OSWindow* window) {
     set_shader_uniform(&light_shader, "model", localToWorld);
 
     glBindVertexArray(light_VAO);
-    glDrawArrays(GL_TRIANGLES, 0, 36);
+    glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
 
     
     // CUBES DRAW
@@ -171,7 +152,7 @@ void render(OSWindow* window) {
         localToWorld = glm::rotate(localToWorld, cubes_rotation * glm::radians(angle), glm::vec3(0.5f, 1.0f, 0.0f));
         set_shader_uniform(&shader, "model", localToWorld);
 
-        glDrawArrays(GL_TRIANGLES, 0, 36);
+        glDrawElements(GL_TRIANGLES, (uint)mesh.indices.count, GL_UNSIGNED_INT, 0);
     }
 
     os_swap_buffers(window);

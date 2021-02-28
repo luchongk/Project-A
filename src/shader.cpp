@@ -2,18 +2,13 @@
 #include "platform.h"
 #include "glad/glad.h"
 #include "shader.h"
+#include "strings.h"
 
-void compile_shader(Shader* shader, const char* name, const char* vertex_path, const char* fragment_path) {
-    int i = 0;
-    while(*name) {
-        shader->name[i++] = *name++;
-    }
-    shader->name[i] = '\0';
-
-    char* vertex_src = os_read_entire_file(vertex_path);
+void compile_shader(Shader* shader, String vertex_path, String fragment_path) {
+    String vertex_src = os_read_entire_file(vertex_path, true);
 
     unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertexShader, 1, &vertex_src, nullptr);
+    glShaderSource(vertexShader, 1, (char**)&vertex_src.data, nullptr);
     glCompileShader(vertexShader);
 
     int success = 0;
@@ -25,10 +20,10 @@ void compile_shader(Shader* shader, const char* name, const char* vertex_path, c
         return;
     }
 
-    char* fragment_src = os_read_entire_file(fragment_path);
+    String fragment_src = os_read_entire_file(fragment_path, true);
 
     unsigned int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &fragment_src, nullptr);
+    glShaderSource(fragmentShader, 1, (char**)&fragment_src.data, nullptr);
     glCompileShader(fragmentShader);
 
     glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);

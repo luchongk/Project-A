@@ -44,11 +44,9 @@ void simulate(PlayerInput* input) {
     }
 
     float dt = time.delta * time.modifier;
-    std::cout << dt << std::endl;
 
     update_camera(input, dt);
     
     light_time_accum += dt;
-    
     cubes_rotation += 2 * glm::sin(10 * glm::radians(light_time_accum)) * cubes_rotation_dir * dt;
 }

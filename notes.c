@@ -1,7 +1,7 @@
 /**
  * TODO: No particular order
  * ✓
- * * [] Clean up vector.h
+ * * [] Clean up vector.h, make some kind of vector3 for ints
  * 
  * * [✓] Math file
  * 
@@ -14,4 +14,6 @@
  * * [] Physics
  * 
  * * [] Get rid of GLM
+ * 
+ * * [] Temporary Storage
  */

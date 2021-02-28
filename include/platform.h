@@ -5,7 +5,7 @@
     #include "Windows.h"
 #endif
 
-#include "array.h"
+#include "strings.h"
 #include "vector.h"
 
 struct OSWindow {
@@ -41,6 +41,6 @@ inline s64 os_get_timer_frequency();
 bool os_poll_events();
 void os_toggle_fullscreen(OSWindow* window, bool borderless);
 void os_swap_buffers(OSWindow* window);
-char* os_read_entire_file(const char* path);
+String os_read_entire_file(String path, bool null_terminated = false);
 
 #endif
