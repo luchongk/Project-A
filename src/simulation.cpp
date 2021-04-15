@@ -5,8 +5,11 @@ static float cubes_rotation_dir = 1;
 Camera camera;
 Vector3 light_pos = {1.0f, 1.0f, -6.0f};
 float cubes_rotation = 0;
-bool paused = true;
+bool paused = false;
 float light_time_accum = 0.0f;
+
+float shapeX = 0;
+float shapeY = 0;
 
 static void update_camera(PlayerInput* input, float dt) {
     camera.yaw += input->mouse_delta.x * 2.0f * dt;
@@ -47,6 +50,11 @@ void simulate(PlayerInput* input) {
 
     update_camera(input, dt);
     
-    light_time_accum += dt;
-    cubes_rotation += 2 * glm::sin(10 * glm::radians(light_time_accum)) * cubes_rotation_dir * dt;
+    light_time_accum += (float)time.delta;
+    //cubes_rotation += 2 * glm::sin(10 * glm::radians(light_time_accum)) * cubes_rotation_dir * dt;
+    light_pos = {
+        glm::cos(light_time_accum * 0.75f) * 2,
+        glm::sin(light_time_accum * 0.75f) * 2,
+        -6.0f
+    };
 }

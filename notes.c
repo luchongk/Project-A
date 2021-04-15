@@ -16,4 +16,6 @@
  * * [] Get rid of GLM
  * 
  * * [] Temporary Storage
+ * 
+ * * [] Position/Rotation interpolation for rendering
  */

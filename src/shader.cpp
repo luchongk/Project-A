@@ -1,6 +1,6 @@
 #include <iostream>
 #include "platform.h"
-#include "glad/glad.h"
+#include "glad/gl.h"
 #include "shader.h"
 #include "strings.h"
 

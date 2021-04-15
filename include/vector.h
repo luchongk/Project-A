@@ -1,7 +1,7 @@
 #ifndef VECTOR_H
 #define VECTOR_H
 
-#include "glm/vec3.hpp"
+#include "glm/glm.hpp"
 
 struct Vector2 {
     float x;
@@ -43,10 +43,6 @@ struct Vector3I {
 
     inline int dot(const Vector3I& other) {
         return this->x * other.x + this->y * other.y + this->z * other.z;
-    }
-
-    inline glm::ivec3 toGLM() {
-        return glm::ivec3{this->x, this->y, this->z};
     }
 };
 

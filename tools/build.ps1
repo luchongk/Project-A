@@ -30,7 +30,7 @@ tools\faster-vcvars.ps1 $platform
 
 $project = "Project_A"
 $includes = "include", "include\3rdParty"
-$libraries = "user32.lib", "winmm.lib", "gdi32.lib", "glad64_d.lib", "opengl32.lib"
+$libraries = "user32.lib", "winmm.lib", "gdi32.lib", "d3d11.lib", "d3dcompiler.lib"
 $ignored_warnings = "4100", "4127", "4201", "4458", "4706", "4505" #"4189"
 $execFolder = if($release) { "bin\Release" } else { "bin\Debug" }
 
@@ -43,13 +43,13 @@ $compileExeOpts =
 #	"-WX",
 	"-W4" +
 	$(foreach($warning in $ignored_warnings) { "-wd$warning" }) +
-	$(if($release) { "-MTd", "-O2" } else { "-MTd", "-Od" }) +
+	$(if($release) { "-MT", "-O2" } else { "-MTd", "-Od" }) +
     "-GR-" +
 	$(foreach($inc in $includes) { "-I$inc" }) +
 	"-Fobin\Debug\",
 	"-Fdbin\Debug\",
 #	"-Faasm\",
-	"-DNOMINMAX",
+	"-D_CRT_SECURE_NO_WARNINGS",
 	"-DUNICODE",
 	"-D_UNICODE" +
 	$(if($release) { } else { "-DDEBUG" })
@@ -73,6 +73,7 @@ rm "$execFolder\game-*.pdb" -ErrorAction SilentlyContinue
 #if($LASTEXITCODE -ne 0) { exit 1 }
 
 cl.exe $compileExeOpts "-Fe$execFolder\$project.exe" src\main.cpp $linkOpts
+
 # Only return the error if we are not running the game,
 # cause compilation of the .exe always fails when we are running
 if(($LASTEXITCODE -ne 0) -and !(Get-Process $project -ErrorAction SilentlyContinue)) { exit 1 }

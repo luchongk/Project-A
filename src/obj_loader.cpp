@@ -2,7 +2,7 @@
 
 #include "obj_loader.h"
 
-struct ObjFace {
+struct ObjVertex {
     int v_index;
     int vn_index;
     int uv_index;
@@ -15,7 +15,7 @@ void load_obj(String path, Mesh* mesh) {
     Array<Vector3> vertices{};
     Array<Vector2> uvs{};
     Array<Vector3> normals{};
-    Array<ObjFace> faces{};
+    Array<ObjVertex> face_vertices{};
 
     auto cursor = find_from_left("v "_s, content);
     
@@ -65,11 +65,11 @@ void load_obj(String path, Mesh* mesh) {
             auto vn_index = atoi((const char*)vn_string.data);
             line = advance(line, 1);
 
-            ObjFace face{v_index, vt_index, vn_index};
+            ObjVertex face_vertex{v_index, vt_index, vn_index};
 
             int found = -1;
-            for(int j = 0; j < faces.count; j++) {
-                if(faces[j].v_index == face.v_index && faces[j].uv_index == face.uv_index && faces[j].vn_index == face.vn_index) {
+            for(int j = 0; j < face_vertices.count; j++) {
+                if(face_vertices[j].v_index == face_vertex.v_index && face_vertices[j].uv_index == face_vertex.uv_index && face_vertices[j].vn_index == face_vertex.vn_index) {
                     found = j;
                     break;
                 }
@@ -79,8 +79,8 @@ void load_obj(String path, Mesh* mesh) {
                 array_add(&mesh->indices,  (uint)found);
             }
             else {
-                array_add(&mesh->indices,  (uint)faces.count);
-                array_add(&faces, face);
+                array_add(&mesh->indices,  (uint)face_vertices.count);
+                array_add(&face_vertices, face_vertex);
                 
                 array_add(&mesh->vertices, vertices[v_index - 1]);
                 array_add(&mesh->uvs,      uvs[vt_index - 1]);

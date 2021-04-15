@@ -1,0 +1,87 @@
+#ifndef GRAPHICS_H
+#define GRAPHICS_H
+
+enum class VertexFormat {
+    PC,
+    PNU,
+};
+
+struct VertexPC {
+    float position[3];
+    float color[4];
+};
+
+struct VertexPNU {
+    Vector3 position;
+    Vector3 normal;
+    Vector2 uv;
+};
+
+// Handle to a graphics buffer (vertex, index, uniform)
+struct GraphicsBuffer;
+
+struct Texture;
+
+enum class GraphicsBufferUsage {
+    STATIC,
+    DYNAMIC
+};
+
+enum class GraphicsPrimitiveType {
+    POINT,
+    LINE,
+    LINE_STRIP,
+    TRIANGLE,
+    TRIANGLE_STRIP
+};
+
+//The numeric value of these indicate register slots for the uniform buffers
+enum class UniformBufferSlot {
+    GLOBAL,
+    PER_SCENE,
+    PER_FRAME,
+    PER_OBJECT
+};
+
+extern void (*on_size_adjusted)(int width, int height);
+
+bool init_graphics(HWND hwnd);
+
+void end_graphics();
+
+uint compile_shader(String vertex_path, String pixel_path, VertexFormat input_format);
+
+void set_shader(uint id);
+
+void set_fullscreen_state(bool fullscreen);
+
+void adjust_size(int width, int height);
+
+void bind_framebuffer();
+
+void swap_buffers();
+
+void clear_color_buffer(float r, float g, float b);
+void clear_depth_buffer();
+
+Texture* create_texture(String path);
+void set_texture(uint slot, Texture* texture);
+void release_texture(Texture* texture);
+
+GraphicsBuffer* create_vertex_buffer(GraphicsBufferUsage usage, VertexFormat format, uint count, void* data = nullptr);
+GraphicsBuffer* create_index_buffer(GraphicsBufferUsage usage, uint count, void* data = nullptr);
+GraphicsBuffer* create_uniform_buffer(GraphicsBufferUsage usage, uint size, void* data = nullptr);
+
+void modify_buffer(GraphicsBuffer* buffer, uint size, void* data);
+
+void set_vertex_buffer(GraphicsBuffer* buffer);
+
+void set_index_buffer(GraphicsBuffer* buffer);
+
+void set_uniform_buffer(UniformBufferSlot slot, GraphicsBuffer* buffer);
+
+void set_primitive_type(GraphicsPrimitiveType type);
+
+void draw_indexed(uint index_count);
+
+#endif

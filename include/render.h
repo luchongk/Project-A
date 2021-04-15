@@ -12,9 +12,10 @@ struct Mesh {
     Array<uint>     indices;
 };
 
-void init();
+void init_renderer();
+void end_renderer();
 
-struct OSWindow;
+struct ::OSWindow;
 
 void render(OSWindow* window);
 

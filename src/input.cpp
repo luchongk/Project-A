@@ -3,15 +3,12 @@
 #include "platform.h"
 
 void handle_events(OSWindow* window, PlayerInput* input) {
-    if(!window->focused) return;
-
-    input->mouse_delta = os_events.mouse_delta;
-
     For(os_events.keyboard) {
         if(it->pressed) {
             switch(it->code) {
                 case 'P': {
                     paused = !paused;
+                    os_lock_cursor(paused ? nullptr : window);
                     continue;
                 }
 
@@ -32,33 +29,23 @@ void handle_events(OSWindow* window, PlayerInput* input) {
                     continue;
                 }
 
+                case VK_F9: {
+                    bool is_fullscreen = os_is_fullscreen(window);
+                    os_set_fullscreen(window, !is_fullscreen, false);
+                    continue;
+                }
+
                 case VK_F11: {
-                    os_toggle_fullscreen(window, true);
+                    bool is_fullscreen = os_is_fullscreen(window);
+                    os_set_fullscreen(window, !is_fullscreen, true);
                     continue;
                 }
             }
         }
-        
-        switch(it->code) {
-            case 'A': {
-                input->horizontal += it->pressed ? -1 : 1;
-                break;
-            }
-
-            case 'D': {
-                input->horizontal += it->pressed ? 1 : -1;
-                break;
-            }
-
-            case 'S': {
-                input->vertical += it->pressed ? -1 : 1;
-                break;
-            }
-
-            case 'W': {
-                input->vertical += it->pressed ? 1 : -1;
-                break;
-            }
-        }
     }
+
+    input->mouse_delta = os_events.mouse_delta;
+
+    input->horizontal = -(int)os_keyboard['A'] + (int)os_keyboard['D'];
+    input->vertical   = -(int)os_keyboard['S'] + (int)os_keyboard['W'];
 }
