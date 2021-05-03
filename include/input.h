@@ -2,8 +2,10 @@
 #define INPUT_H
 
 struct PlayerInput {
-    int horizontal;
+    int horizontalX;
+    int horizontalZ;
     int vertical;
+    int rotationDir;
     Vector2 mouse_delta;
 };
 

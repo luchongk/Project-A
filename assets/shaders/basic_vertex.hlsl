@@ -11,7 +11,7 @@ cbuffer global : register(b0) {
     matrix projection;
 };
 
-cbuffer per_frame : register(b2) {
+cbuffer per_frame : register(b1) {
     matrix view;
 };
 

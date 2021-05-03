@@ -23,6 +23,7 @@ struct GraphicsBuffer;
 struct Texture;
 
 enum class GraphicsBufferUsage {
+    //IMMUTABLE,
     STATIC,
     DYNAMIC
 };
@@ -37,9 +38,9 @@ enum class GraphicsPrimitiveType {
 
 //The numeric value of these indicate register slots for the uniform buffers
 enum class UniformBufferSlot {
-    GLOBAL,
-    PER_SCENE,
+    PER_SETTINGS,
     PER_FRAME,
+    PER_MATERIAL,
     PER_OBJECT
 };
 

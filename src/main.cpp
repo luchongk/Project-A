@@ -7,7 +7,6 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.cpp"
-//#include "shader.cpp"
 #include "input.cpp"
 #include "render.cpp"
 #include "simulation.cpp"

@@ -1,5 +1,5 @@
 
-cbuffer per_frame : register(b2) {
+cbuffer per_frame : register(b1) {
     float3 view_pos : packoffset(c4);
     struct {
         float3 position;
@@ -7,15 +7,18 @@ cbuffer per_frame : register(b2) {
         float3 diffuse;
         float3 specular;
     } light : packoffset(c5);
+    float time : packoffset(c8.w);
 }
 
 cbuffer per_object : register(b3) {
+    matrix world : packoffset(c0);
     struct {
         float3 ambient;
         float3 diffuse;
         float3 specular;
         float shininess;
     } material : packoffset(c4);
+    float3 position : packoffset(c7.y);
 }
 
 Texture2D tex : register(t0);
@@ -38,6 +41,15 @@ float4 main(float3 world_position : POSITION, float3 normal : NORMAL, float2 uv 
     float specular_portion = pow(max(dot(view_dir, reflect_dir), 0), material.shininess);
     float3 specular = specular_portion * light.specular * material.specular;
     
-    float3 result = ambient + diffuse + specular;
-    return float4(result, 1.0) * tex.Sample(smp, uv);
+    float3 color = ambient + diffuse + specular;
+    //color = color * tex.Sample(smp, uv);
+
+    //Gamma correction
+    //color = pow(color, 1.0 / 2.2);
+    color = max(1.055 * pow(color, 0.416666667) - 0.055, 0);
+
+    //Fade in/out based on percieved brightness (non linear, thats why it goes after gamma correction)
+    //color = color * (cos(2 * time) * 0.5 + 0.5);
+
+    return float4(color, 1);
 }

@@ -14,7 +14,9 @@ struct Camera {
 extern Camera camera;
 extern Vector3 light_pos;
 extern float cubes_rotation;
+extern Vector3 cubes_offset;
 extern bool paused;
+extern bool character;
 extern float light_time_accum;
 
 struct PlayerInput;

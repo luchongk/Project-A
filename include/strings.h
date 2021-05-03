@@ -32,6 +32,16 @@ String operator ""_s(const char* str, size_t size) {
     return from_cstring((char*)str, (int)size);
 }
 
+inline int compare(String a, String b) {
+    if(a.count < b.count) return -1;
+    if(a.count > b.count) return 1;
+
+    if(a.count == 0) return 0;
+    
+    s64 length = min(a.count, b.count);
+    return strncmp((const char*)a.data, (const char*)b.data, length);
+}
+
 String advance(String s, s64 amount) {
     amount = min((s64)amount, s.count);
     s.data += amount;

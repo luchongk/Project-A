@@ -16,6 +16,7 @@ void handle_events(OSWindow* window, PlayerInput* input) {
                     camera = {};
                     cubes_rotation = 0;
                     light_time_accum = 0;
+                    cubes_offset = {};
                     continue;
                 }
 
@@ -26,6 +27,11 @@ void handle_events(OSWindow* window, PlayerInput* input) {
 
                 case VK_RIGHT: {
                     time.modifier *= 2.0f;
+                    continue;
+                }
+
+                case VK_TAB: {
+                    character = !character;
                     continue;
                 }
 
@@ -46,6 +52,9 @@ void handle_events(OSWindow* window, PlayerInput* input) {
 
     input->mouse_delta = os_events.mouse_delta;
 
-    input->horizontal = -(int)os_keyboard['A'] + (int)os_keyboard['D'];
-    input->vertical   = -(int)os_keyboard['S'] + (int)os_keyboard['W'];
+    input->horizontalX = -(int)os_keyboard['A'] + (int)os_keyboard['D'];
+    input->horizontalZ = -(int)os_keyboard['S'] + (int)os_keyboard['W'];
+    input->vertical    = -(int)os_keyboard[VK_SHIFT] + (int)os_keyboard[VK_SPACE];
+
+    input->rotationDir = -(int)os_keyboard['Q'] + (int)os_keyboard['E'];
 }

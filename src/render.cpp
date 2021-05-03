@@ -31,7 +31,7 @@ struct PerFrameUniforms {
         float padding3;
         glm::vec3 specular;
     } light;
-    float padding2;
+    float time;
 };
 
 struct PerObjectUniforms {
@@ -44,12 +44,14 @@ struct PerObjectUniforms {
         glm::vec3 specular;
         float shininess;
     } material;
+    glm::vec3 pos;
+    float padding;
 };
 
 static Mesh weird_mesh;
 static Mesh cube_mesh;
 
-static uint the_shader;
+static uint pbr_shader;
 static uint light_shader;
 
 static GraphicsBuffer* weird_vertex_buffer;
@@ -86,11 +88,11 @@ static void adjust_projection(int width, int height) {
 }
 
 void init_renderer() {
-    the_shader   = compile_shader("assets\\shaders\\basic_vertex.hlsl"_s, "assets\\shaders\\basic_pixel.hlsl"_s, VertexFormat::PNU);
+    pbr_shader   = compile_shader("assets\\shaders\\basic_vertex.hlsl"_s, "assets\\shaders\\basic_pixel.hlsl"_s, VertexFormat::PNU);
     light_shader = compile_shader("assets\\shaders\\basic_vertex.hlsl"_s, "assets\\shaders\\light_cube_pixel.hlsl"_s, VertexFormat::PNU);
-    set_shader(the_shader);
+    set_shader(pbr_shader);
 
-    load_obj("assets\\models\\weirdchamp.obj"_s, &weird_mesh);
+    load_obj("assets\\models\\weirdchamp_smooth.obj"_s, &weird_mesh);
 
     Array<VertexPNU> vbo_buffer;
     for(int i = 0; i < weird_mesh.vertices.count; i++) {
@@ -117,7 +119,7 @@ void init_renderer() {
     per_frame_uniform_buffer  = create_uniform_buffer(GraphicsBufferUsage::DYNAMIC, sizeof(PerFrameUniforms));
     per_object_uniform_buffer = create_uniform_buffer(GraphicsBufferUsage::DYNAMIC, sizeof(PerObjectUniforms));
 
-    set_uniform_buffer(UniformBufferSlot::GLOBAL, global_uniform_buffer);
+    set_uniform_buffer(UniformBufferSlot::PER_SETTINGS, global_uniform_buffer);
     set_uniform_buffer(UniformBufferSlot::PER_FRAME, per_frame_uniform_buffer);
     set_uniform_buffer(UniformBufferSlot::PER_OBJECT, per_object_uniform_buffer);
 
@@ -125,25 +127,27 @@ void init_renderer() {
 
     grid_texture = create_texture("assets\\textures\\uv_grid.png"_s);
     set_texture(0, grid_texture);
-
 }
 
 void render(OSWindow* window) {
     bind_framebuffer();
-    clear_color_buffer(0.9f, 0.9f, 0.9f);
+    auto srgb = powf(0.1f, 1.0f / 2.2f);
+    clear_color_buffer(srgb, srgb, srgb);
     clear_depth_buffer();
 
+    per_frame_uniforms.view_pos = camera.position.toGLM();
+
     per_frame_uniforms.view = glm::transpose(glm::lookAt(
-        camera.position.toGLM(),
+        per_frame_uniforms.view_pos,
         (camera.position + camera.forward).toGLM(),
         glm::vec3{0,1,0}
     ));
-    per_frame_uniforms.view_pos = camera.position.toGLM();
     
     per_frame_uniforms.light.position = light_pos.toGLM();
-    per_frame_uniforms.light.diffuse = {0.2f, 0.5f, 0.9f};
-    per_frame_uniforms.light.ambient = per_frame_uniforms.light.diffuse * glm::vec3{0.4f};
+    per_frame_uniforms.light.diffuse = {1.0f, 1.0f, 1.0f};
+    per_frame_uniforms.light.ambient = per_frame_uniforms.light.diffuse * glm::vec3{0.03f};
     per_frame_uniforms.light.specular = {1.0f, 1.0f, 1.0f};
+    per_frame_uniforms.time = time.since_start;
 
     modify_buffer(per_frame_uniform_buffer, sizeof(per_frame_uniforms), &per_frame_uniforms);
 
@@ -161,15 +165,15 @@ void render(OSWindow* window) {
     draw_indexed((uint)cube_mesh.indices.count);
     
     // CUBES DRAW
-    set_shader(the_shader);
+    set_shader(pbr_shader);
 
-    per_object_uniforms.material.ambient   = glm::vec3{0.2f, 0.5f, 0.2f};
-    per_object_uniforms.material.diffuse   = glm::vec3{0.2f, 0.5f, 0.8f};
-    per_object_uniforms.material.specular  = glm::vec3{1.0f, 0.0f, 0.8f};
-    per_object_uniforms.material.shininess = 32.0f;
+    per_object_uniforms.material.ambient   = {0.49f, 0.37f, 0.11f};
+    per_object_uniforms.material.diffuse   = {0.0f, 0.0f, 0.0f};
+    per_object_uniforms.material.specular  = {1.0f, 0.782f, 0.17f};
+    per_object_uniforms.material.shininess = 16.0f;
 
     glm::vec3 cubeposition[] {
-        glm::vec3{2.0f, 0.0f, 0.0f},
+        glm::vec3{0.0f, 0.0f, 0.0f},
         glm::vec3{2.0f, 5.0f, -15.0f},
         glm::vec3{-1.5f, -2.2f, -2.5f},
         glm::vec3{-3.8f, -2.0f, -12.3f},
@@ -178,10 +182,11 @@ void render(OSWindow* window) {
 
     set_vertex_buffer(weird_vertex_buffer);
     set_index_buffer(weird_index_buffer);
-    for(int i = 0; i < 5; i++) {
-        localToWorld = glm::translate(glm::mat4{1.0f}, cubeposition[i]);
-        float angle = 50.0f * (i+1);
-        localToWorld = glm::rotate(localToWorld, cubes_rotation * glm::radians(angle), glm::vec3(0.5f, 1.0f, 0.0f));
+    for(int i = 0; i < 1; i++) {
+        localToWorld = glm::translate(glm::mat4{1.0f}, cubeposition[i] + cubes_offset.toGLM());
+        per_object_uniforms.pos = cubeposition[i] + cubes_offset.toGLM();
+        float angle = cubes_rotation;//50.0f * (i+1);
+        localToWorld = glm::rotate(localToWorld, glm::radians(angle), glm::vec3(0.0f, 1.0f, 0.0f));
         per_object_uniforms.world = glm::transpose(localToWorld);
         modify_buffer(per_object_uniform_buffer, sizeof(per_object_uniforms), &per_object_uniforms);
 

@@ -23,6 +23,7 @@ inline ArrayView<T> make_view(T array[], int count) {
 template<typename T>
 struct Array : public ArrayView<T> {
     s64 allocated = 0;
+    s64 start_size = 8;
 
     Allocator allocator = nullptr;
     void* allocator_data = nullptr;
@@ -41,21 +42,22 @@ struct Array : public ArrayView<T> {
 };
 
 template<typename T>
-void array_add(Array<T>* array, T toAdd) {
+void array_add(Array<T>* array, T to_add) {
     if(array->count >= array->allocated) {
-        s64 newSize = 2 * array->allocated;
-        if(newSize < 8) newSize = 8;
+        s64 new_size = 2 * array->allocated;
+        if(new_size < array->start_size) new_size = array->start_size;
 
         if(array->allocator) {
-            array->data = (T*)array->allocator(array->data, sizeof(T) * array->count, sizeof(T) * newSize, array->allocator_data);
-        } else {
-            array->data = realloc_<T>(array->data, array->count, newSize);
+            array->data = (T*)array->allocator(array->data, sizeof(T) * array->allocated, sizeof(T) * new_size, array->allocator_data);
+        }
+        else {
+            array->data = realloc_<T>(array->data, array->allocated, new_size);
         }
 
-        array->allocated = newSize;
+        array->allocated = new_size;
     }
 
-    array->data[array->count++] = toAdd;
+    array->data[array->count++] = to_add;
 }
 
 #define For(array) for(auto it = &(array).data[0]; it < &(array).data[(array).count]; it++)
