@@ -12,9 +12,9 @@ struct ObjVertex {
 void load_obj(String path, Mesh* mesh) {
     auto content = os_read_entire_file(path);
 
-    Array<Vector3> vertices{};
-    Array<Vector2> uvs{};
-    Array<Vector3> normals{};
+    Array<Vec3> vertices{};
+    Array<Vec2> uvs{};
+    Array<Vec3> normals{};
     Array<ObjVertex> face_vertices{};
 
     auto cursor = find_from_left("v "_s, content);
@@ -23,7 +23,7 @@ void load_obj(String path, Mesh* mesh) {
     while(starts_with("v "_s, cursor)) {
         auto line = eat_line(&cursor);
         line = advance(line, 2);
-        auto v = vec3_parse(line);
+        auto v = parse_vec3(line);
 
         array_add(&vertices, v);
     }
@@ -32,7 +32,7 @@ void load_obj(String path, Mesh* mesh) {
     while(starts_with("vt"_s, cursor)) {
         auto line = eat_line(&cursor);
         line = advance(line, 3);
-        auto vt = vec2_parse(line);
+        auto vt = parse_vec2(line);
 
         array_add(&uvs, vt);
     }
@@ -41,7 +41,7 @@ void load_obj(String path, Mesh* mesh) {
     while(starts_with("vn"_s, cursor)) {
         auto line = eat_line(&cursor);
         line = advance(line, 3);
-        auto vn = vec3_parse(line);
+        auto vn = parse_vec3(line);
 
         array_add(&normals, vn);
     }

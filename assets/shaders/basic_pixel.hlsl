@@ -33,7 +33,7 @@ float4 main(float3 world_position : POSITION, float3 normal : NORMAL, float2 uv 
     float3 norm = normalize(normal);
     float3 light_dir = normalize(light.position - world_position);
     float diffuse_portion = max(dot(light_dir, norm), 0);
-    float3 diffuse = diffuse_portion * light.diffuse * material.diffuse;
+    float3 diffuse = diffuse_portion * light.diffuse * material.diffuse * tex.Sample(smp, uv);
 
     //specular
     float3 view_dir = normalize(view_pos - world_position);

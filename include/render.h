@@ -6,9 +6,9 @@
 #include "vector.h"
 
 struct Mesh {
-    Array<Vector3>  vertices;
-    Array<Vector3>  normals;
-    Array<Vector2>  uvs;
+    Array<Vec3>  vertices;
+    Array<Vec3>  normals;
+    Array<Vec2>  uvs;
     Array<uint>     indices;
 };
 

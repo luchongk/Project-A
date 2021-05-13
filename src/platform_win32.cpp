@@ -8,8 +8,9 @@ struct OSWindow {
     HWND handle;
     HDC device;
     
-    Vector2 position;
-    Vector2 size;
+    //@Cleanup make this integer vectors and remove all the unnecessary casting everywhere
+    Vec2 position;
+    Vec2 size;
     
     //@Cleanup These should probably be state flags
     bool focused;

@@ -6,7 +6,7 @@ struct PlayerInput {
     int horizontalZ;
     int vertical;
     int rotationDir;
-    Vector2 mouse_delta;
+    Vec2 mouse_delta;
 };
 
 void handle_events(OSWindow* window, PlayerInput* input);

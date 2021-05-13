@@ -12,9 +12,9 @@ struct VertexPC {
 };
 
 struct VertexPNU {
-    Vector3 position;
-    Vector3 normal;
-    Vector2 uv;
+    Vec3 position;
+    Vec3 normal;
+    Vec2 uv;
 };
 
 // Handle to a graphics buffer (vertex, index, uniform)

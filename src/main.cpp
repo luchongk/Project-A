@@ -12,6 +12,7 @@
 #include "simulation.cpp"
 #include "graphics.cpp"
 #include "obj_loader.cpp"
+#include "entities.cpp"
 
 Allocator default_allocator = malloc_allocator;
 void* default_allocator_data;
@@ -40,12 +41,12 @@ void main() {
     time.modifier = 1.0f;
     maxFrameTime = 0.25f;
 
-    float accum = 0;
+    //float accum = 0;
 
     OSWindow* window = os_create_window(200, 100, 1600, 800);
     os_lock_cursor(window);
 
-    init_renderer();
+    init_renderer(window);
 
     while(true) {
         if(os_poll_events(window)) break;

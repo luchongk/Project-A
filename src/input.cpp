@@ -1,6 +1,7 @@
 #include "input.h"
 #include "simulation.h"
 #include "platform.h"
+#include "entities.h"
 
 void handle_events(OSWindow* window, PlayerInput* input) {
     For(os_events.keyboard) {

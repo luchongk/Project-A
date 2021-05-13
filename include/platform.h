@@ -29,7 +29,7 @@ struct OSEvents {
     Array<OSKeyboardEvent> keyboard;
     Array<OSTextEvent> chars;
     //Array<OSEventType> other;
-    Vector2 mouse_delta;
+    Vec2 mouse_delta;
 };
 
 OSEvents os_events;
