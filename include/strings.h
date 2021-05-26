@@ -32,7 +32,7 @@ String operator ""_s(const char* str, size_t size) {
     return from_cstring((char*)str, (int)size);
 }
 
-inline int compare(String a, String b) {
+int compare(String a, String b) {
     if(a.count < b.count) return -1;
     if(a.count > b.count) return 1;
 
@@ -83,13 +83,11 @@ String find_from_left(String to_find, String context) {
 
     s64 bytes_left = context.count;
     For(context) {
-        if(*it == to_find[0]) {
-            if(memcmp(it, to_find.data, min(bytes_left, to_find.count)) == 0) {
-                result.data = it;
-                result.count = bytes_left;
+        if(memcmp(it, to_find.data, min(bytes_left, to_find.count)) == 0) {
+            result.data = it;
+            result.count = bytes_left;
 
-                return result;
-            }
+            return result;
         }
         bytes_left--;
     }

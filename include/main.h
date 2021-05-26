@@ -6,12 +6,13 @@ struct Time {
     s64 last_stamp;
     s64 frequency;
     float since_start;
-    float delta;
-    float simulation_delta;
+    float dt;
+    float sim_dt;
+    float scaled_sim_dt;
     float modifier;
 };
 
 extern Time time;
-extern float maxFrameTime;
+extern float max_frame_time;
 
 #endif

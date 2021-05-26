@@ -12,7 +12,7 @@ struct ArrayView {
 };
 
 template<typename T>
-inline ArrayView<T> make_view(T array[], int count) {
+ArrayView<T> make_view(T array[], int count) {
     ArrayView<T> view;
     view.data = array;
     view.count = count;

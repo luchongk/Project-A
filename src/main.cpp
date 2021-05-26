@@ -14,38 +14,71 @@
 #include "obj_loader.cpp"
 #include "entities.cpp"
 
-Allocator default_allocator = malloc_allocator;
-void* default_allocator_data;
-
 Time time;
-float maxFrameTime = 0.25f;
-PlayerInput input;  //Not sure where to put this, I'll leave it there for now.
+float max_frame_time = 0.25f;
 
 static void update_time() {
     s64 now = os_get_timestamp();
     
-    time.delta = (now - time.last_stamp) / (float)time.frequency;
-    if(time.delta > maxFrameTime) {
+    time.dt = (now - time.last_stamp) / (float)time.frequency;
+    if(time.dt > max_frame_time) {
         //Framerate too low, we are falling behind in the simulation! D: Preventing spiral of death.
-        time.delta = maxFrameTime;
+        time.dt = max_frame_time;
     }
+    time.scaled_sim_dt = time.sim_dt * time.modifier;
 
     time.since_start = (now - time.start_stamp) / (float)time.frequency;
     time.last_stamp = now;
 }
 
+static void handle_input(OSWindow* window) {
+    if(key_down('P')) {
+        paused = !paused;
+        os_lock_cursor(paused ? nullptr : window);
+    }
+
+    if(key_down('R')) {
+        reset_entities();
+        cubes_rotation = 0;
+    }
+
+    if(key_down(VK_LEFT)) {
+        time.modifier *= 0.5f;
+    }
+
+    if(key_down(VK_RIGHT)) {
+        time.modifier *= 2.0f;
+    }
+
+    if(key_down(VK_TAB)) {
+        character = !character;
+    }
+
+    if(key_down(VK_F9)) {
+        bool is_fullscreen = os_is_fullscreen(window);
+        os_set_fullscreen(window, !is_fullscreen, false);
+    }
+
+    if(key_down(VK_F11)) {
+        bool is_fullscreen = os_is_fullscreen(window);
+        os_set_fullscreen(window, !is_fullscreen, true);
+    }
+}
+
 void main() {
     time.start_stamp = os_get_timestamp();
     time.frequency = os_get_timer_frequency();
-    time.simulation_delta = 1.0f/60;
+    time.sim_dt = 1.0f/60;
     time.modifier = 1.0f;
-    maxFrameTime = 0.25f;
+    max_frame_time = 0.25f;
 
     //float accum = 0;
 
     OSWindow* window = os_create_window(200, 100, 1600, 800);
     os_lock_cursor(window);
 
+    reset_entities();
+    
     init_renderer(window);
 
     while(true) {
@@ -53,20 +86,20 @@ void main() {
 
         update_time();
 
-        handle_events(window, &input);
-        
-        //accum += time.delta;
-        //while(accum >= time.simulation_delta) {
-            simulate(&input);
-        //    accum -= time.simulation_delta;
+        handle_input(window);
+
+        //accum += time.dt;
+        //while(accum >= time.sim_dt) {
+            simulate(time.scaled_sim_dt);
+        //    accum -= time.sim_dt;
         //}
 
         //TODO: Stuttering comes from not doing position/rotation interpolation. Do that.
         //float lerp = accum / fixedDeltaTime;
         render(window);
 #if 0
-    printf_s("last frame: %f ms\n", time.delta * 1000);
-    printf_s("FPS: %f\n", 1 / time.delta);
+    printf_s("last frame: %f ms\n", time.dt * 1000);
+    printf_s("FPS: %f\n", 1 / time.dt);
     fflush(stdout);   //CPU usage goes 10x and my laptops fan starts going crazy if we do this every frame. WTF!
 #endif
     }

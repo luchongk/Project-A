@@ -31,7 +31,7 @@ tools\faster-vcvars.ps1 $platform
 $project = "Project_A"
 $includes = "include", "include\3rdParty"
 $libraries = "user32.lib", "winmm.lib", "gdi32.lib", "d3d11.lib", "d3dcompiler.lib"
-$ignored_warnings = "4100", "4127", "4201", "4458", "4706", "4505" #"4189"
+$ignored_warnings = "4100", "4127", "4201", "4458", "4706", "4505", "4459" #"4189"
 $execFolder = if($release) { "bin\Release" } else { "bin\Debug" }
 
 $compileExeOpts = 

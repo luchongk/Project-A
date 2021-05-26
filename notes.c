@@ -1,9 +1,11 @@
 /**
  * TODO: No particular order
  * ✓
- * * [] Clean up vector.h, make some kind of vector3 for ints
+ * * [✓] Clean up vector.h
  * 
- * * [✓] Math file
+ * * [] Make some kind of vector3 for ints
+ * 
+ * * [✓] Math header file
  * 
  * * [✓] Array type
  * 
@@ -13,7 +15,7 @@
  * 
  * * [] Physics
  * 
- * * [] Get rid of GLM
+ * * [✓] Get rid of GLM
  * 
  * * [] Temporary Storage
  * 
@@ -23,6 +25,7 @@
 
 /**
  * !BUGS
- * 
+ * ✓
+ * * [] Camera rotation speed is framerate dependent for some reason
  *  
  */

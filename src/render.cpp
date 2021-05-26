@@ -33,15 +33,15 @@ struct PerObjectUniforms {
         Vec3 specular;
         float shininess;
     } material;
-    Vec3 pos;
+    Vec3 position;
     float padding;
 };
 
-static Mesh weird_mesh;
-static Mesh cube_mesh;
+Mesh weird_mesh;
+Mesh cube_mesh;
 
-static uint pbr_shader;
-static uint light_shader;
+uint pbr_shader;
+uint light_shader;
 
 static GraphicsBuffer* weird_vertex_buffer;
 static GraphicsBuffer* weird_index_buffer;
@@ -52,9 +52,9 @@ static GraphicsBuffer* global_uniform_buffer;
 static GraphicsBuffer* per_frame_uniform_buffer;
 static GraphicsBuffer* per_object_uniform_buffer;
 
-GlobalUniforms global_uniforms;
-PerFrameUniforms  per_frame_uniforms;
-PerObjectUniforms per_object_uniforms;
+static GlobalUniforms global_uniforms;
+static PerFrameUniforms  per_frame_uniforms;
+static PerObjectUniforms per_object_uniforms;
 
 static Texture* grid_texture;
 
@@ -112,14 +112,13 @@ void render(OSWindow* window) {
     clear_depth_buffer();
 
     per_frame_uniforms.view_pos = camera.position;
-
-    per_frame_uniforms.view = lookDir(camera.position, camera.forward, Vec3{0,1,0});
-    Vec3 test = per_frame_uniforms.view * Vec3{0,0,1};
+    per_frame_uniforms.view = look_dir(camera.position, camera.forward, Vec3{0,1,0});
     
-    per_frame_uniforms.light.position = light_pos;
-    per_frame_uniforms.light.diffuse = {1.0f, 1.0f, 1.0f};
-    per_frame_uniforms.light.ambient = per_frame_uniforms.light.diffuse * Vec3{0.03f, 0.03f, 0.03f};
-    per_frame_uniforms.light.specular = {1.0f, 1.0f, 1.0f};
+    per_frame_uniforms.light.position = light.position;
+    per_frame_uniforms.light.diffuse = light.diffuse;
+    per_frame_uniforms.light.ambient = light.ambient;
+    per_frame_uniforms.light.specular = light.specular;
+    
     per_frame_uniforms.time = time.since_start;
 
     modify_buffer(per_frame_uniform_buffer, sizeof(per_frame_uniforms), &per_frame_uniforms);
@@ -127,7 +126,7 @@ void render(OSWindow* window) {
     // LIGHT DRAW
     set_shader(light_shader);
 
-    Matrix localToWorld = translation(light_pos);
+    Matrix localToWorld = translation(light.position);
     localToWorld = scale(localToWorld, 0.2f);
 
     per_object_uniforms.world = localToWorld;
@@ -135,34 +134,24 @@ void render(OSWindow* window) {
 
     set_vertex_buffer(cube_vertex_buffer);
     set_index_buffer(cube_index_buffer);
-    draw_indexed((uint)cube_mesh.indices.count);
+    draw_indexed((uint)light.mesh->indices.count);
     
     // CUBES DRAW
     set_shader(pbr_shader);
 
-    per_object_uniforms.material.ambient   = {0.49f, 0.37f, 0.11f};
-    per_object_uniforms.material.diffuse   = {0.5f, 0.35f, 0.05f};
-    per_object_uniforms.material.specular  = {1.0f, 0.782f, 0.17f};
-    per_object_uniforms.material.shininess = 16.0f;
-
-    Vec3 cubeposition[] {
-        Vec3{0.0f, 0.0f, 0.0f},
-        Vec3{2.0f, 5.0f, -15.0f},
-        Vec3{-1.5f, -2.2f, -2.5f},
-        Vec3{-3.8f, -2.0f, -12.3f},
-        Vec3{2.4f, -0.4f, -3.5f},
-    };
-
     set_vertex_buffer(weird_vertex_buffer);
     set_index_buffer(weird_index_buffer);
-    for(int i = 0; i < 1; i++) {
-        per_object_uniforms.pos = cubeposition[i] + cubes_offset;
-        localToWorld = translation(per_object_uniforms.pos);
-        localToWorld = rotate(localToWorld, {0,1,0}, cubes_rotation);
-        per_object_uniforms.world = localToWorld;
-        modify_buffer(per_object_uniform_buffer, sizeof(per_object_uniforms), &per_object_uniforms);
+    for(int i = 0; i < 5; i++) {
+        per_object_uniforms.material.ambient   = entities[i].material.ambient;
+        per_object_uniforms.material.diffuse   = entities[i].material.diffuse;
+        per_object_uniforms.material.specular  = entities[i].material.specular;
+        per_object_uniforms.material.shininess = entities[i].material.shininess;
+        per_object_uniforms.position = entities[i].position;
+        
+        per_object_uniforms.world = get_world_matrix(&entities[i]);
 
-        draw_indexed((uint)weird_mesh.indices.count);
+        modify_buffer(per_object_uniform_buffer, sizeof(per_object_uniforms), &per_object_uniforms);
+        draw_indexed((uint)entities[i].mesh->indices.count);
     }
 
     os_swap_buffers(window);

@@ -3,9 +3,10 @@
 
 #include "obj_loader.h"
 #include "matrix.h"
+#include "render.h"
 
 struct Camera {
-    Vec3 position = {0,0,2};
+    Vec3 position;
     float yaw;
     float pitch;
     Vec3 forward;
@@ -13,12 +14,25 @@ struct Camera {
 
 struct Entity {
     Vec3 position;
-    Vec3 scale;
+    float scale;
     Matrix orientation;
     Mesh* mesh;
+    Material material;
+};
+
+struct Light : Entity {
+    Vec3 ambient;
+    Vec3 diffuse;
+    Vec3 specular;
+    float t_movement;
 };
 
 extern Camera camera;
+extern Light light;
 extern Entity entities[10];
+
+void reset_entities();
+
+Matrix get_world_matrix(Entity* entity);
 
 #endif

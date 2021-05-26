@@ -3,59 +3,47 @@
 #include "platform.h"
 #include "entities.h"
 
-void handle_events(OSWindow* window, PlayerInput* input) {
-    For(os_events.keyboard) {
-        if(it->pressed) {
-            switch(it->code) {
-                case 'P': {
-                    paused = !paused;
-                    os_lock_cursor(paused ? nullptr : window);
-                    continue;
-                }
+Input input;
 
-                case 'R': {
-                    camera = {};
-                    cubes_rotation = 0;
-                    light_time_accum = 0;
-                    cubes_offset = {};
-                    continue;
-                }
-
-                case VK_LEFT: {
-                    time.modifier *= 0.5f;
-                    continue;
-                }
-
-                case VK_RIGHT: {
-                    time.modifier *= 2.0f;
-                    continue;
-                }
-
-                case VK_TAB: {
-                    character = !character;
-                    continue;
-                }
-
-                case VK_F9: {
-                    bool is_fullscreen = os_is_fullscreen(window);
-                    os_set_fullscreen(window, !is_fullscreen, false);
-                    continue;
-                }
-
-                case VK_F11: {
-                    bool is_fullscreen = os_is_fullscreen(window);
-                    os_set_fullscreen(window, !is_fullscreen, true);
-                    continue;
-                }
-            }
-        }
+void input_next_frame() {
+    input.mouse_delta = {0,0};
+    for(int i = 0; i < 256; i++) {
+        input.keys[i].last = input.keys[i].current;
     }
+    input.text.count = 0;
+    //os_events.other.count = 0;
+}
 
-    input->mouse_delta = os_events.mouse_delta;
+void clear_keys() {
+    for(int i = 0; i < 256; i++) {
+        input.keys[i].current = false;
+    }
+}
 
-    input->horizontalX = -(int)os_keyboard['A'] + (int)os_keyboard['D'];
-    input->horizontalZ = -(int)os_keyboard['S'] + (int)os_keyboard['W'];
-    input->vertical    = -(int)os_keyboard[VK_SHIFT] + (int)os_keyboard[VK_SPACE];
+void clear_input() {
+    input.mouse_delta = {0,0};
+    clear_keys();
+    input.text.count = 0;
+}
 
-    input->rotationDir = -(int)os_keyboard['Q'] + (int)os_keyboard['E'];
+bool key_down(u32 code) {
+    KeyState key = input.keys[code];
+
+    return key.current && !key.last;
+}
+
+bool key_up(u32 code) {
+    KeyState key = input.keys[code];
+    
+    return key.last && !key.current;
+}
+
+bool key_pressed(u32 code) {
+    KeyState key = input.keys[code];
+    
+    return key.current;
+}
+
+int key_axis(u32 negative, u32 positive) {
+    return -(int)input.keys[negative].current + (int)input.keys[positive].current;
 }

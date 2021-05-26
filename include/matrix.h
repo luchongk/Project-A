@@ -20,7 +20,7 @@ const Matrix Matrix::ident{
     0, 0, 0, 1
 };
 
-inline Vec4 operator*(const Matrix& m, const Vec4& v) {
+Vec4 operator*(const Matrix& m, const Vec4& v) {
     Vec4 result;
     result.x = dot(m.rows[0], v);
     result.y = dot(m.rows[1], v);
@@ -30,7 +30,7 @@ inline Vec4 operator*(const Matrix& m, const Vec4& v) {
     return result;
 }
 
-inline Vec3 operator*(const Matrix& m, const Vec3& v) {
+Vec3 operator*(const Matrix& m, const Vec3& v) {
     Vec3 result;
     result.x = dot(m.rows[0], vec4(v, 1));
     result.y = dot(m.rows[1], vec4(v, 1));
@@ -39,7 +39,7 @@ inline Vec3 operator*(const Matrix& m, const Vec3& v) {
     return result;
 }
 
-inline Matrix operator*(const Matrix& m, const Matrix& n) {
+Matrix operator*(const Matrix& m, const Matrix& n) {
     Vec4 col1{n.elems[0], n.elems[4], n.elems[8],  n.elems[12]};
     Vec4 col2{n.elems[1], n.elems[5], n.elems[9],  n.elems[13]};
     Vec4 col3{n.elems[2], n.elems[6], n.elems[10], n.elems[14]};
@@ -50,7 +50,13 @@ inline Matrix operator*(const Matrix& m, const Matrix& n) {
         dot(m.rows[1], col1), dot(m.rows[1], col2), dot(m.rows[1], col3), dot(m.rows[1], col4),
         dot(m.rows[2], col1), dot(m.rows[2], col2), dot(m.rows[2], col3), dot(m.rows[2], col4),
         dot(m.rows[3], col1), dot(m.rows[3], col2), dot(m.rows[3], col3), dot(m.rows[3], col4),
-    };;
+    };
+}
+
+Matrix operator*=(Matrix& m, const Matrix& n) {
+    m = m * n;
+    
+    return m;
 }
 
 Matrix from_columns(Vec3 cols[3]) {
@@ -62,17 +68,17 @@ Matrix from_columns(Vec3 cols[3]) {
     };
 }
 
-inline Vec3 position(const Matrix& m) {
+Vec3 position(const Matrix& m) {
     return Vec3{m.elems[3], m.elems[7], m.elems[11]};
 }
 
-inline Vec3 forward(const Matrix& m) {
+Vec3 forward(const Matrix& m) {
     Vec3 v{m.elems[2], m.elems[6], m.elems[10]};
     
     return normalize(v);
 }
 
-inline Matrix translation(Vec3 v) {
+Matrix translation(Vec3 v) {
     return Matrix{
         1, 0, 0, v.x,
         0, 1, 0, v.y,
@@ -137,7 +143,7 @@ Matrix rotation(float yaw, float pitch) {
 }
 
 //This name sucks. Should be something along the line of "to_view_coordinates" or something like that
-Matrix lookDir(Vec3 pos, Vec3 forward, Vec3 up) {
+Matrix look_dir(Vec3 pos, Vec3 forward, Vec3 up) {
     Vec3 right = normalize(cross(up, forward));
     up = cross(forward, right);
 
@@ -150,10 +156,10 @@ Matrix lookDir(Vec3 pos, Vec3 forward, Vec3 up) {
 }
 
 //This name sucks. Should be something along the line of "to_view_coordinates" or something like that
-Matrix lookAt(Vec3 pos, Vec3 to, Vec3 up) {
+Matrix look_at(Vec3 pos, Vec3 to, Vec3 up) {
     Vec3 forward = normalize(to - pos);
 
-    return lookDir(pos, forward, up);
+    return look_dir(pos, forward, up);
 }
 
 Matrix perspective(int width, int height) {

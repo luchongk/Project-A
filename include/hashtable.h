@@ -52,16 +52,16 @@ struct HashTable {
 };
 
 template<typename K>
-inline bool keys_are_equal(K key1, K key2) {
+bool keys_are_equal(K key1, K key2) {
     return key1 == key2;
 }
 
-inline bool keys_are_equal(String key1, String key2) {
+bool keys_are_equal(String key1, String key2) {
     return !compare(key1, key2);
 }
 
 template<typename K>
-inline u32 get_hash(K key) {
+u32 get_hash(K key) {
     u32 hash = fnv1_32a_hash((u8*)&key, sizeof(K));
     if(hash == 0) hash += 2;   //0 is reserved for empty key
     else if(hash == 1) hash++; //1 is reserved for tombstone
@@ -69,7 +69,7 @@ inline u32 get_hash(K key) {
     return hash;
 }
 
-inline u32 get_hash(String key) {
+u32 get_hash(String key) {
     u32 hash = fnv1_32a_hash(key.data, key.count);
     if(hash == 0) hash += 2;
     else if(hash == 1) hash++;

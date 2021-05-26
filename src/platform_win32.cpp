@@ -3,6 +3,7 @@
 #include "iostream"
 #include "strings.h"
 #include "graphics.h"
+#include "input.h"
 
 struct OSWindow {
     HWND handle;
@@ -17,9 +18,6 @@ struct OSWindow {
     bool fullscreen;
     bool borderless;
 };
-
-extern OSEvents os_events;
-extern bool os_keyboard[256];
 
 static wchar_t window_class_name[] = L"Project_A";
 static int default_window_style = WS_OVERLAPPEDWINDOW & ~WS_SIZEBOX;
@@ -60,29 +58,22 @@ OSWindow* os_create_window(int x, int y, int width, int height) {
     return window;
 }
 
-inline s64 os_get_timestamp() {
+s64 os_get_timestamp() {
     LARGE_INTEGER timestamp;
     QueryPerformanceCounter(&timestamp);
     
     return timestamp.QuadPart;
 }
 
-inline s64 os_get_timer_frequency() {
+s64 os_get_timer_frequency() {
     LARGE_INTEGER frequency;
     QueryPerformanceFrequency(&frequency);
 
     return frequency.QuadPart;
 }
 
-static void clear_event_queue() {
-    os_events.mouse_delta = {0,0};
-    os_events.keyboard.count = 0;
-    os_events.chars.count = 0;
-    //os_events.other.count = 0;
-}
-
 bool os_poll_events(OSWindow* window) {
-    clear_event_queue();
+    input_next_frame();
 
     MSG msg{};
     while(PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
@@ -209,27 +200,27 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         } break;
 
         case WM_KEYUP: {
-            uint32_t VKCode = (uint32_t)wParam;
-            bool wasDown = lParam & 0x40000000;
+            u32 vk_code = (u32)wParam;
+            //bool was_down = lParam & 0x40000000;
 
-            if(wasDown) {
-                OSKeyboardEvent event{VKCode, false};
-                array_add(&os_events.keyboard, event);
+            //if(was_down) {
+                //OSKeyboardEvent event{vk_code, false};
+                //array_add(&os_events.keyboard, event);
 
-                os_keyboard[VKCode] = false;
-            }
+                input.keys[vk_code].current = false;
+            //}
         } break;
 
         case WM_KEYDOWN: {
-            uint32_t VKCode = (uint32_t)wParam;
-            bool wasDown = lParam & 0x40000000;
+            u32 vk_code = (u32)wParam;
+            //bool was_down = lParam & 0x40000000;
 
-            if(!wasDown) {
-                OSKeyboardEvent event{VKCode, true};
-                array_add(&os_events.keyboard, event);
+            //if(!was_down) {
+                //OSKeyboardEvent event{vk_code, true};
+                //array_add(&os_events.keyboard, event);
 
-                os_keyboard[VKCode] = true;
-            }
+                input.keys[vk_code].current = true;
+            //}
         } break;
 
         case WM_NCLBUTTONDOWN: {
@@ -240,9 +231,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             if(LOWORD(wParam) == WA_INACTIVE) {
                 window->focused = false;
                 
-                for(int i = 0; i < 256; i++) {
-                    os_keyboard[i] = false;
-                }
+                clear_keys();
 
                 if(cursor_locked_to) ShowCursor(true);
 
@@ -264,11 +253,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         } break;
 
         case WM_EXITSIZEMOVE: {
-            os_events.mouse_delta = {0,0};
+            input.mouse_delta = {0,0};
 
-            for(int i = 0; i < 256; i++) {
-                os_keyboard[i] = false;
-            }
+            clear_keys();
         } break;
 
         case WM_INPUT: {
@@ -279,8 +266,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
             if (raw.header.dwType == RIM_TYPEMOUSE) 
             {
-                os_events.mouse_delta.x += raw.data.mouse.lLastX;
-                os_events.mouse_delta.y += raw.data.mouse.lLastY;
+                input.mouse_delta.x += raw.data.mouse.lLastX;
+                input.mouse_delta.y += raw.data.mouse.lLastY;
             }
 
             return DefWindowProc(hwnd, uMsg, wParam, lParam);
