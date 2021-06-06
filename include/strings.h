@@ -18,6 +18,14 @@ String from_cstring(char* cstring, int count) {
     return result;
 }
 
+char* to_cstring(String string) {
+    char* result = alloc_<char>(string.count+1);
+    memcpy(result, string.data, string.count);
+    result[string.count] = '\0';
+
+    return result;
+}
+
 String new_string(int count) {
     u8* bytes = alloc_<u8>(count);
 

@@ -12,14 +12,14 @@
 
 struct OSWindow;
 
-OSWindow* os_create_window(int x, int y, int width, int height);
-s64 os_get_timestamp();
-s64 os_get_timer_frequency();
+OSWindow* os_create_window(int width, int height, String title = ""_s);
+float os_get_time();
+//s64 os_get_timer_frequency();
 bool os_poll_events(OSWindow* window);
-void os_lock_cursor(OSWindow* window);
+void os_lock_mouse(OSWindow* window);
 bool os_is_fullscreen(OSWindow* window);
 void os_set_fullscreen(OSWindow* window, bool fullscreen, bool borderless);
 void os_swap_buffers(OSWindow* window);
-String os_read_entire_file(String path, bool null_terminated = false);
+String os_read_entire_file(String path);
 
 #endif

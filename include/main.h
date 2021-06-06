@@ -2,17 +2,16 @@
 #define GAME_H
 
 struct Time {
-    s64 start_stamp;
-    s64 last_stamp;
-    s64 frequency;
+    float start_at;
     float since_start;
+    float max_allowed_per_frame;
+    float last_frame;
     float dt;
     float sim_dt;
-    float scaled_sim_dt;
-    float modifier;
+    float sim_scale;
 };
 
 extern Time time;
-extern float max_frame_time;
+extern OSWindow* window;
 
 #endif

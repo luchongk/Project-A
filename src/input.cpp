@@ -3,47 +3,113 @@
 #include "platform.h"
 #include "entities.h"
 
-Input input;
+PlayerControls controls;
 
-void input_next_frame() {
-    input.mouse_delta = {0,0};
-    for(int i = 0; i < 256; i++) {
-        input.keys[i].last = input.keys[i].current;
+static void handle_key_event(u32 keycode, bool pressed, bool is_repeat) {
+    if(!is_repeat) {
+        switch(keycode) {
+            case 'W': {
+                controls.move.z += pressed ? 1 : -1;
+                break;
+            }
+
+            case 'S': {
+                controls.move.z -= pressed ? 1 : -1;
+                break;
+            }
+            
+            case 'A': {
+                controls.move.x -= pressed ? 1 : -1;
+                break;
+            }
+
+            case 'D': {
+                controls.move.x += pressed ? 1 : -1;
+                break;
+            }
+
+            case VK_SPACE: {
+                controls.move.y += pressed ? 1 : -1;
+                break;
+            }
+
+            case VK_SHIFT: {
+                controls.move.y -= pressed ? 1 : -1;
+                break;
+            }
+
+            case 'Q': {
+                controls.rotation -= pressed ? 1 : -1;
+                break;
+            }
+
+            case 'E': {
+                controls.rotation += pressed ? 1 : -1;
+                break;
+            }
+
+            case 'P': {
+                if(pressed) {
+                    paused = !paused;
+                    os_lock_mouse(paused ? nullptr : window);
+                }
+                break;
+            }
+
+            case 'R': {
+                if(pressed) {
+                    reset_entities();
+                    cubes_rotation = 0;
+                }
+                break;
+            }
+
+            case VK_LEFT: {
+                if(pressed) {
+                    time.sim_scale *= 0.5f;
+                }
+                break;
+            }
+
+            case VK_RIGHT: {
+                if(pressed) {
+                    time.sim_scale *= 2.0f;
+                }
+                break;
+            }
+
+            case VK_TAB: {
+                if(pressed) {
+                    character = !character;
+                }
+                break;
+            }
+
+            case VK_F9: {
+                if(pressed) {
+                    bool is_fullscreen = os_is_fullscreen(window);
+                    os_set_fullscreen(window, !is_fullscreen, false);
+                }
+                break;
+            }
+
+            case VK_F11: {
+                if(pressed) {
+                    bool is_fullscreen = os_is_fullscreen(window);
+                    os_set_fullscreen(window, !is_fullscreen, true);
+                }
+                break;
+            }
+        }
     }
-    input.text.count = 0;
-    //os_events.other.count = 0;
 }
 
-void clear_keys() {
-    for(int i = 0; i < 256; i++) {
-        input.keys[i].current = false;
+void handle_event(Event* e) {
+    switch(e->type) {
+        case EventType::KEY: {
+            //TODO: Here we would call the keymapper instead of passing the keycode directly to the function below
+            handle_key_event(e->key.keycode, e->key.pressed, e->key.is_repeat);
+            break;
+        }
     }
-}
-
-void clear_input() {
-    input.mouse_delta = {0,0};
-    clear_keys();
-    input.text.count = 0;
-}
-
-bool key_down(u32 code) {
-    KeyState key = input.keys[code];
-
-    return key.current && !key.last;
-}
-
-bool key_up(u32 code) {
-    KeyState key = input.keys[code];
-    
-    return key.last && !key.current;
-}
-
-bool key_pressed(u32 code) {
-    KeyState key = input.keys[code];
-    
-    return key.current;
-}
-
-int key_axis(u32 negative, u32 positive) {
-    return -(int)input.keys[negative].current + (int)input.keys[positive].current;
 }

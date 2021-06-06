@@ -1,28 +1,31 @@
 #ifndef INPUT_H
 #define INPUT_H
 
-struct KeyState {
-    bool last;
-    bool current;
+enum class EventType {
+    KEY
 };
 
-struct Input {
+struct EventKey {
+    u32 keycode;
+    bool pressed;
+    bool is_repeat;
+};
+
+struct Event {
+    EventType type;
+    union {
+        EventKey key;
+    };
+};
+
+struct PlayerControls {
     Vec2 mouse_delta;
-    KeyState keys[256];
-    
-    //@Temporary
-    Array<char> text;
+    Vec3 move;
+    float rotation;
 };
 
-extern Input input;
+extern PlayerControls controls;
 
-void input_next_frame();
-void clear_keys();
-void clear_input();
-
-bool key_down(u32 code);
-bool key_up(u32 code);
-bool key_pressed(u32 code);
-int key_axis(u32 negative, u32 positive);
+void handle_event(Event* e);
 
 #endif

@@ -4,6 +4,7 @@
 #include "strings.h"
 #include "graphics.h"
 #include "input.h"
+#include "memory.h"
 
 struct OSWindow {
     HWND handle;
@@ -19,20 +20,34 @@ struct OSWindow {
     bool borderless;
 };
 
-static wchar_t window_class_name[] = L"Project_A";
+static char window_class_name[] = "Project_A";
 static int default_window_style = WS_OVERLAPPEDWINDOW & ~WS_SIZEBOX;
 static OSWindow* cursor_locked_to = nullptr;
 
-OSWindow* os_create_window(int x, int y, int width, int height) {
+static LARGE_INTEGER timer_frequency;
+
+OSWindow* os_create_window(int width, int height, String title) {
     RECT wr = {0, 0, width, height};                    // set the size, but not the position
     AdjustWindowRect(&wr, default_window_style, false); // adjust the size
 
+    char* null_terminated_title;
+    if(title.count > 0) {
+        null_terminated_title = to_cstring(title);
+    }
+    else {
+        null_terminated_title = window_class_name;
+    }
+    
     HINSTANCE app_instance = GetModuleHandleA(nullptr);
-    HWND hwnd = CreateWindow(window_class_name, L"Project_A", default_window_style,
-                                x, y,
+    HWND hwnd = CreateWindowA(window_class_name, null_terminated_title, default_window_style,
+                                200, 100,
                                 wr.right - wr.left,
                                 wr.bottom - wr.top,
                                 nullptr, nullptr, app_instance, nullptr);
+
+    if(title.count > 0) {
+        free_(null_terminated_title);
+    }
                                 
     if(!hwnd)
         return nullptr;
@@ -44,7 +59,7 @@ OSWindow* os_create_window(int x, int y, int width, int height) {
     *window = {
         hwnd,
         GetDC(hwnd),
-        {(float)x, (float)y},
+        {0,0},
         {(float)width, (float)height},
         false,
         false,
@@ -58,32 +73,32 @@ OSWindow* os_create_window(int x, int y, int width, int height) {
     return window;
 }
 
-s64 os_get_timestamp() {
+float os_get_time() {
     LARGE_INTEGER timestamp;
     QueryPerformanceCounter(&timestamp);
     
-    return timestamp.QuadPart;
+    return timestamp.QuadPart / (float)timer_frequency.QuadPart;
 }
 
-s64 os_get_timer_frequency() {
-    LARGE_INTEGER frequency;
+/*s64 os_get_timer_frequency() {
+    static LARGE_INTEGER frequency = 0;
     QueryPerformanceFrequency(&frequency);
 
     return frequency.QuadPart;
-}
+}*/
 
 bool os_poll_events(OSWindow* window) {
-    input_next_frame();
+    controls.mouse_delta = {0,0};
 
     MSG msg{};
-    while(PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+    while(PeekMessageA(&msg, nullptr, 0, 0, PM_REMOVE)) {
         if(msg.message == WM_QUIT) {
             end_graphics();
             return true;
         }
 
         TranslateMessage(&msg);
-        DispatchMessage(&msg);
+        DispatchMessageA(&msg);
     }
 
     if(cursor_locked_to == window && window->focused) {
@@ -102,7 +117,7 @@ bool os_poll_events(OSWindow* window) {
     return false;
 }
 
-void os_lock_cursor(OSWindow* window) {
+void os_lock_mouse(OSWindow* window) {
     ShowCursor(window ? false : true);
     cursor_locked_to = window;
 }
@@ -158,14 +173,13 @@ void os_swap_buffers(OSWindow* window) {
     swap_buffers();
 }
 
-String os_read_entire_file(String path, bool null_terminated) {
+String os_read_entire_file(String path) {
     HANDLE file = CreateFileA((char*)path.data, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
     assert(file != INVALID_HANDLE_VALUE);
 
     uint size = GetFileSize(file, nullptr);
     
     uint alloc_size = size;
-    if(null_terminated) alloc_size++;
     String content = new_string(alloc_size);
 
     DWORD bytesRead;
@@ -173,8 +187,6 @@ String os_read_entire_file(String path, bool null_terminated) {
     assert(size == bytesRead);
 
     CloseHandle(file);
-
-    if(null_terminated) content.data[size] = '\0';
 
     return content;
 }
@@ -201,38 +213,33 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
         case WM_KEYUP: {
             u32 vk_code = (u32)wParam;
-            //bool was_down = lParam & 0x40000000;
 
-            //if(was_down) {
-                //OSKeyboardEvent event{vk_code, false};
-                //array_add(&os_events.keyboard, event);
+            Event e;
+            e.type = EventType::KEY;
+            e.key.keycode   = vk_code;
+            e.key.pressed   = false;
+            e.key.is_repeat = false;
 
-                input.keys[vk_code].current = false;
-            //}
+            handle_event(&e);
         } break;
 
         case WM_KEYDOWN: {
             u32 vk_code = (u32)wParam;
-            //bool was_down = lParam & 0x40000000;
+            bool was_down = lParam & 0x40000000;
 
-            //if(!was_down) {
-                //OSKeyboardEvent event{vk_code, true};
-                //array_add(&os_events.keyboard, event);
+            Event e;
+            e.type = EventType::KEY;
+            e.key.keycode   = vk_code;
+            e.key.pressed   = true;
+            e.key.is_repeat = was_down;
 
-                input.keys[vk_code].current = true;
-            //}
-        } break;
-
-        case WM_NCLBUTTONDOWN: {
-            return DefWindowProc(hwnd, uMsg, wParam, lParam);
+            handle_event(&e);
         } break;
 
         case WM_ACTIVATE: {
             if(LOWORD(wParam) == WA_INACTIVE) {
                 window->focused = false;
                 
-                clear_keys();
-
                 if(cursor_locked_to) ShowCursor(true);
 
                 if(window->fullscreen && !window->borderless) {
@@ -253,9 +260,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         } break;
 
         case WM_EXITSIZEMOVE: {
-            input.mouse_delta = {0,0};
-
-            clear_keys();
+            controls.mouse_delta = {0,0};
         } break;
 
         case WM_INPUT: {
@@ -266,15 +271,15 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
             if (raw.header.dwType == RIM_TYPEMOUSE) 
             {
-                input.mouse_delta.x += raw.data.mouse.lLastX;
-                input.mouse_delta.y += raw.data.mouse.lLastY;
+                controls.mouse_delta.x += raw.data.mouse.lLastX;
+                controls.mouse_delta.y += raw.data.mouse.lLastY;
             }
 
-            return DefWindowProc(hwnd, uMsg, wParam, lParam);
+            return DefWindowProcA(hwnd, uMsg, wParam, lParam);
         } break;
 
         default:
-            return DefWindowProc(hwnd, uMsg, wParam, lParam);
+            return DefWindowProcA(hwnd, uMsg, wParam, lParam);
     }
 
     return 0;
@@ -283,14 +288,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 void main();
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR lpCmdLine, int nCmdShow) {
-    WNDCLASS wc{};
+    WNDCLASSA wc{};
     wc.hInstance = hInstance;
     wc.lpfnWndProc = WindowProc;
     wc.lpszClassName = window_class_name;
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     wc.style = CS_OWNDC;
     
-    if(!RegisterClass(&wc))
+    if(!RegisterClassA(&wc))
         return 1;
 
 #if 1
@@ -304,6 +309,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR lpCmdLine, int nCmdSho
         /* ERROR */
     }
 #endif
+
+    QueryPerformanceFrequency(&timer_frequency);
 
     main();
 

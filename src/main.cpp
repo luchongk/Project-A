@@ -15,82 +15,45 @@
 #include "entities.cpp"
 
 Time time;
-float max_frame_time = 0.25f;
+OSWindow* window;
 
 static void update_time() {
-    s64 now = os_get_timestamp();
+    float now = os_get_time();
     
-    time.dt = (now - time.last_stamp) / (float)time.frequency;
-    if(time.dt > max_frame_time) {
+    time.since_start = now - time.start_at;
+    
+    time.dt = now - time.last_frame;
+    if(time.dt > time.max_allowed_per_frame) {
         //Framerate too low, we are falling behind in the simulation! D: Preventing spiral of death.
-        time.dt = max_frame_time;
-    }
-    time.scaled_sim_dt = time.sim_dt * time.modifier;
-
-    time.since_start = (now - time.start_stamp) / (float)time.frequency;
-    time.last_stamp = now;
-}
-
-static void handle_input(OSWindow* window) {
-    if(key_down('P')) {
-        paused = !paused;
-        os_lock_cursor(paused ? nullptr : window);
+        time.dt = time.max_allowed_per_frame;
     }
 
-    if(key_down('R')) {
-        reset_entities();
-        cubes_rotation = 0;
-    }
-
-    if(key_down(VK_LEFT)) {
-        time.modifier *= 0.5f;
-    }
-
-    if(key_down(VK_RIGHT)) {
-        time.modifier *= 2.0f;
-    }
-
-    if(key_down(VK_TAB)) {
-        character = !character;
-    }
-
-    if(key_down(VK_F9)) {
-        bool is_fullscreen = os_is_fullscreen(window);
-        os_set_fullscreen(window, !is_fullscreen, false);
-    }
-
-    if(key_down(VK_F11)) {
-        bool is_fullscreen = os_is_fullscreen(window);
-        os_set_fullscreen(window, !is_fullscreen, true);
-    }
+    time.last_frame = now;
 }
 
 void main() {
-    time.start_stamp = os_get_timestamp();
-    time.frequency = os_get_timer_frequency();
+    time.start_at = os_get_time();
     time.sim_dt = 1.0f/60;
-    time.modifier = 1.0f;
-    max_frame_time = 0.25f;
+    time.sim_scale = 1.0f;
+    time.max_allowed_per_frame = 0.25f;
 
     //float accum = 0;
 
-    OSWindow* window = os_create_window(200, 100, 1600, 800);
-    os_lock_cursor(window);
+    window = os_create_window(1600, 800, "PepegaClap"_s);
+    os_lock_mouse(window);
 
     reset_entities();
     
     init_renderer(window);
 
     while(true) {
-        if(os_poll_events(window)) break;
-
         update_time();
 
-        handle_input(window);
+        if(os_poll_events(window)) break;
 
         //accum += time.dt;
         //while(accum >= time.sim_dt) {
-            simulate(time.scaled_sim_dt);
+            simulate(time.sim_dt * time.sim_scale);
         //    accum -= time.sim_dt;
         //}
 
