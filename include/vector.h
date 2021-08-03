@@ -61,6 +61,11 @@ union Vec3 {
         float y;
         float z;
     };
+    struct {
+        float r;
+        float g;
+        float b;
+    };
     float elems[3];
 };
 
@@ -151,6 +156,12 @@ union Vec4 {
         float y;
         float z;
         float w;
+    };
+    struct {
+        float r;
+        float g;
+        float b;
+        float a;
     };
     float elems[4];
 };

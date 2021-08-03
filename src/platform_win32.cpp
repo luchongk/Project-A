@@ -6,25 +6,21 @@
 #include "input.h"
 #include "memory.h"
 
-struct OSWindow {
+struct Win32Window {
+    OSWindow common;
     HWND handle;
     HDC device;
-    
-    //@Cleanup make this integer vectors and remove all the unnecessary casting everywhere
-    Vec2 position;
-    Vec2 size;
-    
-    //@Cleanup These should probably be state flags
-    bool focused;
-    bool fullscreen;
-    bool borderless;
 };
 
 static char window_class_name[] = "Project_A";
 static int default_window_style = WS_OVERLAPPEDWINDOW & ~WS_SIZEBOX;
-static OSWindow* cursor_locked_to = nullptr;
+static bool mouse_visible = true;
 
 static LARGE_INTEGER timer_frequency;
+
+Array<Event> events;
+//Vec2 mouse_position;
+//Vec2 mouse_delta;
 
 OSWindow* os_create_window(int width, int height, String title) {
     RECT wr = {0, 0, width, height};                    // set the size, but not the position
@@ -37,7 +33,7 @@ OSWindow* os_create_window(int width, int height, String title) {
     else {
         null_terminated_title = window_class_name;
     }
-    
+
     HINSTANCE app_instance = GetModuleHandleA(nullptr);
     HWND hwnd = CreateWindowA(window_class_name, null_terminated_title, default_window_style,
                                 200, 100,
@@ -49,97 +45,97 @@ OSWindow* os_create_window(int width, int height, String title) {
         free_(null_terminated_title);
     }
                                 
-    if(!hwnd)
-        return nullptr;
+    if(!hwnd) return nullptr;
 
-    if(!init_graphics(hwnd))
-        return nullptr;
+    if(!init_graphics(hwnd)) return nullptr;
 
-    OSWindow* window = alloc_<OSWindow>();
-    *window = {
-        hwnd,
-        GetDC(hwnd),
-        {0,0},
-        {(float)width, (float)height},
+    Win32Window* window = alloc_<Win32Window>();
+    window->common = {
+        200, 100,
+        (float)width, (float)height,
         false,
         false,
         true,
     };
+    window->handle = hwnd;
+    window->device = GetDC(hwnd);
 
-    SetProp(hwnd, L"window_data", window);
+    SetPropA(hwnd, "window_data", window);
     
     ShowWindow(hwnd, SW_SHOW);
     
-    return window;
+    return (OSWindow*)window;
 }
 
-float os_get_time() {
+u64 os_get_timestamp() {
     LARGE_INTEGER timestamp;
     QueryPerformanceCounter(&timestamp);
     
-    return timestamp.QuadPart / (float)timer_frequency.QuadPart;
+    return timestamp.QuadPart;
 }
 
-/*s64 os_get_timer_frequency() {
-    static LARGE_INTEGER frequency = 0;
-    QueryPerformanceFrequency(&frequency);
+float os_elapsed_time(u64 from_stamp, u64 to_stamp) {
+    return (to_stamp - from_stamp) / (float)timer_frequency.QuadPart;
+}
 
-    return frequency.QuadPart;
-}*/
+//? Should we move this to input.h?
+void os_poll_events() {
+    player_input.mouse_delta = {0,0};
 
-bool os_poll_events(OSWindow* window) {
-    controls.mouse_delta = {0,0};
-
+    array_reset(&events);
+    
     MSG msg{};
     while(PeekMessageA(&msg, nullptr, 0, 0, PM_REMOVE)) {
-        if(msg.message == WM_QUIT) {
-            end_graphics();
-            return true;
-        }
-
         TranslateMessage(&msg);
         DispatchMessageA(&msg);
-    }
 
-    if(cursor_locked_to == window && window->focused) {
-        HWND hwnd = window->handle;
+        if(msg.message == WM_QUIT) {
+            Event e;
+            e.type = EventType::QUIT;
+            array_add(&events, e);
+        }
+    }
+}
+
+void os_show_mouse(bool show) {
+    if(show != mouse_visible) {
+        ShowCursor(show);
+        mouse_visible = show;
+    }
+}
+
+void os_set_mouse_center(OSWindow* window) {
+    HWND hwnd = ((Win32Window*)window)->handle;
         
-        RECT rect;
-        GetClientRect(hwnd, &rect);
+    RECT rect;
+    GetClientRect(hwnd, &rect);
 
-        POINT center;
-        center.x = rect.right / 2;
-        center.y = rect.bottom / 2;
-        ClientToScreen(hwnd, &center);
-        SetCursorPos(center.x, center.y);
-    }
-
-    return false;
+    POINT center;
+    center.x = rect.right / 2;
+    center.y = rect.bottom / 2;
+    ClientToScreen(hwnd, &center);
+    SetCursorPos(center.x, center.y);
 }
 
-void os_lock_mouse(OSWindow* window) {
-    ShowCursor(window ? false : true);
-    cursor_locked_to = window;
+void os_minimize_window(OSWindow* window) {
+    Win32Window* win32_window = (Win32Window*)window;
+    ShowWindow(win32_window->handle, SW_MINIMIZE);
 }
 
-bool os_is_fullscreen(OSWindow* window) {
-    return window->fullscreen;
+void os_restore_window(OSWindow* window) {
+    Win32Window* win32_window = (Win32Window*)window;
+    ShowWindow(win32_window->handle, SW_RESTORE);
 }
 
 void os_set_fullscreen(OSWindow* window, bool fullscreen, bool borderless) {
-    if(borderless) {
-        HWND hwnd = window->handle;
-
-        if (fullscreen && !window->fullscreen)
-        {
-            window->fullscreen = true;
+    HWND hwnd = ((Win32Window*)window)->handle;
+    
+    if(fullscreen && !window->fullscreen) {
+        window->fullscreen = true;
+        
+        if (borderless) {
             window->borderless = true;
 
-            RECT rect;
-            GetWindowRect(hwnd, &rect);
-            window->position = {(float)rect.left, (float)rect.top};
-            window->size = {(float)(rect.right - rect.left), (float)(rect.bottom - rect.top)};
-            
             MONITORINFOEX mi;
             mi.cbSize = sizeof(mi);
             if (GetMonitorInfo(MonitorFromWindow(hwnd, MONITOR_DEFAULTTOPRIMARY), &mi)) {
@@ -151,40 +147,42 @@ void os_set_fullscreen(OSWindow* window, bool fullscreen, bool borderless) {
                                 mi.rcMonitor.bottom - mi.rcMonitor.top,
                                 SWP_FRAMECHANGED);
             }
-        } else if(!fullscreen && window->fullscreen) {
-            window->fullscreen = false;
+        } else {
+            window->borderless = false;
+            set_fullscreen(true);
+        }
+    }
+    else if(!fullscreen && window->fullscreen) {
+        window->fullscreen = false;
 
+        if(window->borderless) {
             SetWindowLong(hwnd, GWL_STYLE, WS_VISIBLE | WS_CLIPSIBLINGS | default_window_style);
+
+            RECT wr = {0, 0, (int)window->size.x, (int)window->size.y};                    // set the size, but not the position
+            AdjustWindowRect(&wr, default_window_style, false); // adjust the size
 
             SetWindowPos(hwnd, HWND_NOTOPMOST,
                             (int)window->position.x, (int)window->position.y,
-                            (int)window->size.x, (int)window->size.y,
+                            wr.right - wr.left, wr.bottom - wr.top,
                             SWP_FRAMECHANGED);
         }
+        else {
+            set_fullscreen(false);
+        }
     }
-    else {
-        window->fullscreen = fullscreen;
-        window->borderless = false;
-        set_fullscreen_state(fullscreen);
-    }
-}
-
-void os_swap_buffers(OSWindow* window) {
-    swap_buffers();
 }
 
 String os_read_entire_file(String path) {
     HANDLE file = CreateFileA((char*)path.data, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
     assert(file != INVALID_HANDLE_VALUE);
 
-    uint size = GetFileSize(file, nullptr);
+    uint alloc_size = GetFileSize(file, nullptr);
     
-    uint alloc_size = size;
     String content = new_string(alloc_size);
 
     DWORD bytesRead;
-    assert(ReadFile(file, content.data, (DWORD)size, &bytesRead, nullptr));
-    assert(size == bytesRead);
+    assert(ReadFile(file, content.data, (DWORD)alloc_size, &bytesRead, nullptr));
+    assert(alloc_size == bytesRead);
 
     CloseHandle(file);
 
@@ -192,7 +190,7 @@ String os_read_entire_file(String path) {
 }
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-    OSWindow* window = (OSWindow*)GetProp(hwnd, L"window_data");
+    OSWindow* window = (OSWindow*)GetPropA(hwnd, "window_data");
 
     switch(uMsg) {
         case WM_DESTROY: {
@@ -200,7 +198,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         } break;
 
         case WM_SIZE: {
-            adjust_size(LOWORD(lParam), HIWORD(lParam));
+            Event e;
+            e.type = EventType::WINDOW;
+            e.window.window = window;
+            
+            e.window.type = EventWindowType::RESIZE;
+            e.window.data1 = LOWORD(lParam);
+            e.window.data2 = HIWORD(lParam);
+            array_add(&events, e);
         } break;
 
         //Remove weird beep when ALT+Enter
@@ -219,8 +224,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             e.key.keycode   = vk_code;
             e.key.pressed   = false;
             e.key.is_repeat = false;
-
-            handle_event(&e);
+            array_add(&events, e);
         } break;
 
         case WM_KEYDOWN: {
@@ -232,35 +236,60 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             e.key.keycode   = vk_code;
             e.key.pressed   = true;
             e.key.is_repeat = was_down;
-
-            handle_event(&e);
+            array_add(&events, e);
         } break;
 
         case WM_ACTIVATE: {
-            if(LOWORD(wParam) == WA_INACTIVE) {
-                window->focused = false;
-                
-                if(cursor_locked_to) ShowCursor(true);
+            Event e;
+            e.type = EventType::WINDOW;
+            e.window.window = window;
 
-                if(window->fullscreen && !window->borderless) {
-                    set_fullscreen_state(false);
-                    ShowWindow(hwnd, SW_MINIMIZE);
-                }
+            if(LOWORD(wParam) == WA_INACTIVE) {
+                e.window.type = EventWindowType::FOCUS_LOST;
+                window->focused = false;
             }
             else {
+                e.window.type = EventWindowType::FOCUS_GAINED;
                 window->focused = true;
-
-                if(cursor_locked_to) ShowCursor(false);
-
-                if(window->fullscreen && !window->borderless) {
-                    ShowWindow(hwnd, SW_RESTORE);
-                    set_fullscreen_state(true);
-                }
             }
+            
+            array_add(&events, e);
         } break;
 
         case WM_EXITSIZEMOVE: {
-            controls.mouse_delta = {0,0};
+            player_input.mouse_delta = {0,0};
+        } break;
+
+        case WM_MOUSEMOVE: {
+            //@Temporary: We are casting mouse positions to float until we have a integer Vector type.
+            player_input.mouse_pos_screen.x = (short)(lParam & 0xFFFF);
+            player_input.mouse_pos_screen.y = (short)(lParam >> 16);
+        } break;
+
+        case WM_LBUTTONDOWN: {
+            Event e;
+            e.type = EventType::KEY;
+            e.key.keycode   = VK_LBUTTON;
+            e.key.pressed   = true;
+            e.key.is_repeat = false;
+            array_add(&events, e);
+        } break;
+
+        case WM_LBUTTONUP: {
+            Event e;
+            e.type = EventType::KEY;
+            e.key.keycode   = VK_LBUTTON;
+            e.key.pressed   = false;
+            e.key.is_repeat = false;
+            array_add(&events, e);
+        } break;
+
+        case WM_RBUTTONDOWN: {
+
+        } break;
+
+        case WM_RBUTTONUP: {
+
         } break;
 
         case WM_INPUT: {
@@ -269,10 +298,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             
             GetRawInputData((HRAWINPUT)lParam, RID_INPUT, &raw, &dwSize, sizeof(RAWINPUTHEADER));
 
-            if (raw.header.dwType == RIM_TYPEMOUSE) 
+            if(raw.header.dwType == RIM_TYPEMOUSE) 
             {
-                controls.mouse_delta.x += raw.data.mouse.lLastX;
-                controls.mouse_delta.y += raw.data.mouse.lLastY;
+                player_input.mouse_delta.x += raw.data.mouse.lLastX;
+                player_input.mouse_delta.y += raw.data.mouse.lLastY;
             }
 
             return DefWindowProcA(hwnd, uMsg, wParam, lParam);
@@ -304,7 +333,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR lpCmdLine, int nCmdSho
     Rid.usUsage = 0x02; 
     Rid.dwFlags = 0; //RIDEV_NOLEGACY;   // adds HID mouse and also ignores legacy mouse messages
     Rid.hwndTarget = 0;    
-
+    
     if (!RegisterRawInputDevices(&Rid, 1, sizeof(RAWINPUTDEVICE))) {
         /* ERROR */
     }

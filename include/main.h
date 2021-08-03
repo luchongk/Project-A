@@ -2,10 +2,10 @@
 #define GAME_H
 
 struct Time {
-    float start_at;
+    u64 start_stamp;
+    u64 last_frame_stamp;
     float since_start;
     float max_allowed_per_frame;
-    float last_frame;
     float dt;
     float sim_dt;
     float sim_scale;
@@ -13,5 +13,6 @@ struct Time {
 
 extern Time time;
 extern OSWindow* window;
+extern bool mouse_locked;
 
 #endif

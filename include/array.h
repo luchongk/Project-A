@@ -42,6 +42,11 @@ struct Array : public ArrayView<T> {
 };
 
 template<typename T>
+void array_reset(Array<T>* array) {
+    array->count = 0;
+}
+
+template<typename T>
 void array_add(Array<T>* array, T to_add) {
     if(array->count >= array->allocated) {
         s64 new_size = 2 * array->allocated;

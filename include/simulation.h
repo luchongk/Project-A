@@ -1,14 +1,11 @@
 #ifndef SIMULATION_H
 #define SIMULATION_H
 
-#include "vector.h"
-
 //All these are @TEMPORARY
 extern float cubes_rotation;
 extern bool paused;
-extern bool character;
+extern bool character_selected;
 
-struct PlayerInput;
-void simulate(PlayerInput* input);
+void simulate(float dt);
 
 #endif

@@ -1,4 +1,5 @@
 param([string]$platform='64', [bool]$release=$false)
+$debug_build_file = $false
 
 if($platform -eq '32') { $platform = '86' }
 
@@ -32,9 +33,9 @@ $project = "Project_A"
 $includes = "include", "include\3rdParty"
 $libraries = "user32.lib", "winmm.lib", "gdi32.lib", "d3d11.lib", "d3dcompiler.lib"
 $ignored_warnings = "4100", "4127", "4201", "4458", "4706", "4505", "4459" #"4189"
-$execFolder = if($release) { "bin\Release" } else { "bin\Debug" }
+$exec_folder = if($release) { "bin\Release" } else { "bin\Debug" }
 
-$compileExeOpts = 
+$compile_exe_opts = 
 	"-nologo", 
 	"-Zi", 
 	"-Zc:offsetof-", 
@@ -42,10 +43,10 @@ $compileExeOpts =
 	"-FC",
 #	"-WX",
 	"-W4" +
-	$(foreach($warning in $ignored_warnings) { "-wd$warning" }) +
+	($ignored_warnings | % { "-wd$_" }) +
 	$(if($release) { "-MT", "-O2" } else { "-MTd", "-Od" }) +
     "-GR-" +
-	$(foreach($inc in $includes) { "-I$inc" }) +
+	($includes | % { "-I$_" }) +
 	"-Fobin\Debug\",
 	"-Fdbin\Debug\",
 #	"-Faasm\",
@@ -54,7 +55,7 @@ $compileExeOpts =
 	"-D_UNICODE" +
 	$(if($release) { } else { "-DDEBUG" })
 
-$linkOpts = 
+$link_opts = 
 	"-link",
 	"-SUBSYSTEM:WINDOWS",
 	"-MACHINE:X$platform",
@@ -62,17 +63,12 @@ $linkOpts =
 	"-INCREMENTAL:NO",
 	"-OPT:REF" +
 	$libraries
-	
-#rm src\generated.cpp -ErrorAction SilentlyContinue
-#cl.exe $compileExeOpts -std:c++17 -Fetools\parser\ tools\parser\parser.cpp -Itools\parser\
-#tools\reflection_parser.exe src\generated.cpp include\
 
-rm "$execFolder\game-*.pdb" -ErrorAction SilentlyContinue
+if($debug_build_file) {
+	echo "cl.exe $compile_exe_opts -Fe$exec_folder\$project.exe src\main.cpp $link_opts`n"
+}
 
-#cl.exe $compileExeOpts -LD "-Fe$execFolder\" src\game.cpp $linkOpts -PDB:bin\Debug\game-$(get-date -Format FileDateTime).pdb
-#if($LASTEXITCODE -ne 0) { exit 1 }
-
-cl.exe $compileExeOpts "-Fe$execFolder\$project.exe" src\main.cpp $linkOpts
+cl.exe $compile_exe_opts "-Fe$exec_folder\$project.exe" src\main.cpp $link_opts
 
 # Only return the error if we are not running the game,
 # cause compilation of the .exe always fails when we are running

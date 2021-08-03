@@ -30,8 +30,9 @@ struct Light : Entity {
 extern Camera camera;
 extern Light light;
 extern Entity entities[10];
+extern int entities_count;
 
-void reset_entities();
+void reset_scene();
 
 Matrix get_world_matrix(Entity* entity);
 

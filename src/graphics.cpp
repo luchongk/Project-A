@@ -17,8 +17,8 @@ struct ShaderProgram {
 
 struct GraphicsBuffer {
     ID3D11Buffer* d3d;
-    GraphicsBufferUsage usage;
     uint stride;
+    GraphicsBufferUsage usage;
 };
 
 //struct Texture {};
@@ -28,21 +28,21 @@ static ID3D11DeviceContext4* device_context;
 static IDXGISwapChain2* swap_chain;
 static ID3D11RenderTargetView* render_target;
 static ID3D11DepthStencilView* depth_stencil;
-static ID3D11DepthStencilState* depth_stencil_state;
+static ID3D11DepthStencilState* depth_stencil_state_off;
+static ID3D11BlendState1* blend_state_on;
 static ID3D11RasterizerState2* rasterizer_state;
+static ID3D11SamplerState* sampler_state;
 
 static const int MAX_SHADER_COUNT = 8;
 static ShaderProgram shaders[MAX_SHADER_COUNT];
 static int shader_count;
 
-static const int MAX_BUFFER_COUNT = 8;
+static const int MAX_BUFFER_COUNT = 16;
 static GraphicsBuffer buffers[MAX_BUFFER_COUNT];
 static int buffer_count;
 
 //static ShaderProgram* current_shader = nullptr;
 //static GraphicsBuffer* current_vertex_buffer = nullptr;
-
-void (*on_size_adjusted)(int, int) = nullptr;
 
 static uint get_format_stride(VertexFormat format) {
     switch(format) {
@@ -178,13 +178,13 @@ bool init_graphics(HWND hwnd) {
     create_color_and_depth_views();
 
     D3D11_DEPTH_STENCIL_DESC depth_stencil_desc;
-    depth_stencil_desc.DepthEnable = true;
-    depth_stencil_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
-    depth_stencil_desc.DepthFunc = D3D11_COMPARISON_LESS;
+    depth_stencil_desc.DepthEnable = false;
+    //depth_stencil_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+    //depth_stencil_desc.DepthFunc = D3D11_COMPARISON_LESS;
     
     depth_stencil_desc.StencilEnable = false;
-    depth_stencil_desc.StencilReadMask = 0xFF;
-    depth_stencil_desc.StencilWriteMask = 0xFF;
+    /*depth_stencil_desc.StencilReadMask = D3D11_DEFAULT_STENCIL_READ_MASK;
+    depth_stencil_desc.StencilWriteMask = D3D11_DEFAULT_STENCIL_WRITE_MASK;
 
     // Stencil operations if pixel is front-facing
     depth_stencil_desc.FrontFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
@@ -196,15 +196,35 @@ bool init_graphics(HWND hwnd) {
     depth_stencil_desc.BackFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
     depth_stencil_desc.BackFace.StencilDepthFailOp = D3D11_STENCIL_OP_DECR;
     depth_stencil_desc.BackFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
-    depth_stencil_desc.BackFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
+    depth_stencil_desc.BackFace.StencilFunc = D3D11_COMPARISON_ALWAYS;*/
     
-    device->CreateDepthStencilState(&depth_stencil_desc, &depth_stencil_state);
-    device_context->OMSetDepthStencilState(depth_stencil_state, 1);
+    device->CreateDepthStencilState(&depth_stencil_desc, &depth_stencil_state_off);
+
+    D3D11_RENDER_TARGET_BLEND_DESC1 rt_blend_desc;
+    rt_blend_desc.BlendEnable           = true;
+    rt_blend_desc.LogicOpEnable         = false;
+    rt_blend_desc.SrcBlend              = D3D11_BLEND_SRC_ALPHA;
+    rt_blend_desc.DestBlend             = D3D11_BLEND_INV_SRC_ALPHA;
+    rt_blend_desc.BlendOp               = D3D11_BLEND_OP_ADD;
+    rt_blend_desc.SrcBlendAlpha         = D3D11_BLEND_ONE;
+    rt_blend_desc.DestBlendAlpha        = D3D11_BLEND_INV_SRC_ALPHA;
+    rt_blend_desc.BlendOpAlpha          = D3D11_BLEND_OP_ADD;
+    rt_blend_desc.RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+
+    D3D11_BLEND_DESC1 blend_desc;
+    blend_desc.AlphaToCoverageEnable  = false;
+    blend_desc.IndependentBlendEnable = false;
+    blend_desc.RenderTarget[0] = rt_blend_desc;
+    device->CreateBlendState1(&blend_desc, &blend_state_on);
     
     CD3D11_RASTERIZER_DESC2 rasterizer_desc{D3D11_DEFAULT};
     rasterizer_desc.FrontCounterClockwise = true;
     device->CreateRasterizerState2(&rasterizer_desc, &rasterizer_state);
     device_context->RSSetState(rasterizer_state);
+
+    CD3D11_SAMPLER_DESC sampler_desc{D3D11_DEFAULT};
+    device->CreateSamplerState(&sampler_desc, &sampler_state);
+    device_context->PSSetSamplers(0, 1, &sampler_state);
 
     // Set up the viewport.
     D3D11_VIEWPORT vp;
@@ -233,8 +253,10 @@ void end_graphics() {
         shaders[i].vertex_shader->Release();
     }
 
+    sampler_state->Release();
     rasterizer_state->Release();
-    depth_stencil_state->Release();
+    depth_stencil_state_off->Release();
+    blend_state_on->Release();
     depth_stencil->Release();
     render_target->Release();
     swap_chain->Release();
@@ -246,6 +268,7 @@ void end_graphics() {
     debug->ReportLiveDeviceObjects((D3D11_RLDO_FLAGS)7);*/
 }
 
+//@Cleanup: We could use ID3D11ShaderReflection to get rid of the input_format parameter here, and maybe some other stuff too...
 uint compile_shader(String vertex_path, String pixel_path, VertexFormat input_format) {
     ID3D10Blob* bytecode;
 
@@ -304,7 +327,7 @@ void set_shader(uint id) {
     device_context->IASetInputLayout(program->input_layout);
 }
 
-void set_fullscreen_state(bool fullscreen) {
+void set_fullscreen(bool fullscreen) {
     HRESULT error;
     error = swap_chain->SetFullscreenState(fullscreen, nullptr);
 }
@@ -317,22 +340,19 @@ void adjust_size(int width, int height) {
 
     HRESULT error;
     // Preserve the existing buffer count and format.
-    // Automatically choose the width and height to match the client rect for HWNDs.
-    error = swap_chain->ResizeBuffers(0, 0, 0, DXGI_FORMAT_UNKNOWN, 0/* DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT*/);
+    error = swap_chain->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0/* DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT*/);
                         
     create_color_and_depth_views();
 
     // Set up the viewport.
     D3D11_VIEWPORT vp;
-    vp.Width = (float)width;
+    vp.Width  = (float)width;
     vp.Height = (float)height;
     vp.MinDepth = 0.0f;
     vp.MaxDepth = 1.0f;
     vp.TopLeftX = 0;
     vp.TopLeftY = 0;
     device_context->RSSetViewports(1, &vp);
-
-    if(on_size_adjusted) on_size_adjusted(width, height);
 }
 
 // We only have 1 framebuffer at the moment so we dont take any parameters
@@ -354,6 +374,16 @@ void clear_depth_buffer() {
     device_context->ClearDepthStencilView(depth_stencil, D3D11_CLEAR_DEPTH, 1.0f, 0);
 }
 
+void set_depth(bool on) {
+    if(on) device_context->OMSetDepthStencilState(nullptr, 1);
+    else   device_context->OMSetDepthStencilState(depth_stencil_state_off, 1);
+}
+
+void set_blend(bool on) {
+    if(on) device_context->OMSetBlendState(blend_state_on, nullptr, 0xFFFFFFFF);
+    else   device_context->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
+}
+
 Texture* create_texture(String path) {
     stbi_set_flip_vertically_on_load(true);  
     
@@ -367,7 +397,7 @@ Texture* create_texture(String path) {
     texture_desc.Height = height;
     texture_desc.MipLevels = 0;
     texture_desc.ArraySize = 1;
-    texture_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    texture_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
     texture_desc.SampleDesc.Quality = 0;
     texture_desc.SampleDesc.Count = 1;
     texture_desc.Usage = D3D11_USAGE_DEFAULT;
@@ -424,6 +454,7 @@ static GraphicsBuffer* create_buffer(D3D11_BIND_FLAG type, GraphicsBufferUsage u
         subresource_data = &srd;
     }
 
+    assert(buffer_count < MAX_BUFFER_COUNT);
     GraphicsBuffer* buffer = &buffers[buffer_count];
     buffer->usage = usage;
 
@@ -467,6 +498,9 @@ void set_uniform_buffer(UniformBufferSlot slot, GraphicsBuffer* buffer) {
 }
 
 void modify_buffer(GraphicsBuffer* buffer, uint size, void* data) {
+    // @Cleanup: GraphicsBuffer should probably be separated into VertexBuffer, IndexBuffer, ConsantBuffer, etc.
+    // We almost never treat them the same and there are cases like this where we can't assume there is a stride
+    // (constant buffers don't have stride), to automatically get the size of a vertex buffer.
     if(buffer->usage == GraphicsBufferUsage::DYNAMIC) {
         HRESULT error;
         D3D11_MAPPED_SUBRESOURCE resource;
@@ -483,6 +517,10 @@ void set_primitive_type(GraphicsPrimitiveType type) {
     D3D11_PRIMITIVE_TOPOLOGY d3d_type = (D3D11_PRIMITIVE_TOPOLOGY)((int)type + 1);
 
     device_context->IASetPrimitiveTopology(d3d_type);
+}
+
+void draw(uint vertex_count) {
+    device_context->Draw(vertex_count, 0);
 }
 
 void draw_indexed(uint index_count) {

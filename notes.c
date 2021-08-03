@@ -26,6 +26,6 @@
 /**
  * !BUGS
  * ✓
- * * [] Camera rotation speed is framerate dependent for some reason
+ * * [✓] Camera rotation speed is framerate dependent for some reason
  *  
  */

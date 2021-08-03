@@ -142,8 +142,7 @@ Matrix rotation(float yaw, float pitch) {
     };
 }
 
-//This name sucks. Should be something along the line of "to_view_coordinates" or something like that
-Matrix look_dir(Vec3 pos, Vec3 forward, Vec3 up) {
+Matrix look_to(Vec3 pos, Vec3 forward, Vec3 up) {
     Vec3 right = normalize(cross(up, forward));
     up = cross(forward, right);
 
@@ -155,11 +154,10 @@ Matrix look_dir(Vec3 pos, Vec3 forward, Vec3 up) {
     };
 }
 
-//This name sucks. Should be something along the line of "to_view_coordinates" or something like that
 Matrix look_at(Vec3 pos, Vec3 to, Vec3 up) {
     Vec3 forward = normalize(to - pos);
 
-    return look_dir(pos, forward, up);
+    return look_to(pos, forward, up);
 }
 
 Matrix perspective(int width, int height) {

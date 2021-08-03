@@ -7,8 +7,8 @@ enum class VertexFormat {
 };
 
 struct VertexPC {
-    float position[3];
-    float color[4];
+    Vec3 position;
+    Vec4 color;
 };
 
 struct VertexPNU {
@@ -22,13 +22,13 @@ struct GraphicsBuffer;
 
 struct Texture;
 
-enum class GraphicsBufferUsage {
+enum class GraphicsBufferUsage : u8 {
     //IMMUTABLE,
     STATIC,
     DYNAMIC
 };
 
-enum class GraphicsPrimitiveType {
+enum class GraphicsPrimitiveType : u8 {
     POINT,
     LINE,
     LINE_STRIP,
@@ -54,7 +54,7 @@ uint compile_shader(String vertex_path, String pixel_path, VertexFormat input_fo
 
 void set_shader(uint id);
 
-void set_fullscreen_state(bool fullscreen);
+void set_fullscreen(bool fullscreen);
 
 void adjust_size(int width, int height);
 
@@ -64,6 +64,8 @@ void swap_buffers();
 
 void clear_color_buffer(float r, float g, float b);
 void clear_depth_buffer();
+void set_depth(bool on);
+void set_blend(bool on);
 
 Texture* create_texture(String path);
 void set_texture(uint slot, Texture* texture);
@@ -82,6 +84,8 @@ void set_index_buffer(GraphicsBuffer* buffer);
 void set_uniform_buffer(UniformBufferSlot slot, GraphicsBuffer* buffer);
 
 void set_primitive_type(GraphicsPrimitiveType type);
+
+void draw(uint vertex_count);
 
 void draw_indexed(uint index_count);
 

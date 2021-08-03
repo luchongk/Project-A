@@ -21,11 +21,14 @@ cbuffer per_object : register(b3) {
     float3 position : packoffset(c7.y);
 }
 
-Texture2D tex : register(t0);
-SamplerState smp;
+Texture2D _texture;
+SamplerState _sampler;
 
 float4 main(float3 world_position : POSITION, float3 normal : NORMAL, float2 uv : UV) : SV_TARGET
 {
+    float distance    = length(light.position - world_position);
+    float attenuation = 1.0 / (1.0 + 0.01f * distance * distance);    
+
     //ambient
     float3 ambient = light.ambient * material.ambient;
 
@@ -33,17 +36,20 @@ float4 main(float3 world_position : POSITION, float3 normal : NORMAL, float2 uv 
     float3 norm = normalize(normal);
     float3 light_dir = normalize(light.position - world_position);
     float diffuse_portion = max(dot(light_dir, norm), 0);
-    float3 diffuse = diffuse_portion * light.diffuse * material.diffuse * tex.Sample(smp, uv);
+    float3 diffuse = diffuse_portion * light.diffuse * material.diffuse * attenuation;
 
     //specular
+    //if(diffuse_portion > 0) {
     float3 view_dir = normalize(view_pos - world_position);
-    float3 reflect_dir = reflect(-light_dir, norm);
-    float specular_portion = pow(max(dot(view_dir, reflect_dir), 0), material.shininess);
-    float3 specular = specular_portion * light.specular * material.specular;
+    float3 halfway_dir = normalize(light_dir + view_dir);
+    //float3 reflect_dir = reflect(-light_dir, norm);
+    float specular_portion = pow(max(dot(norm, halfway_dir), 0), material.shininess);
+    float3 specular = diffuse_portion * specular_portion * light.specular * material.specular * attenuation;
+    //}
     
     float3 color = ambient + diffuse + specular;
-    //color = color * tex.Sample(smp, uv);
-
+    //color *= _texture.Sample(_sampler, uv);
+    
     //Gamma correction
     //color = pow(color, 1.0 / 2.2);
     color = max(1.055 * pow(color, 0.416666667) - 0.055, 0);

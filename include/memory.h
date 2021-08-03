@@ -19,20 +19,20 @@
 typedef void* (*Allocator)(void* old_pointer, u64 old_size, u64 new_size, void* allocator_data);
 
 template<typename T>
-static T* alloc_(u64 count = 1) {
+T* alloc_(u64 count = 1) {
     //TODO: Think about alignment!
     auto result = (T*)default_allocator(nullptr, 0, sizeof(T) * count, default_allocator_data);
     return result;
 }
 
 template<typename T>
-static T* realloc_(T* oldPointer, u64 oldCount, u64 newCount) {
+T* realloc_(T* oldPointer, u64 oldCount, u64 newCount) {
     auto result = (T*)default_allocator(oldPointer, sizeof(T) * oldCount, sizeof(T) * newCount, default_allocator_data);
     return result;
 }
 
 template<typename T>
-static void free_(T* pointer) {
+void free_(T* pointer) {
     default_allocator(pointer, sizeof(T), 0, default_allocator_data);
 }
 
@@ -102,7 +102,7 @@ static void* linear_allocator(void* old_pointer, u64 old_size, u64 new_size, voi
     }
     else if(new_size == 0) {
         //FREE: Not supported.
-        assert(false);
+        //assert(false);
     }
     else {
         //RESIZE: We just copy the old data, we never deallocate.
