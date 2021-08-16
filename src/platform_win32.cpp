@@ -80,7 +80,7 @@ float os_elapsed_time(u64 from_stamp, u64 to_stamp) {
 
 //? Should we move this to input.h?
 void os_poll_events() {
-    player_input.mouse_delta = {0,0};
+    player_input.mouse_delta_pixels = {0,0};
 
     array_reset(&events);
     
@@ -146,6 +146,9 @@ void os_set_fullscreen(OSWindow* window, bool fullscreen, bool borderless) {
                                 mi.rcMonitor.right - mi.rcMonitor.left,
                                 mi.rcMonitor.bottom - mi.rcMonitor.top,
                                 SWP_FRAMECHANGED);
+
+                RECT my_rect = {mi.rcMonitor.left, mi.rcMonitor.top, mi.rcMonitor.right, mi.rcMonitor.bottom};
+                ClipCursor(&my_rect);
             }
         } else {
             window->borderless = false;
@@ -169,6 +172,8 @@ void os_set_fullscreen(OSWindow* window, bool fullscreen, bool borderless) {
         else {
             set_fullscreen(false);
         }
+
+        ClipCursor(nullptr);
     }
 }
 
@@ -251,19 +256,24 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             else {
                 e.window.type = EventWindowType::FOCUS_GAINED;
                 window->focused = true;
+                
+                if(window->fullscreen) {
+                    RECT monitor = {0, 0, 1920, 1080};  //@Cleanup: Save monitor size for this.
+                    ClipCursor(&monitor);
+                }
             }
             
             array_add(&events, e);
         } break;
 
         case WM_EXITSIZEMOVE: {
-            player_input.mouse_delta = {0,0};
+            player_input.mouse_delta_pixels = {0,0};
         } break;
 
         case WM_MOUSEMOVE: {
             //@Temporary: We are casting mouse positions to float until we have a integer Vector type.
-            player_input.mouse_pos_screen.x = (short)(lParam & 0xFFFF);
-            player_input.mouse_pos_screen.y = (short)(lParam >> 16);
+            player_input.mouse_pos_pixels.x = (short)(lParam & 0xFFFF);
+            player_input.mouse_pos_pixels.y = (short)(lParam >> 16);
         } break;
 
         case WM_LBUTTONDOWN: {
@@ -300,8 +310,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
             if(raw.header.dwType == RIM_TYPEMOUSE) 
             {
-                player_input.mouse_delta.x += raw.data.mouse.lLastX;
-                player_input.mouse_delta.y += raw.data.mouse.lLastY;
+                player_input.mouse_delta_pixels.x += raw.data.mouse.lLastX;
+                player_input.mouse_delta_pixels.y += raw.data.mouse.lLastY;
             }
 
             return DefWindowProcA(hwnd, uMsg, wParam, lParam);

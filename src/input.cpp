@@ -9,8 +9,10 @@ void update_input() {
     os_poll_events();
 
     Vec2 actual_size = window->fullscreen ? Vec2{1920, 1080} : window->size;
-    player_input.mouse_pos_normalized.x = player_input.mouse_pos_screen.x / actual_size.x;
-    player_input.mouse_pos_normalized.y = player_input.mouse_pos_screen.y / actual_size.y;
+    player_input.mouse_pos_normalized.x   = player_input.mouse_pos_pixels.x   / actual_size.x;
+    player_input.mouse_pos_normalized.y   = player_input.mouse_pos_pixels.y   / actual_size.y;
+    player_input.mouse_delta_normalized.x = player_input.mouse_delta_pixels.x / actual_size.x;
+    player_input.mouse_delta_normalized.y = player_input.mouse_delta_pixels.y / actual_size.y;
 
     player_input.left_click = KeyState::NONE;
 }
@@ -53,7 +55,7 @@ static void handle_key_event(u32 keycode, bool pressed, bool is_repeat) {
             case 'P': {
                 if(pressed) {
                     paused = !paused;
-                    os_show_mouse(paused);
+                    //os_show_mouse(paused);
                 }
             } break;
 
@@ -81,7 +83,6 @@ static void handle_key_event(u32 keycode, bool pressed, bool is_repeat) {
             case VK_F9: {
                 if(pressed) {
                     bool is_fullscreen = window->fullscreen;
-                    os_show_mouse(paused);
                     os_set_fullscreen(window, !is_fullscreen, false);
                 }
             } break;
@@ -89,7 +90,6 @@ static void handle_key_event(u32 keycode, bool pressed, bool is_repeat) {
             case VK_F11: {
                 if(pressed) {
                     bool is_fullscreen = window->fullscreen;
-                    os_show_mouse(paused);
                     os_set_fullscreen(window, !is_fullscreen, true);
                 }
             } break;

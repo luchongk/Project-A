@@ -118,7 +118,7 @@ void render(OSWindow* window) {
     clear_color_buffer(srgb, srgb, srgb);
     clear_depth_buffer();
 
-    per_frame_uniforms.view_pos = camera.position;
+    /*per_frame_uniforms.view_pos = camera.position;
     per_frame_uniforms.view = look_to(camera.position, camera.forward, Vec3{0,1,0});
     
     per_frame_uniforms.light.position = light.position;
@@ -157,7 +157,7 @@ void render(OSWindow* window) {
         
         modify_buffer(per_object_uniform_buffer, sizeof(per_object_uniforms), &per_object_uniforms);
         draw_indexed((uint)entities[i].mesh->indices.count);
-    }
+    }*/
 
 #if DEBUG
 #if 0

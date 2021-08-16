@@ -67,4 +67,6 @@ void array_add(Array<T>* array, T to_add) {
 
 #define For(array) for(auto it = &(array).data[0]; it < &(array).data[(array).count]; it++)
 
+#define ReverseFor(array) for(auto it = &(array).data[(array).count - 1]; it >= &(array).data[0]; it--)
+
 #endif

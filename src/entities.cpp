@@ -13,7 +13,8 @@ static void make_entity(Vec3 position) {
     e->mesh = &weird_mesh;
     e->material.ambient   = {0.1f, 0.07f, 0.01f};
     e->material.diffuse   = {0.05f, 0.025f, 0.005f};
-    e->material.specular  = {1.0f, 0.7f, 0.0f};
+    //e->material.specular  = {1.0f, 0.7f, 0.0f};
+    e->material.specular  = {0.0f, 0.0f, 0.0f};
     e->material.shininess = 32.0f;
 
     ++entities_count;

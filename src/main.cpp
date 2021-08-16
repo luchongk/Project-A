@@ -41,13 +41,15 @@ void main() {
     //float accum = 0;
 
     window = os_create_window(1600, 800, "PepegaClap"_s);
-    os_show_mouse(false);
+    os_show_mouse(true);
 
     reset_scene();
     
     init_renderer(window);
 
     while(true) {
+        wait_for_vblank();
+        
         update_time();
 
         update_input();

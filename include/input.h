@@ -44,9 +44,10 @@ enum class KeyState : u8 {
 struct PlayerInput {
     KeyState left_click;
     bool mouse_interacting_with_ui = false;
-    Vec2 mouse_pos_screen;
+    Vec2 mouse_pos_pixels;
     Vec2 mouse_pos_normalized;
-    Vec2 mouse_delta;
+    Vec2 mouse_delta_pixels;
+    Vec2 mouse_delta_normalized;
     Vec3 move;
     float rotation;
 };

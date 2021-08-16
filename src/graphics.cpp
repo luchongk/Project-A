@@ -32,6 +32,7 @@ static ID3D11DepthStencilState* depth_stencil_state_off;
 static ID3D11BlendState1* blend_state_on;
 static ID3D11RasterizerState2* rasterizer_state;
 static ID3D11SamplerState* sampler_state;
+static HANDLE frame_latency_waitable;
 
 static const int MAX_SHADER_COUNT = 8;
 static ShaderProgram shaders[MAX_SHADER_COUNT];
@@ -163,7 +164,7 @@ bool init_graphics(HWND hwnd) {
     swap_chain_desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;       // the recommended flip mode
     swap_chain_desc.SampleDesc.Count = 1;
     swap_chain_desc.SampleDesc.Quality = 0;                           // disable anti-aliasing
-    swap_chain_desc.Flags = 0; //DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT
+    swap_chain_desc.Flags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT; //DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT
 
     IDXGISwapChain1* sc1;
     error = dxgiFactory->CreateSwapChainForHwnd(device, hwnd, &swap_chain_desc, nullptr, nullptr, &sc1);
@@ -175,11 +176,13 @@ bool init_graphics(HWND hwnd) {
 
     dxgiFactory->Release();
 
+    frame_latency_waitable = swap_chain->GetFrameLatencyWaitableObject();
+
     create_color_and_depth_views();
 
     D3D11_DEPTH_STENCIL_DESC depth_stencil_desc;
     depth_stencil_desc.DepthEnable = false;
-    //depth_stencil_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+    depth_stencil_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
     //depth_stencil_desc.DepthFunc = D3D11_COMPARISON_LESS;
     
     depth_stencil_desc.StencilEnable = false;
@@ -240,8 +243,8 @@ bool init_graphics(HWND hwnd) {
 }
 
 void end_graphics() {
-    HRESULT error;
-    error = swap_chain->SetFullscreenState(false, nullptr);
+    //HRESULT error;
+    //error = swap_chain->SetFullscreenState(false, nullptr);
 
     for(int i = 0; i < buffer_count; i++) {
         buffers[i].d3d->Release();
@@ -266,6 +269,10 @@ void end_graphics() {
     /*ID3D11Debug* debug;
     device->QueryInterface(__uuidof(ID3D11Debug), reinterpret_cast<void**>(&debug));
     debug->ReportLiveDeviceObjects((D3D11_RLDO_FLAGS)7);*/
+}
+
+void wait_for_vblank() {
+    WaitForSingleObjectEx(frame_latency_waitable, 1000, true);
 }
 
 //@Cleanup: We could use ID3D11ShaderReflection to get rid of the input_format parameter here, and maybe some other stuff too...
@@ -340,7 +347,7 @@ void adjust_size(int width, int height) {
 
     HRESULT error;
     // Preserve the existing buffer count and format.
-    error = swap_chain->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0/* DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT*/);
+    error = swap_chain->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT/* DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT*/);
                         
     create_color_and_depth_views();
 

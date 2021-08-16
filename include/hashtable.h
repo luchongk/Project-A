@@ -64,7 +64,7 @@ template<typename K>
 u32 get_hash(K key) {
     u32 hash = fnv1_32a_hash((u8*)&key, sizeof(K));
     if(hash == 0) hash += 2;   //0 is reserved for empty key
-    else if(hash == 1) hash++; //1 is reserved for tombstone
+    //else if(hash == 1) hash++; //1 is reserved for tombstone
     
     return hash;
 }
@@ -72,7 +72,7 @@ u32 get_hash(K key) {
 u32 get_hash(String key) {
     u32 hash = fnv1_32a_hash(key.data, key.count);
     if(hash == 0) hash += 2;
-    else if(hash == 1) hash++;
+    //else if(hash == 1) hash++;
 
     return hash;
 }
@@ -95,12 +95,12 @@ V* get(HashTable<K,V>* table, K key) {
         }
     }
 
-    assert(!"UNREACHABLE");
+    assert(table->allocated == 0);
     return nullptr;
 };
 
 template<typename K, typename V>
-void put(HashTable<K,V>* table, K key, V value) {
+V* put(HashTable<K,V>* table, K key, V value) {
     assert(table);
     
     if(table->count >= 0.9f * table->allocated) {
@@ -109,43 +109,75 @@ void put(HashTable<K,V>* table, K key, V value) {
 
     u32 hash = get_hash(key);
 
-    bool verifying = false;
+    //?Incomplete: Commented stuff is for tombstones, but is incomplete
+    //bool verifying = false;
     for(int i = 0; i < table->allocated; i++) {
         int index = (hash + i) & (table->allocated - 1);
         auto entry = &table->entries[index];
 
-        if(verifying) {
+        /*if(verifying) {
             if(keys_are_equal(entry->key, key)) {
                 entry->hash = 0;
                 return;
             }
         }
-        else {
+        else {*/
             if(entry->hash == 0) {
                 table->count++;
                 entry->hash = hash;
                 entry->key = key;
                 entry->value = value;
-                return;
+                return &entry->value;
             }
 
-            if(entry->hash == 1) {
+            /*if(entry->hash == 1) {
                 verifying = true;
                 entry->hash = hash;
                 entry->key = key;
                 entry->value = value;
-            }
+            }*/
             
             if(keys_are_equal(entry->key, key)) {
                 entry->hash = hash;
                 entry->key = key;
                 entry->value = value;
-                return;
+                return &entry->value;
             }
+        //}
+    }
+
+    assert(!"UNREACHABLE");
+    return nullptr;
+};
+
+template<typename K, typename V>
+V* get_or_create(HashTable<K,V>* table, K key, V default_value) {
+    assert(table);
+    
+    if(table->count >= 0.9f * table->allocated) {
+        grow(table);
+    }
+
+    u32 hash = get_hash(key);
+
+    for(int i = 0; i < table->allocated; i++) {
+        int index = (hash + i) & (table->allocated - 1);
+        auto entry = &table->entries[index];
+
+        if(entry->hash == 0) {
+            table->count++;
+            entry->hash = hash;
+            entry->key = key;
+            entry->value = default_value;
+            return &entry->value;
+        }       
+        else if(keys_are_equal(entry->key, key)) {
+            return &entry->value;
         }
     }
 
     assert(!"UNREACHABLE");
+    return nullptr;
 };
 
 template<typename K, typename V>
@@ -162,6 +194,9 @@ bool remove(HashTable<K,V>* table, K key) {
             return false;
         }
         else if(entry->hash == hash && keys_are_equal(entry->key, key)) {
+            //! This is currently wrong. We are disconnecting the rest of the entries that have the same hash
+            //If we do a "get" of something else after this we might get false nulls.
+            //We should use tombstones (or something) instead.
             entry->hash = 0;
             table->count--;
             return true;
