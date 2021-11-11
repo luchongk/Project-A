@@ -22,7 +22,7 @@ struct Mesh {
 
 void init_renderer();
 void end_renderer();
-void adjust_projection(int width, int height);
+void set_projection(int width, int height);
 
 struct ::OSWindow;
 

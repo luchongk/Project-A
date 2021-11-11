@@ -5,14 +5,17 @@
     #include "platform_win32.cpp"
 #endif
 
-#define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.cpp"
+#include "stb_truetype.cpp"
 #include "input.cpp"
 #include "render.cpp"
 #include "simulation.cpp"
 #include "graphics.cpp"
 #include "obj_loader.cpp"
 #include "entities.cpp"
+#include "rect.cpp"
+#include "font.cpp"
+#include "simple_draw.cpp"
 #include "ui.cpp"
 
 Time time;
@@ -34,7 +37,7 @@ static void update_time() {
 
 void main() {
     time.start_stamp = os_get_timestamp();
-    time.sim_dt = 1.0f/120;
+    time.sim_dt = 1.0f/60;
     time.sim_scale = 1.0f;
     time.max_allowed_per_frame = 0.25f;
 
@@ -72,7 +75,7 @@ void main() {
     printf_s("FPS: %f\n", 1 / time.dt);
     fflush(stdout);   //CPU usage goes 10x and my laptops fan starts going crazy if we do this every frame. WTF!
 #elif 0
-    printf_s("Mouse X: %f Y: %f\n", player_input.mouse_position.x, player_input.mouse_position.y);
+    printf_s("Mouse X: %f Y: %f\n", input.mouse_position.x, input.mouse_position.y);
     fflush(stdout);   //CPU usage goes 10x and my laptops fan starts going crazy if we do this every frame. WTF!
 #endif
     }

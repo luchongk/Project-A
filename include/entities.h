@@ -24,7 +24,6 @@ struct Light : Entity {
     Vec3 ambient;
     Vec3 diffuse;
     Vec3 specular;
-    float t_movement;
 };
 
 extern Camera camera;

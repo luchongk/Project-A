@@ -32,7 +32,7 @@ float os_elapsed_time(u64 from_stamp, u64 to_stamp);
 //s64 os_get_timer_frequency();
 void os_poll_events();
 //void os_lock_mouse(OSWindow* window);
-void os_set_mouse_center(OSWindow* window);
+void os_set_mouse_to_center(OSWindow* window);
 void os_show_mouse(bool show);
 //bool os_is_fullscreen(OSWindow* window);
 void os_set_fullscreen(OSWindow* window, bool fullscreen, bool borderless);

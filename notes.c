@@ -1,31 +1,35 @@
 /**
  * TODO: No particular order
  * ✓
- * * [✓] Clean up vector.h
+ * * [✓] Clean up vector.h.
  * 
- * * [] Make some kind of vector3 for ints
+ * * [] Make some kind of vector3 for ints.
  * 
- * * [✓] Math header file
+ * * [✓] Math header file.
  * 
- * * [✓] Array type
+ * * [✓] Array type.
  * 
- * * [] LearnOpengl
+ * * [] LearnOpengl.
  * 
- * * [] Make Debug UI
+ * * [] Make Debug UI.
  * 
- * * [] Physics
+ * * [] Physics.
  * 
- * * [✓] Get rid of GLM
+ * * [✓] Get rid of GLM.
  * 
- * * [] Temporary Storage
+ * * [] Temporary Storage.
  * 
- * * [] Position/Rotation interpolation for rendering
+ * * [] Position/Rotation interpolation for rendering.
  * 
+ * * [] Better input handling. Detect both pressing and holding.
  */
 
 /**
  * !BUGS
  * ✓
- * * [✓] Camera rotation speed is framerate dependent for some reason
+ * * [✓] Camera rotation speed is framerate dependent for some reason.
  *  
  */
+
+
+// Idea: https://gamedev.net/forums/topic/436821-which-is-faster-switch-statement-or-function-pointers/3900191/?page=2

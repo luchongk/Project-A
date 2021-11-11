@@ -44,10 +44,11 @@ static int buffer_count;
 
 //static ShaderProgram* current_shader = nullptr;
 //static GraphicsBuffer* current_vertex_buffer = nullptr;
+Texture* white_pixel;
 
 static uint get_format_stride(VertexFormat format) {
     switch(format) {
-        case VertexFormat::PC:  return sizeof(VertexPC);
+        case VertexFormat::PCU:  return sizeof(VertexPCU);
         case VertexFormat::PNU: return sizeof(VertexPNU);
         
         default: assert(!"UNREACHABLE");
@@ -58,15 +59,18 @@ static uint get_format_stride(VertexFormat format) {
 
 static void create_input_layout(VertexFormat format, ID3DBlob* bytecode, ShaderProgram* program) {
     switch(format) {
-        case VertexFormat::PC: {
+        case VertexFormat::PCU: {
             D3D11_INPUT_ELEMENT_DESC attributes[] = {
                 {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0,                            0, D3D11_INPUT_PER_VERTEX_DATA, 0},
                 {"COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
+                {"UV",       0, DXGI_FORMAT_R32G32_FLOAT,       0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
             };
 
             HRESULT error;
-            error = device->CreateInputLayout(attributes, 2, bytecode->GetBufferPointer(), bytecode->GetBufferSize(), &program->input_layout);
-        } break;
+            error = device->CreateInputLayout(attributes, 3, bytecode->GetBufferPointer(), bytecode->GetBufferSize(), &program->input_layout);
+            
+            break;
+        }
 
         case VertexFormat::PNU: {
             D3D11_INPUT_ELEMENT_DESC attributes[] = {
@@ -77,7 +81,9 @@ static void create_input_layout(VertexFormat format, ID3DBlob* bytecode, ShaderP
 
             HRESULT error;
             error = device->CreateInputLayout(attributes, 3, bytecode->GetBufferPointer(), bytecode->GetBufferSize(), &program->input_layout);
-        } break;
+
+            break;
+        }
 
         default: assert(false);
     }
@@ -239,6 +245,32 @@ bool init_graphics(HWND hwnd) {
     vp.TopLeftY = 0;
     device_context->RSSetViewports( 1, &vp );
 
+    // Create 1 pixel white texture
+    {
+        D3D11_TEXTURE2D_DESC texture_desc;
+        texture_desc.Width = 1;
+        texture_desc.Height = 1;
+        texture_desc.MipLevels = 0;
+        texture_desc.ArraySize = 1;
+        texture_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        texture_desc.SampleDesc.Quality = 0;
+        texture_desc.SampleDesc.Count = 1;
+        texture_desc.Usage = D3D11_USAGE_DEFAULT;
+        texture_desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+        texture_desc.CPUAccessFlags = 0;
+        texture_desc.MiscFlags = 0;
+
+        ID3D11Texture2D *texture;
+        error = device->CreateTexture2D(&texture_desc, nullptr, &texture);
+
+        error = device->CreateShaderResourceView(texture, nullptr, (ID3D11ShaderResourceView**)&white_pixel);
+        
+        u8 white[4] = {255,255,255,255};
+        device_context->UpdateSubresource(texture, 0, 0, white, 4, 0);
+
+        texture->Release();
+    }
+        
     return true;
 }
 
@@ -256,6 +288,7 @@ void end_graphics() {
         shaders[i].vertex_shader->Release();
     }
 
+    ((ID3D11ShaderResourceView*)white_pixel)->Release();
     sampler_state->Release();
     rasterizer_state->Release();
     depth_stencil_state_off->Release();
@@ -339,7 +372,7 @@ void set_fullscreen(bool fullscreen) {
     error = swap_chain->SetFullscreenState(fullscreen, nullptr);
 }
 
-void adjust_size(int width, int height) {
+void set_framebuffer_size(int width, int height) {
     device_context->OMSetRenderTargets(0, nullptr, nullptr);
 
     render_target->Release();
@@ -391,10 +424,41 @@ void set_blend(bool on) {
     else   device_context->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
 }
 
-Texture* create_texture(String path) {
+Texture* create_texture_from_bitmap(void* data, int width, int height) {
+    D3D11_TEXTURE2D_DESC texture_desc;
+    texture_desc.Width = width;
+    texture_desc.Height = height;
+    texture_desc.MipLevels = 1;
+    texture_desc.ArraySize = 1;
+    texture_desc.Format = DXGI_FORMAT_R8_UNORM;
+    texture_desc.SampleDesc.Quality = 0;
+    texture_desc.SampleDesc.Count = 1;
+    texture_desc.Usage = D3D11_USAGE_DEFAULT;
+    texture_desc.BindFlags = D3D11_BIND_SHADER_RESOURCE /*| D3D11_BIND_RENDER_TARGET*/;
+    texture_desc.CPUAccessFlags = 0;
+    texture_desc.MiscFlags = 0;
+
+    /*D3D11_SUBRESOURCE_DATA initData;
+    initData.pSysMem = image_data;
+    initData.SysMemPitch = width * nrChannels;*/
+
+    ID3D11Texture2D *texture;
+    HRESULT error;
+    error = device->CreateTexture2D(&texture_desc, nullptr, &texture);
+
+    ID3D11ShaderResourceView* texture_view;
+    error = device->CreateShaderResourceView(texture, nullptr, &texture_view);
+    
+    device_context->UpdateSubresource(texture, 0, 0, data, width, 0);
+
+    texture->Release();
+
+    return (Texture*)texture_view;
+}
+
+Texture* create_texture_from_file(String path) {
     stbi_set_flip_vertically_on_load(true);  
     
-    // load and generate the texture
     int width, height, nrChannels;
     unsigned char *image_data = stbi_load((const char*)path.data, &width, &height, &nrChannels, 0);
     if (!image_data) return nullptr;

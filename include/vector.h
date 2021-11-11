@@ -24,6 +24,10 @@ Vec2 operator*(const Vec2& u, const Vec2& v) {
     return Vec2{u.x * v.x, u.y * v.y};
 }
 
+Vec2 operator/(const Vec2& u, const Vec2& v) {
+    return Vec2{u.x / v.x, u.y / v.y};
+}
+
 Vec2 operator*(const Vec2& v, const float& scalar) {
     return Vec2{v.x * scalar, v.y * scalar};
 }
@@ -223,6 +227,10 @@ Vec4 parse_vec4(String s) {
 //Convinient conversions
 
 Vec2 vec2(const Vec3 v) {
+    return Vec2{v.x, v.y};
+}
+
+Vec2 vec2(const Vec4 v) {
     return Vec2{v.x, v.y};
 }
 

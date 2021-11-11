@@ -49,7 +49,7 @@ $compile_exe_opts =
 	($includes | % { "-I$_" }) +
 	"-Fobin\Debug\",
 	"-Fdbin\Debug\",
-#	"-Faasm\",
+#	"-Fabin\Debug\",
 	"-D_CRT_SECURE_NO_WARNINGS",
 	"-DUNICODE",
 	"-D_UNICODE" +

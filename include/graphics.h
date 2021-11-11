@@ -2,13 +2,14 @@
 #define GRAPHICS_H
 
 enum class VertexFormat {
-    PC,
+    PCU,
     PNU,
 };
 
-struct VertexPC {
+struct VertexPCU {
     Vec3 position;
     Vec4 color;
+    Vec2 uv;
 };
 
 struct VertexPNU {
@@ -17,7 +18,7 @@ struct VertexPNU {
     Vec2 uv;
 };
 
-// Handle to a graphics buffer (vertex, index, uniform)
+// Handle to a vertex, index or uniform buffer.
 struct GraphicsBuffer;
 
 struct Texture;
@@ -36,7 +37,7 @@ enum class GraphicsPrimitiveType : u8 {
     TRIANGLE_STRIP
 };
 
-//The numeric value of these indicate register slots for the uniform buffers
+//The numeric value of these indicate register slots for the uniform buffers.
 enum class UniformBufferSlot {
     PER_SETTINGS,
     PER_FRAME,
@@ -44,7 +45,7 @@ enum class UniformBufferSlot {
     PER_OBJECT
 };
 
-extern void (*on_size_adjusted)(int width, int height);
+extern Texture* white_pixel;
 
 bool init_graphics(HWND hwnd);
 
@@ -56,7 +57,7 @@ void set_shader(uint id);
 
 void set_fullscreen(bool fullscreen);
 
-void adjust_size(int width, int height);
+void set_framebuffer_size(int width, int height);
 
 void bind_framebuffer();
 
@@ -67,7 +68,7 @@ void clear_depth_buffer();
 void set_depth(bool on);
 void set_blend(bool on);
 
-Texture* create_texture(String path);
+Texture* create_texture_from_file(String path);
 void set_texture(uint slot, Texture* texture);
 void release_texture(Texture* texture);
 

@@ -68,7 +68,7 @@ void load_obj(String path, Mesh* mesh) {
             ObjVertex face_vertex{v_index, vt_index, vn_index};
 
             int found = -1;
-            for(int j = 0; j < face_vertices.count; j++) {
+            for(uint j = 0; j < face_vertices.count; j++) {
                 if(face_vertices[j].v_index == face_vertex.v_index && face_vertices[j].uv_index == face_vertex.uv_index && face_vertices[j].vn_index == face_vertex.vn_index) {
                     found = j;
                     break;
@@ -79,7 +79,7 @@ void load_obj(String path, Mesh* mesh) {
                 array_add(&mesh->indices,  (uint)found);
             }
             else {
-                array_add(&mesh->indices,  (uint)face_vertices.count);
+                array_add(&mesh->indices,  face_vertices.count);
                 array_add(&face_vertices, face_vertex);
                 
                 array_add(&mesh->vertices, vertices[v_index - 1]);

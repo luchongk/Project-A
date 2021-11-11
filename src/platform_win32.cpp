@@ -12,15 +12,18 @@ struct Win32Window {
     HDC device;
 };
 
-static char window_class_name[] = "Project_A";
-static int default_window_style = WS_OVERLAPPEDWINDOW & ~WS_SIZEBOX;
-static bool mouse_visible = true;
+static char window_class_name[]  = "Project_A";
+static int  default_window_style = WS_OVERLAPPEDWINDOW;
+static bool mouse_visible        = true;
+
+// These are used during the sizing of a window (as in clicking and dragging the borders) to keep track of some state that Windows™ doesn't want to keep track of for us.
+static bool  in_sizemove = false;
+static float desired_width;
+static float desired_height;
 
 static LARGE_INTEGER timer_frequency;
 
 Array<Event> events;
-//Vec2 mouse_position;
-//Vec2 mouse_delta;
 
 OSWindow* os_create_window(int width, int height, String title) {
     RECT wr = {0, 0, width, height};                    // set the size, but not the position
@@ -80,7 +83,7 @@ float os_elapsed_time(u64 from_stamp, u64 to_stamp) {
 
 //? Should we move this to input.h?
 void os_poll_events() {
-    player_input.mouse_delta_pixels = {0,0};
+    input.mouse_delta_pixels = {0,0};
 
     array_reset(&events);
     
@@ -104,7 +107,7 @@ void os_show_mouse(bool show) {
     }
 }
 
-void os_set_mouse_center(OSWindow* window) {
+void os_set_mouse_to_center(OSWindow* window) {
     HWND hwnd = ((Win32Window*)window)->handle;
         
     RECT rect;
@@ -133,12 +136,12 @@ void os_set_fullscreen(OSWindow* window, bool fullscreen, bool borderless) {
     if(fullscreen && !window->fullscreen) {
         window->fullscreen = true;
         
-        if (borderless) {
+        if(borderless) {
             window->borderless = true;
 
             MONITORINFOEX mi;
             mi.cbSize = sizeof(mi);
-            if (GetMonitorInfo(MonitorFromWindow(hwnd, MONITOR_DEFAULTTOPRIMARY), &mi)) {
+            if(GetMonitorInfo(MonitorFromWindow(hwnd, MONITOR_DEFAULTTOPRIMARY), &mi)) {
                 SetWindowLong(hwnd, GWL_STYLE, WS_VISIBLE | WS_CLIPSIBLINGS);
                 
                 SetWindowPos(hwnd, HWND_TOP,
@@ -161,8 +164,8 @@ void os_set_fullscreen(OSWindow* window, bool fullscreen, bool borderless) {
         if(window->borderless) {
             SetWindowLong(hwnd, GWL_STYLE, WS_VISIBLE | WS_CLIPSIBLINGS | default_window_style);
 
-            RECT wr = {0, 0, (int)window->size.x, (int)window->size.y};                    // set the size, but not the position
-            AdjustWindowRect(&wr, default_window_style, false); // adjust the size
+            RECT wr = {0, 0, (int)window->size.x, (int)window->size.y}; // set the size, but not the position
+            AdjustWindowRect(&wr, default_window_style, false);         // adjust the size
 
             SetWindowPos(hwnd, HWND_NOTOPMOST,
                             (int)window->position.x, (int)window->position.y,
@@ -186,12 +189,25 @@ String os_read_entire_file(String path) {
     String content = new_string(alloc_size);
 
     DWORD bytesRead;
-    assert(ReadFile(file, content.data, (DWORD)alloc_size, &bytesRead, nullptr));
+    auto result = ReadFile(file, content.data, (DWORD)alloc_size, &bytesRead, nullptr);
+    assert(result);
     assert(alloc_size == bytesRead);
 
     CloseHandle(file);
 
     return content;
+}
+
+void os_write_file(String path, String to_write) {
+    HANDLE file = CreateFileA((char*)path.data, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_NEW, 0, nullptr);
+    assert(file != INVALID_HANDLE_VALUE);
+
+    DWORD bytesWritten;
+    auto result = WriteFile(file, to_write.data, to_write.count, &bytesWritten, nullptr);
+    assert(result);
+    assert(to_write.count == bytesWritten);
+
+    CloseHandle(file);
 }
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
@@ -200,26 +216,48 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     switch(uMsg) {
         case WM_DESTROY: {
             PostQuitMessage(0);
-        } break;
+            break;
+        }
 
         case WM_SIZE: {
-            Event e;
-            e.type = EventType::WINDOW;
-            e.window.window = window;
-            
-            e.window.type = EventWindowType::RESIZE;
-            e.window.data1 = LOWORD(lParam);
-            e.window.data2 = HIWORD(lParam);
-            array_add(&events, e);
-        } break;
+            //TODO: Handle window minimization.
 
-        //Remove weird beep when ALT+Enter
+            if(in_sizemove) {
+                desired_width  = (float)LOWORD(lParam);
+                desired_height = (float)HIWORD(lParam);
+            }
+            else {
+                window->size.x = (float)LOWORD(lParam);
+                window->size.y = (float)HIWORD(lParam);
+
+                Event e;
+                e.type = EventType::WINDOW;
+                e.window.window = window;
+                
+                e.window.type = EventWindowType::RESIZE;
+                array_add(&events, e);
+            }
+            
+            break;
+        }
+
+        //This removes the weird beep sound when pressing ALT+Enter
         case WM_SYSCHAR: break;
 
-        //Don't let ALT freeze the window but still handle exiting with ALT+F4
+        //Don't let ALT key freeze the window but still handle exiting with ALT+F4
         case WM_SYSKEYDOWN: {
             if(wParam == VK_F4) PostQuitMessage(0);
-        } break;
+            break;
+        }
+
+        case WM_CHAR: {
+            Event e;
+            e.type = EventType::TEXT;
+            e.text.character = (char)wParam;
+            array_add(&events, e);
+
+            break;
+        }
 
         case WM_KEYUP: {
             u32 vk_code = (u32)wParam;
@@ -230,7 +268,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             e.key.pressed   = false;
             e.key.is_repeat = false;
             array_add(&events, e);
-        } break;
+            
+            break;
+        }
 
         case WM_KEYDOWN: {
             u32 vk_code = (u32)wParam;
@@ -242,7 +282,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             e.key.pressed   = true;
             e.key.is_repeat = was_down;
             array_add(&events, e);
-        } break;
+            
+            break;
+        }
 
         case WM_ACTIVATE: {
             Event e;
@@ -264,17 +306,43 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             }
             
             array_add(&events, e);
-        } break;
+            
+            break;
+        }
+
+        case WM_ENTERSIZEMOVE: {
+            in_sizemove = true;
+            desired_width  = window->size.x;
+            desired_height = window->size.y;
+            break;
+        }
 
         case WM_EXITSIZEMOVE: {
-            player_input.mouse_delta_pixels = {0,0};
-        } break;
+            in_sizemove = false;
+            input.mouse_delta_pixels = {0,0};
+
+            if(desired_width != window->size.x || desired_height != window->size.y) {
+                window->size.x = desired_width;
+                window->size.y = desired_height;
+
+                Event e;
+                e.type = EventType::WINDOW;
+                e.window.window = window;
+                
+                e.window.type = EventWindowType::RESIZE;
+                array_add(&events, e);
+            }
+
+            break;
+        }
 
         case WM_MOUSEMOVE: {
-            //@Temporary: We are casting mouse positions to float until we have a integer Vector type.
-            player_input.mouse_pos_pixels.x = (short)(lParam & 0xFFFF);
-            player_input.mouse_pos_pixels.y = (short)(lParam >> 16);
-        } break;
+            //@Temporary: We are casting mouse positions to float until we have an integer Vector type.
+            input.mouse_pos_pixels.x = (short)(lParam & 0xFFFF);
+            input.mouse_pos_pixels.y = (short)(lParam >> 16);
+            
+            break;
+        }
 
         case WM_LBUTTONDOWN: {
             Event e;
@@ -283,7 +351,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             e.key.pressed   = true;
             e.key.is_repeat = false;
             array_add(&events, e);
-        } break;
+            
+            break;
+        }
 
         case WM_LBUTTONUP: {
             Event e;
@@ -292,15 +362,31 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             e.key.pressed   = false;
             e.key.is_repeat = false;
             array_add(&events, e);
-        } break;
+            
+            break;
+        }
 
         case WM_RBUTTONDOWN: {
-
-        } break;
+            Event e;
+            e.type = EventType::KEY;
+            e.key.keycode   = VK_RBUTTON;
+            e.key.pressed   = true;
+            e.key.is_repeat = false;
+            array_add(&events, e);
+            
+            break;
+        }
 
         case WM_RBUTTONUP: {
-
-        } break;
+            Event e;
+            e.type = EventType::KEY;
+            e.key.keycode   = VK_RBUTTON;
+            e.key.pressed   = false;
+            e.key.is_repeat = false;
+            array_add(&events, e);
+            
+            break;
+        }
 
         case WM_INPUT: {
             UINT dwSize = sizeof(RAWINPUT);
@@ -310,12 +396,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
             if(raw.header.dwType == RIM_TYPEMOUSE) 
             {
-                player_input.mouse_delta_pixels.x += raw.data.mouse.lLastX;
-                player_input.mouse_delta_pixels.y += raw.data.mouse.lLastY;
+                input.mouse_delta_pixels.x += raw.data.mouse.lLastX;
+                input.mouse_delta_pixels.y += raw.data.mouse.lLastY;
             }
 
             return DefWindowProcA(hwnd, uMsg, wParam, lParam);
-        } break;
+        }
 
         default:
             return DefWindowProcA(hwnd, uMsg, wParam, lParam);

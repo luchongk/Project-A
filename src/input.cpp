@@ -2,128 +2,155 @@
 #include "simulation.h"
 #include "platform.h"
 #include "entities.h"
+#include "ui.h"
 
-PlayerInput player_input;
+PlayerInput input;
 
 void update_input() {
     os_poll_events();
 
-    Vec2 actual_size = window->fullscreen ? Vec2{1920, 1080} : window->size;
-    player_input.mouse_pos_normalized.x   = player_input.mouse_pos_pixels.x   / actual_size.x;
-    player_input.mouse_pos_normalized.y   = player_input.mouse_pos_pixels.y   / actual_size.y;
-    player_input.mouse_delta_normalized.x = player_input.mouse_delta_pixels.x / actual_size.x;
-    player_input.mouse_delta_normalized.y = player_input.mouse_delta_pixels.y / actual_size.y;
-
-    player_input.left_click = KeyState::NONE;
+    input.mouse_pos_normalized   = input.mouse_pos_pixels   / window->size;
+    input.mouse_delta_normalized = input.mouse_delta_pixels / window->size;
 }
 
-static void handle_key_event(u32 keycode, bool pressed, bool is_repeat) {
+static void handle_key_event(EventKey* event) {
+    u32  keycode   = event->keycode;
+    bool pressed   = event->pressed;
+    bool is_repeat = event->is_repeat;
+
     if(!is_repeat) {
         switch(keycode) {
             case 'W': {
-                player_input.move.z += pressed ? 1 : -1;
-            } break;
+                input.move.z += pressed ? 1 : -1;
+                break;
+            }
 
             case 'S': {
-                player_input.move.z -= pressed ? 1 : -1;
-            } break;
+                input.move.z -= pressed ? 1 : -1;
+                break;
+            }
             
             case 'A': {
-                player_input.move.x -= pressed ? 1 : -1;
-            } break;
+                input.move.x -= pressed ? 1 : -1;
+                break;
+            }
 
             case 'D': {
-                player_input.move.x += pressed ? 1 : -1;
-            } break;
+                input.move.x += pressed ? 1 : -1;
+                break;
+            }
 
             case VK_SPACE: {
-                player_input.move.y += pressed ? 1 : -1;
-            } break;
+                input.move.y += pressed ? 1 : -1;
+                break;
+            }
 
             case VK_SHIFT: {
-                player_input.move.y -= pressed ? 1 : -1;
-            } break;
+                input.move.y -= pressed ? 1 : -1;
+                break;
+            }
 
             case 'Q': {
-                player_input.rotation -= pressed ? 1 : -1;
-            } break;
+                input.rotation -= pressed ? 1 : -1;
+                break;
+            }
 
             case 'E': {
-                player_input.rotation += pressed ? 1 : -1;
-            } break;
+                input.rotation += pressed ? 1 : -1;
+                break;
+            }
 
             case 'P': {
                 if(pressed) {
                     paused = !paused;
                     //os_show_mouse(paused);
                 }
-            } break;
+                break;
+            }
 
             case 'R': {
-                if(pressed) {
+                if(pressed && !ui_current_action.element) {
                     reset_scene();
                     cubes_rotation = 0;
+                    time.start_stamp = os_get_timestamp();
+                    time.since_start = 0;
+                    ui_reset();
                 }
-            } break;
+                break;
+            }
 
             case VK_LEFT: {
                 if(pressed) time.sim_scale *= 0.5f;
-            } break;
+                break;
+            }
 
             case VK_RIGHT: {
                 if(pressed) time.sim_scale *= 2.0f;
-            } break;
+                break;
+            }
 
             case VK_TAB: {
                 if(pressed) {
+                    //ui_visible = !ui_visible;
                     character_selected = !character_selected;
                 }
-            } break;
+                break;
+            }
 
             case VK_F9: {
                 if(pressed) {
                     bool is_fullscreen = window->fullscreen;
                     os_set_fullscreen(window, !is_fullscreen, false);
                 }
-            } break;
+                break;
+            }
 
             case VK_F11: {
                 if(pressed) {
                     bool is_fullscreen = window->fullscreen;
                     os_set_fullscreen(window, !is_fullscreen, true);
                 }
-            } break;
+                break;
+            }
 
-            case VK_LBUTTON: {
-                if(pressed) {
-                    player_input.left_click = KeyState::DOWN;
-                }
-                else {
-                    player_input.left_click = KeyState::UP;
-                }
-            } break;
+            case VK_LBUTTON:
+            case VK_RBUTTON: {
+                ui_handle_click_event(event);
+                break;
+            }
         }
     }
 }
 
-void handle_window_event(EventWindowType type, OSWindow* window, int data1, int data2) {
-    switch(type) {
+static void handle_text_event(EventText* event) {
+    if(ui_hot) {
+        ui_handle_text_event(event);
+    }
+}
+
+static void handle_window_event(EventWindow* event) {
+    OSWindow* window = event->window;
+
+    switch(event->type) {
         case EventWindowType::RESIZE: {
-            adjust_projection(data1, data2);
-            adjust_size(data1, data2);
+            int width  = (int)window->size.x;
+            int height = (int)window->size.y;
+            set_projection(width, height);
+            set_framebuffer_size(width, height);
             
-            if(!window->fullscreen) window->size = {(float)data1, (float)data2};
-        } break;
+            break;
+        }
 
         case EventWindowType::FOCUS_LOST: {
-            player_input.move = {0,0};
-            player_input.rotation = 0;
+            input.move = {0,0};
+            input.rotation = 0;
 
             if(window->fullscreen && !window->borderless) {
                 set_fullscreen(false);
                 os_minimize_window(window);
             }
-        } break;
+            break;
+        }
         
         case EventWindowType::FOCUS_GAINED: {
             if(window->fullscreen) {
@@ -132,14 +159,17 @@ void handle_window_event(EventWindowType type, OSWindow* window, int data1, int 
                     set_fullscreen(true);
                 }
             }
-        } break;
+            break;
+        }
     }
 }
 
 bool handle_input(Array<Event>* events) {
     /*if(window->fullscreen && window->focused) {
-        os_set_mouse_center(window);
+        os_set_mouse_to_center(window);
     }*/
+
+    ui_update_hot();
 
     For(*events) {
         switch(it->type) {
@@ -147,12 +177,18 @@ bool handle_input(Array<Event>* events) {
             
             case EventType::KEY: {
                 //TODO: Here we would call the keymapper instead of passing the keycode directly to the function below
-                handle_key_event(it->key.keycode, it->key.pressed, it->key.is_repeat);
-            } break;
+                handle_key_event(&it->key);
+                break;
+            }
+
+            case EventType::TEXT: {
+                handle_text_event(&it->text);
+            }
 
             case EventType::WINDOW: {
-                handle_window_event(it->window.type, it->window.window, it->window.data1, it->window.data2);
-            } break;
+                handle_window_event(&it->window);
+                break;
+            }
         }
     }
 

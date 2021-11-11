@@ -4,6 +4,7 @@
 enum class EventType {
     QUIT,
     KEY,
+    TEXT,
     WINDOW,
 };
 
@@ -19,17 +20,20 @@ struct EventKey {
     bool is_repeat;
 };
 
+struct EventText {
+    char character;
+};
+
 struct EventWindow {
     EventWindowType type;
     OSWindow* window;
-    int data1;
-    int data2;
 };
 
 struct Event {
     EventType type;
     union {
         EventKey key;
+        EventText text;
         EventWindow window;
     };
 };
@@ -42,7 +46,6 @@ enum class KeyState : u8 {
 };
 
 struct PlayerInput {
-    KeyState left_click;
     bool mouse_interacting_with_ui = false;
     Vec2 mouse_pos_pixels;
     Vec2 mouse_pos_normalized;
@@ -52,7 +55,7 @@ struct PlayerInput {
     float rotation;
 };
 
-extern PlayerInput player_input;
+extern PlayerInput input;
 
 void update_input();
 bool handle_input(Array<Event>* events);

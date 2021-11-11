@@ -40,6 +40,12 @@ String operator ""_s(const char* str, size_t size) {
     return from_cstring((char*)str, (int)size);
 }
 
+bool equals(String a, String b) {
+    if(a.count != b.count) return false;
+
+    return strncmp((const char*)a.data, (const char*)b.data, a.count) == 0;
+}
+
 int compare(String a, String b) {
     if(a.count < b.count) return -1;
     if(a.count > b.count) return 1;
@@ -50,8 +56,8 @@ int compare(String a, String b) {
     return strncmp((const char*)a.data, (const char*)b.data, length);
 }
 
-String advance(String s, s64 amount) {
-    amount = min((s64)amount, s.count);
+String advance(String s, uint amount) {
+    amount = min(amount, s.count);
     s.data += amount;
     s.count -= amount;
 
@@ -89,7 +95,7 @@ String eat_line(String* s) {
 String find_from_left(String to_find, String context) {
     String result;
 
-    s64 bytes_left = context.count;
+    uint bytes_left = context.count;
     For(context) {
         if(memcmp(it, to_find.data, min(bytes_left, to_find.count)) == 0) {
             result.data = it;
