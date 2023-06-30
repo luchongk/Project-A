@@ -4,7 +4,7 @@ if($target -eq 32) { $target = 86 }
 
 $target = "x${target}"
 
-$path_vs = "C:\Program Files (x86)\Microsoft Visual Studio"
+$path_vs = "C:\Program Files\Microsoft Visual Studio"
 
 $path_winkit = "C:\Program Files (x86)\Windows Kits\10"
 

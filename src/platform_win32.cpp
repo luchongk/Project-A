@@ -43,13 +43,10 @@ OSWindow* os_create_window(int width, int height, String title) {
                                 wr.right - wr.left,
                                 wr.bottom - wr.top,
                                 nullptr, nullptr, app_instance, nullptr);
-
-    if(title.count > 0) {
-        free_(null_terminated_title);
-    }
                                 
     if(!hwnd) return nullptr;
 
+    //@Cleanup: Graphics should not be a dependency of platform code!
     if(!init_graphics(hwnd)) return nullptr;
 
     Win32Window* window = alloc_<Win32Window>();
@@ -58,7 +55,6 @@ OSWindow* os_create_window(int width, int height, String title) {
         (float)width, (float)height,
         false,
         false,
-        true,
     };
     window->handle = hwnd;
     window->device = GetDC(hwnd);
@@ -82,13 +78,16 @@ float os_elapsed_time(u64 from_stamp, u64 to_stamp) {
 }
 
 //? Should we move this to input.h?
-void os_poll_events() {
+void os_poll_events(OSWindow* window) {
     input.mouse_delta_pixels = {0,0};
 
     array_reset(&events);
     
     MSG msg{};
-    while(PeekMessageA(&msg, nullptr, 0, 0, PM_REMOVE)) {
+    while(true) {
+        bool has_message = PeekMessageA(&msg, nullptr, 0, 0, PM_REMOVE);
+        if(!has_message) break;
+
         TranslateMessage(&msg);
         DispatchMessageA(&msg);
 
@@ -130,72 +129,61 @@ void os_restore_window(OSWindow* window) {
     ShowWindow(win32_window->handle, SW_RESTORE);
 }
 
-void os_set_fullscreen(OSWindow* window, bool fullscreen, bool borderless) {
+void os_set_fullscreen(OSWindow* window, bool fullscreen) {
     HWND hwnd = ((Win32Window*)window)->handle;
     
     if(fullscreen && !window->fullscreen) {
         window->fullscreen = true;
-        
-        if(borderless) {
-            window->borderless = true;
 
-            MONITORINFOEX mi;
-            mi.cbSize = sizeof(mi);
-            if(GetMonitorInfo(MonitorFromWindow(hwnd, MONITOR_DEFAULTTOPRIMARY), &mi)) {
-                SetWindowLong(hwnd, GWL_STYLE, WS_VISIBLE | WS_CLIPSIBLINGS);
-                
-                SetWindowPos(hwnd, HWND_TOP,
-                                mi.rcMonitor.left, mi.rcMonitor.top,
-                                mi.rcMonitor.right - mi.rcMonitor.left,
-                                mi.rcMonitor.bottom - mi.rcMonitor.top,
-                                SWP_FRAMECHANGED);
+        MONITORINFOEX mi;
+        mi.cbSize = sizeof(mi);
+        if(GetMonitorInfo(MonitorFromWindow(hwnd, MONITOR_DEFAULTTOPRIMARY), &mi)) {
+            SetWindowLong(hwnd, GWL_STYLE, WS_VISIBLE | WS_CLIPSIBLINGS);
+            
+            SetWindowPos(hwnd, HWND_TOP,
+                            mi.rcMonitor.left, mi.rcMonitor.top,
+                            mi.rcMonitor.right - mi.rcMonitor.left,
+                            mi.rcMonitor.bottom - mi.rcMonitor.top,
+                            SWP_FRAMECHANGED);
 
-                RECT my_rect = {mi.rcMonitor.left, mi.rcMonitor.top, mi.rcMonitor.right, mi.rcMonitor.bottom};
-                ClipCursor(&my_rect);
-            }
-        } else {
-            window->borderless = false;
-            set_fullscreen(true);
+            RECT my_rect = {mi.rcMonitor.left, mi.rcMonitor.top, mi.rcMonitor.right, mi.rcMonitor.bottom};
+            ClipCursor(&my_rect);
         }
     }
     else if(!fullscreen && window->fullscreen) {
         window->fullscreen = false;
 
-        if(window->borderless) {
-            SetWindowLong(hwnd, GWL_STYLE, WS_VISIBLE | WS_CLIPSIBLINGS | default_window_style);
+        SetWindowLong(hwnd, GWL_STYLE, WS_VISIBLE | WS_CLIPSIBLINGS | default_window_style);
 
-            RECT wr = {0, 0, (int)window->size.x, (int)window->size.y}; // set the size, but not the position
-            AdjustWindowRect(&wr, default_window_style, false);         // adjust the size
+        RECT wr = {0, 0, (int)window->size.x, (int)window->size.y}; // set the size, but not the position
+        AdjustWindowRect(&wr, default_window_style, false);         // adjust the size
 
-            SetWindowPos(hwnd, HWND_NOTOPMOST,
-                            (int)window->position.x, (int)window->position.y,
-                            wr.right - wr.left, wr.bottom - wr.top,
-                            SWP_FRAMECHANGED);
-        }
-        else {
-            set_fullscreen(false);
-        }
+        SetWindowPos(hwnd, HWND_NOTOPMOST,
+                        (int)window->position.x, (int)window->position.y,
+                        wr.right - wr.left, wr.bottom - wr.top,
+                        SWP_FRAMECHANGED);
 
         ClipCursor(nullptr);
     }
 }
 
-String os_read_entire_file(String path) {
+bool os_read_entire_file(String path, Array<u8>* bytes) {
     HANDLE file = CreateFileA((char*)path.data, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
-    assert(file != INVALID_HANDLE_VALUE);
+    if(file == INVALID_HANDLE_VALUE) return false;
 
     uint alloc_size = GetFileSize(file, nullptr);
     
-    String content = new_string(alloc_size);
+    array_reserve(bytes, alloc_size);
 
     DWORD bytesRead;
-    auto result = ReadFile(file, content.data, (DWORD)alloc_size, &bytesRead, nullptr);
-    assert(result);
+    auto result = ReadFile(file, bytes->data, alloc_size, &bytesRead, nullptr);
+    if(!result) return false;
+
     assert(alloc_size == bytesRead);
+    bytes->count = alloc_size;
 
     CloseHandle(file);
-
-    return content;
+    return true;
 }
 
 void os_write_file(String path, String to_write) {
@@ -241,6 +229,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             break;
         }
 
+        case WM_MOVE: {
+            if(in_sizemove) {
+                window->position.x = (float)LOWORD(lParam);
+                window->position.y = (float)HIWORD(lParam);
+            }
+            break;
+        }
+
         //This removes the weird beep sound when pressing ALT+Enter
         case WM_SYSCHAR: break;
 
@@ -251,10 +247,16 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         }
 
         case WM_CHAR: {
-            Event e;
-            e.type = EventType::TEXT;
-            e.text.character = (char)wParam;
-            array_add(&events, e);
+            auto c = (char)wParam;
+
+            // We are ignoring control code chars (U+0000 - U+001F) because it doesn't make any sense at ALL to receive them as chars.
+            // If you want to support them in your application use the WM_KEYDOWN/WM_KEYUP events.
+            if(c > 31) {
+                Event e;
+                e.type = EventType::TEXT;
+                e.text.character = c;
+                array_add(&events, e);
+            }
 
             break;
         }
@@ -397,7 +399,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             if(raw.header.dwType == RIM_TYPEMOUSE) 
             {
                 input.mouse_delta_pixels.x += raw.data.mouse.lLastX;
-                input.mouse_delta_pixels.y += raw.data.mouse.lLastY;
+                input.mouse_delta_pixels.y -= raw.data.mouse.lLastY;
             }
 
             return DefWindowProcA(hwnd, uMsg, wParam, lParam);
@@ -406,29 +408,33 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         default:
             return DefWindowProcA(hwnd, uMsg, wParam, lParam);
     }
-
+    
     return 0;
 }
 
 void main();
+#include <strsafe.h>
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR lpCmdLine, int nCmdShow) {
+    setvbuf(stdout, nullptr, _IONBF, BUFSIZ);
+    timeBeginPeriod(1);
+
     WNDCLASSA wc{};
-    wc.hInstance = hInstance;
-    wc.lpfnWndProc = WindowProc;
-    wc.lpszClassName = window_class_name;
-    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     wc.style = CS_OWNDC;
+    wc.lpfnWndProc = WindowProc;
+    wc.hInstance = hInstance;
+    wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    wc.lpszClassName = window_class_name;
     
     if(!RegisterClassA(&wc))
         return 1;
 
 #if 1
     RAWINPUTDEVICE Rid;
-    Rid.usUsagePage = 0x01; 
-    Rid.usUsage = 0x02; 
-    Rid.dwFlags = 0; //RIDEV_NOLEGACY;   // adds HID mouse and also ignores legacy mouse messages
-    Rid.hwndTarget = 0;    
+    Rid.usUsagePage = 0x01;
+    Rid.usUsage = 0x02;
+    Rid.dwFlags = 0; //RIDEV_NOLEGACY;   // Ignores legacy mouse messages
+    Rid.hwndTarget = nullptr;
     
     if (!RegisterRawInputDevices(&Rid, 1, sizeof(RAWINPUTDEVICE))) {
         /* ERROR */

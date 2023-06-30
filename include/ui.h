@@ -4,21 +4,37 @@
 #include "rect.h"
 #include "hashtable.h"
 
-enum class UIElementType {
+struct UIWidget;
+
+enum class UIWidgetType {
     PANEL,
     BUTTON,
     SLIDER,
     TEXT_FIELD,
 };
 
-struct UIElement {
-    String name;  //@Speed: Hash this
-    Rect rect;
-    UIElementType type;
-    void* type_data;
+enum class UIEventType {
+    CLICK,
+    TEXT
 };
 
-enum class UIActionType {
+struct UIEventHandler {
+    UIEventType type;
+    union {
+        bool (*key)(UIWidget* widget, EventKey* event);
+    };
+};
+
+struct UIWidget {
+    Rect rect;
+    String name;  //@Speed: Hash this
+    Array<UIEventHandler> handlers;
+    UIWidgetType type;
+    void* type_data;
+    bool visible = true;
+};
+
+enum class UIActionType : u8 {
     MOVE,
     SIZE,
 };
@@ -31,14 +47,12 @@ struct UIActionSize{
     Vec2 pivot;
 };
 
+// In all UIs (that I know of), there is at most only 1 action being done by the user at any point in time.
+// That means we can store the current action as a global that anyone can access.
 struct UIAction {
-    UIActionType type;
-    UIElement* element;
-    bool lock_hot = false;
-    union {
-        UIActionMove move;
-        UIActionSize size;
-    };
+    UIWidget* widget;
+    UIActionType type;        // Action type, interpreted by each widget however they need.
+    u8 data[32];    // 32 bytes of custom data associated with the action.
 };
 
 /*namespace UIButtonFlags {
@@ -50,22 +64,22 @@ struct UIAction {
 }*/
 
 struct UIPanel {
-    UIElement* element;
+    UIWidget* widget;
     bool visible = true;
     Vec4 base_color = {0,0,0,0.3f};
     uint children_count = 0;
-    UIElement* children[16];
+    UIWidget* children[16];
 };
 
 struct UIButton {
-    UIElement* element;
+    UIWidget* widget;
     Vec4 base_color  = {1,0,0,1};
     Vec4 hover_color = {1,1,1,1};
     //u8 state = UIButtonFlags::NONE;
 };
 
 struct UISlider {
-    UIElement* element;
+    UIWidget* widget;
     Vec4 base_color   = {0.0f,0.5f,0.5f,1};
     Vec4 button_color = {0.2f,0.2f,0.2f,1};
     float* value;
@@ -73,7 +87,7 @@ struct UISlider {
 };
 
 struct UITextField {
-    UIElement* element;
+    UIWidget* widget;
     char value[64];
     int count = 0;
 };
@@ -81,21 +95,23 @@ struct UITextField {
 void ui_init();
 void ui_reset();
 void ui_update_hot();
-void ui_handle_text_event(EventText* event);
-void ui_handle_click_event(EventKey* event);
+bool ui_handle_click_event(EventKey* event);
+bool ui_handle_key_event(EventKey* event);
+bool ui_handle_text_event(EventText* event);
 void ui_update();
 void ui_render();
 bool is_mouse_over(Rect rect);
 
 extern bool ui_visible;
-extern UIAction ui_current_action;
 // I don't think these should be dynamic, but lets have them be that for now.
-extern Array<UIElement>    ui_elements;
-extern Array<UIPanel>      ui_panels;
-extern Array<UIButton>     ui_buttons;
-extern Array<UISlider>     ui_sliders;
-extern Array<UITextField>  ui_text_fields;
-extern UIElement* ui_hot;
-extern UIPanel*   ui_hot_panel;
+extern Array<UIWidget>    ui_elements;
+extern Array<UIPanel>     ui_panels;
+extern Array<UIButton>    ui_buttons;
+extern Array<UISlider>    ui_sliders;
+extern Array<UITextField> ui_text_fields;
+extern UIWidget* ui_hot;
+extern UIPanel*  ui_hot_panel;
+extern UIAction  ui_current_action;
+extern UIWidget* ui_focused;
 
 #endif

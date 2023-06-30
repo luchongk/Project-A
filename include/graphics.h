@@ -1,10 +1,11 @@
 #ifndef GRAPHICS_H
 #define GRAPHICS_H
 
-enum class VertexFormat {
+ENUM(VertexFormat,
     PCU,
     PNU,
-};
+    COUNT,
+)
 
 struct VertexPCU {
     Vec3 position;
@@ -17,11 +18,6 @@ struct VertexPNU {
     Vec3 normal;
     Vec2 uv;
 };
-
-// Handle to a vertex, index or uniform buffer.
-struct GraphicsBuffer;
-
-struct Texture;
 
 enum class GraphicsBufferUsage : u8 {
     //IMMUTABLE,
@@ -45,21 +41,43 @@ enum class UniformBufferSlot {
     PER_OBJECT
 };
 
+struct ShaderProgram {
+    String vertex_name;
+    String pixel_name;
+    VertexFormat input_format;
+    Array<uint> vertex_texture_slots;
+    Array<uint> vertex_sampler_slots;
+    Array<uint> pixel_texture_slots;
+    Array<uint> pixel_sampler_slots;
+};
+
+// Handles
+
+// Vertex, index or uniform buffer.
+struct GraphicsBuffer;
+
+struct Texture;
+struct Framebuffer;
+
+// API
+
+extern ShaderProgram* current_shader;
 extern Texture* white_pixel;
 
 bool init_graphics(HWND hwnd);
 
 void end_graphics();
 
-uint compile_shader(String vertex_path, String pixel_path, VertexFormat input_format);
+ShaderProgram* compile_shader(String vertex_path, String pixel_path, VertexFormat input_format);
 
-void set_shader(uint id);
+void set_shader(ShaderProgram* program);
 
-void set_fullscreen(bool fullscreen);
-
-void set_framebuffer_size(int width, int height);
-
-void bind_framebuffer();
+Framebuffer* create_onscreen_framebuffer(int width, int height);
+Framebuffer* create_offscreen_framebuffer(int width, int height);
+void set_onscreen_framebuffer_size(int width, int height);
+void set_offscreen_framebuffer_size(int width, int height);
+Texture* get_framebuffer_texture(Framebuffer* framebuffer);
+void bind_framebuffer(Framebuffer* framebuffer);
 
 void swap_buffers();
 
@@ -76,18 +94,15 @@ GraphicsBuffer* create_vertex_buffer(GraphicsBufferUsage usage, VertexFormat for
 GraphicsBuffer* create_index_buffer(GraphicsBufferUsage usage, uint count, void* data = nullptr);
 GraphicsBuffer* create_uniform_buffer(GraphicsBufferUsage usage, uint size, void* data = nullptr);
 
-void modify_buffer(GraphicsBuffer* buffer, uint size, void* data);
+void modify_buffer(GraphicsBuffer* buffer, u64 size, void* data);
 
 void set_vertex_buffer(GraphicsBuffer* buffer);
-
 void set_index_buffer(GraphicsBuffer* buffer);
-
 void set_uniform_buffer(UniformBufferSlot slot, GraphicsBuffer* buffer);
 
 void set_primitive_type(GraphicsPrimitiveType type);
 
-void draw(uint vertex_count);
-
-void draw_indexed(uint index_count);
+void draw(uint vertex_base, uint vertex_count);
+void draw_indexed(uint vertex_base, uint index_base, uint index_count);
 
 #endif

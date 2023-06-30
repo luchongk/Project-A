@@ -6,18 +6,29 @@
 
 PlayerInput input;
 
-void update_input() {
-    os_poll_events();
+void update_input(OSWindow* window) {
+    os_poll_events(window);
 
     input.mouse_pos_normalized   = input.mouse_pos_pixels   / window->size;
     input.mouse_delta_normalized = input.mouse_delta_pixels / window->size;
 }
 
 static void handle_key_event(EventKey* event) {
-    u32  keycode   = event->keycode;
-    bool pressed   = event->pressed;
-    bool is_repeat = event->is_repeat;
+    u32  keycode = event->keycode;
+    bool pressed = event->pressed;
 
+    if(keycode == VK_LBUTTON || keycode == VK_RBUTTON) {
+        bool handled = ui_handle_click_event(event);
+        if(handled) return;
+        
+        if(!event->pressed) std::cout << "Clicked the screen!" << std::endl;
+    }
+
+    bool handled = ui_handle_key_event(event);
+    if(handled) return;
+
+    bool is_repeat = event->is_repeat;
+    
     if(!is_repeat) {
         switch(keycode) {
             case 'W': {
@@ -69,23 +80,23 @@ static void handle_key_event(EventKey* event) {
             }
 
             case 'R': {
-                if(pressed && !ui_current_action.element) {
+                if(pressed && !ui_current_action.widget) {
                     reset_scene();
                     cubes_rotation = 0;
-                    time.start_stamp = os_get_timestamp();
-                    time.since_start = 0;
+                    my_time.start_stamp = os_get_timestamp();
+                    my_time.since_start = 0;
                     ui_reset();
                 }
                 break;
             }
 
             case VK_LEFT: {
-                if(pressed) time.sim_scale *= 0.5f;
+                if(pressed) my_time.sim_scale *= 0.5f;
                 break;
             }
 
             case VK_RIGHT: {
-                if(pressed) time.sim_scale *= 2.0f;
+                if(pressed) my_time.sim_scale *= 2.0f;
                 break;
             }
 
@@ -100,7 +111,7 @@ static void handle_key_event(EventKey* event) {
             case VK_F9: {
                 if(pressed) {
                     bool is_fullscreen = window->fullscreen;
-                    os_set_fullscreen(window, !is_fullscreen, false);
+                    os_set_fullscreen(window, !is_fullscreen);
                 }
                 break;
             }
@@ -108,14 +119,8 @@ static void handle_key_event(EventKey* event) {
             case VK_F11: {
                 if(pressed) {
                     bool is_fullscreen = window->fullscreen;
-                    os_set_fullscreen(window, !is_fullscreen, true);
+                    os_set_fullscreen(window, !is_fullscreen);
                 }
-                break;
-            }
-
-            case VK_LBUTTON:
-            case VK_RBUTTON: {
-                ui_handle_click_event(event);
                 break;
             }
         }
@@ -123,9 +128,7 @@ static void handle_key_event(EventKey* event) {
 }
 
 static void handle_text_event(EventText* event) {
-    if(ui_hot) {
-        ui_handle_text_event(event);
-    }
+    if(ui_focused) ui_handle_text_event(event);
 }
 
 static void handle_window_event(EventWindow* event) {
@@ -136,29 +139,17 @@ static void handle_window_event(EventWindow* event) {
             int width  = (int)window->size.x;
             int height = (int)window->size.y;
             set_projection(width, height);
-            set_framebuffer_size(width, height);
-            
+            set_onscreen_framebuffer_size(width, height);
             break;
         }
 
         case EventWindowType::FOCUS_LOST: {
             input.move = {0,0};
             input.rotation = 0;
-
-            if(window->fullscreen && !window->borderless) {
-                set_fullscreen(false);
-                os_minimize_window(window);
-            }
             break;
         }
         
         case EventWindowType::FOCUS_GAINED: {
-            if(window->fullscreen) {
-                if(!window->borderless) {
-                    os_restore_window(window);
-                    set_fullscreen(true);
-                }
-            }
             break;
         }
     }
@@ -183,6 +174,7 @@ bool handle_input(Array<Event>* events) {
 
             case EventType::TEXT: {
                 handle_text_event(&it->text);
+                break;
             }
 
             case EventType::WINDOW: {

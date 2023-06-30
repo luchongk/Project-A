@@ -98,10 +98,19 @@ Matrix translate(const Matrix& m, Vec3 v) {
 
 Matrix scale(const Matrix& m, float s) {
     return Matrix{
-        s * m.elems[0], s * m.elems[1],   s * m.elems[2],  m.elems[3],
-        s * m.elems[4], s * m.elems[5],   s * m.elems[6],  m.elems[7],
-        s * m.elems[8], s * m.elems[9],  s * m.elems[10], m.elems[11],
-           m.elems[12],    m.elems[13],      m.elems[14], m.elems[15],
+        s * m.elems[0], s * m.elems[1],  s * m.elems[2],  m.elems[3],
+        s * m.elems[4], s * m.elems[5],  s * m.elems[6],  m.elems[7],
+        s * m.elems[8], s * m.elems[9], s * m.elems[10], m.elems[11],
+           m.elems[12],    m.elems[13],     m.elems[14], m.elems[15],
+    };
+}
+
+Matrix scale(const Matrix& m, Vec3 s) {
+    return Matrix{
+        s.x * m.elems[0], s.y * m.elems[1],  s.z * m.elems[2],  m.elems[3],
+        s.x * m.elems[4], s.y * m.elems[5],  s.z * m.elems[6],  m.elems[7],
+        s.x * m.elems[8], s.y * m.elems[9],  s.z * m.elems[10], m.elems[11],
+           m.elems[12],    m.elems[13],     m.elems[14], m.elems[15],
     };
 }
 
@@ -142,19 +151,19 @@ Matrix rotation(float yaw, float pitch) {
     };
 }
 
-Matrix look_to(Vec3 pos, Vec3 forward, Vec3 up) {
-    Vec3 right = normalize(cross(up, forward));
-    up = cross(forward, right);
+Matrix look_to(Vec3 pos, Vec3 forward, Vec3 up = {0,1,0}) {
+    Vec3 right = normalize(cross(up, -forward));
+    up = cross(-forward, right);
 
     return Matrix{
-          right.x,   right.y,   right.z, dot(right, -pos),
-             up.x,      up.y,      up.z, dot(up, -pos),
-        forward.x, forward.y, forward.z, dot(forward, -pos),
-                0,         0,         0, 1,
+           right.x,    right.y,    right.z, -dot(right, pos),
+              up.x,       up.y,       up.z, -dot(up, pos),
+        -forward.x, -forward.y, -forward.z, -dot(-forward, pos),
+                 0,          0,          0, 1,
     };
 }
 
-Matrix look_at(Vec3 pos, Vec3 to, Vec3 up) {
+inline Matrix look_at(Vec3 pos, Vec3 to, Vec3 up = {0,1,0}) {
     Vec3 forward = normalize(to - pos);
 
     return look_to(pos, forward, up);
@@ -167,7 +176,7 @@ Matrix perspective(int width, int height) {
     // X and Y axis are treated the same in D3D vs OpenGL (-1 to 1), so we borrowed those rows from glm's matrix.
 
     float aspect = (float)width / height;
-    float tanHalfFovy = tan(radians(45.0f) / 2);
+    float tanHalfFovy = tan(to_radians(45.0f) / 2);
     return Matrix{
         1.0f / (aspect * tanHalfFovy),               0.0f,          0.0f,                0.0f,
                                  0.0f, 1.0f / tanHalfFovy,          0.0f,                0.0f,

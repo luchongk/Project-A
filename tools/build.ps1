@@ -1,5 +1,5 @@
 param([string]$platform='64', [bool]$release=$false)
-$debug_build_file = $false
+$debug_build_command = $false
 
 if($platform -eq '32') { $platform = '86' }
 
@@ -31,12 +31,13 @@ tools\faster-vcvars.ps1 $platform
 
 $project = "Project_A"
 $includes = "include", "include\3rdParty"
-$libraries = "user32.lib", "winmm.lib", "gdi32.lib", "d3d11.lib", "d3dcompiler.lib"
-$ignored_warnings = "4100", "4127", "4201", "4458", "4706", "4505", "4459" #"4189"
+$libraries = "user32.lib", "winmm.lib", "gdi32.lib", "d3d11.lib", "d3dcompiler.lib", "dxguid.lib"
+$ignored_warnings = "4100", "4127", "4201", "4458", "4706", "4505", "4459" , "4702", "4326"#"4189"
 $exec_folder = if($release) { "bin\Release" } else { "bin\Debug" }
 
 $compile_exe_opts = 
 	"-nologo", 
+	"-std:c++20",
 	"-Zi", 
 	"-Zc:offsetof-", 
 	"-EHsc", 
@@ -47,9 +48,9 @@ $compile_exe_opts =
 	$(if($release) { "-MT", "-O2" } else { "-MTd", "-Od" }) +
     "-GR-" +
 	($includes | % { "-I$_" }) +
-	"-Fobin\Debug\",
-	"-Fdbin\Debug\",
-#	"-Fabin\Debug\",
+	"-Fo$exec_folder\",
+	"-Fd$exec_folder\",
+#	"-Fa$exec_folder\",
 	"-D_CRT_SECURE_NO_WARNINGS",
 	"-DUNICODE",
 	"-D_UNICODE" +
@@ -64,12 +65,12 @@ $link_opts =
 	"-OPT:REF" +
 	$libraries
 
-if($debug_build_file) {
+if($debug_build_command) {
 	echo "cl.exe $compile_exe_opts -Fe$exec_folder\$project.exe src\main.cpp $link_opts`n"
 }
 
 cl.exe $compile_exe_opts "-Fe$exec_folder\$project.exe" src\main.cpp $link_opts
 
 # Only return the error if we are not running the game,
-# cause compilation of the .exe always fails when we are running
+# because compilation of the .exe always fails when we are running
 if(($LASTEXITCODE -ne 0) -and !(Get-Process $project -ErrorAction SilentlyContinue)) { exit 1 }

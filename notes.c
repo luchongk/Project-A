@@ -17,11 +17,13 @@
  * 
  * * [✓] Get rid of GLM.
  * 
- * * [] Temporary Storage.
+ * * [✓] Temporary Storage.
  * 
  * * [] Position/Rotation interpolation for rendering.
  * 
  * * [] Better input handling. Detect both pressing and holding.
+ * 
+ * * [] Mouse picking
  */
 
 /**
@@ -30,6 +32,3 @@
  * * [✓] Camera rotation speed is framerate dependent for some reason.
  *  
  */
-
-
-// Idea: https://gamedev.net/forums/topic/436821-which-is-faster-switch-statement-or-function-pointers/3900191/?page=2

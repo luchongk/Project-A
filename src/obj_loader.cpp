@@ -8,9 +8,13 @@ struct ObjVertex {
     int uv_index;
 };
 
-//@Leak: Use temporary storage for all these allocations
 void load_obj(String path, Mesh* mesh) {
-    auto content = os_read_entire_file(path);
+    default_allocator = linear_allocator;
+    default_allocator_data = &temporary_storage;
+
+    Array<u8> bytes;
+    os_read_entire_file(path, &bytes);
+    auto content = (String)bytes;
 
     Array<Vec3> vertices{};
     Array<Vec2> uvs{};
@@ -79,7 +83,7 @@ void load_obj(String path, Mesh* mesh) {
                 array_add(&mesh->indices,  (uint)found);
             }
             else {
-                array_add(&mesh->indices,  face_vertices.count);
+                array_add(&mesh->indices, face_vertices.count);
                 array_add(&face_vertices, face_vertex);
                 
                 array_add(&mesh->vertices, vertices[v_index - 1]);
@@ -89,6 +93,9 @@ void load_obj(String path, Mesh* mesh) {
             
         }
     }
+
+    default_allocator = malloc_allocator;
+    default_allocator_data = nullptr;
 
     return;
 }

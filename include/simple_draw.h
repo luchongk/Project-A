@@ -8,7 +8,7 @@ void draw_text(Vec2 origin, String text);
 
 Vec4 darken(Vec4 color, float amount);
 
-/*void sd_flush();*/
+void sd_flush();
 
 extern Texture* sd_font_texture;
 

@@ -80,7 +80,7 @@ Rect pad_rect(Rect to_pad, float percentage) {
     return result;
 }
 
-Rect pad_leftright(Rect to_pad, float percentage) {
+Rect pad_left_right(Rect to_pad, float percentage) {
     Rect result;
     result.width  = to_pad.width - to_pad.width * percentage;
     result.height = to_pad.height;
@@ -90,7 +90,7 @@ Rect pad_leftright(Rect to_pad, float percentage) {
     return result;
 }
 
-Rect pad_topbottom(Rect to_pad, float percentage) {
+Rect pad_top_bottom(Rect to_pad, float percentage) {
     Rect result;
     result.width  = to_pad.width;
     result.height = to_pad.height - to_pad.height * percentage;

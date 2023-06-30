@@ -7,60 +7,89 @@ static float cubes_rotation_dir = 1;
 float cubes_rotation = 0;
 bool paused = false;
 bool character_selected = true;
+float camera_distance = 10.0f;
 
 static void update_camera(float dt) {
-    float yaw = input.mouse_delta_pixels.x * radians(2.0f) * dt;
-    camera.yaw = normalize_angle(camera.yaw + yaw);
+    float delta_yaw = -input.mouse_delta_pixels.x * to_radians(2.0f) * dt;
+    main_camera->yaw = normalize_angle(main_camera->yaw + delta_yaw);
     
-    float pitch = input.mouse_delta_pixels.y * radians(2.0f) * dt;
-    camera.pitch = normalize_angle(camera.pitch + pitch);
+    float delta_pitch = input.mouse_delta_pixels.y * to_radians(2.0f) * dt;
+    main_camera->pitch = clamp(main_camera->pitch + delta_pitch, to_radians(-89), to_radians(89));
 
-    camera.forward = angles_to_vec(camera.yaw, camera.pitch);
+    Vec3 forward = angles_to_vec(main_camera->yaw, main_camera->pitch);
 
-    if(character_selected) {
+    if(!character_selected) {
         if(input.move.x != 0) {
-            camera.position += normalize(cross(Vec3{0,1,0}, camera.forward)) * 3.0f * input.move.x * dt;
-        }
-
-        if(input.move.z != 0) {
-            camera.position -= camera.forward * 2.0f * input.move.z * dt;
+            main_camera->entity->position += normalize(cross(Vec3{0,1,0}, -forward)) * 3.0f * input.move.x * dt;
         }
 
         if(input.move.y != 0) {
-            camera.position += Vec3{0,1,0} * 2.0f * input.move.y * dt;
+            main_camera->entity->position += Vec3{0,1,0} * 2.0f * input.move.y * dt;
+        }
+
+        if(input.move.z != 0) {
+            main_camera->entity->position += forward * 2.0f * input.move.z * dt;
         }
     }
+    else {
+        float zoom = 10.0;
+        main_camera->entity->position = player->entity->position + normalize(Vec3{0, 4, 7}) * camera_distance;
+    }
+
+    per_frame_uniforms.view_pos = main_camera->entity->position;
+    per_frame_uniforms.view = look_to(main_camera->entity->position, forward);
 }
+
+Vec3 player_velocity = {};
+const Vec3 g_acceleration = {0, 2 * -9.8f, 0};
+bool grounded = false;
+float move_speed = 5;
+float jump_speed = 10;
 
 void simulate(float dt) {
     ui_update();
-
     if(paused) return;
 
     float non_scaled_dt = dt;
-    dt = dt * time.sim_scale;
-
-    update_camera(non_scaled_dt);
-    /*std::cout << "POS: " << camera.position.x << " " << camera.position.y << " " << camera.position.z << std::endl;
-    std::cout << "PITCH: " << camera.pitch << " YAW:" << camera.yaw << std::endl;*/
+    dt = dt * my_time.sim_scale;
+   
+    cubes_rotation += -input.rotation * to_radians(45.0f) * dt;
     
-    cubes_rotation += -input.rotation * radians(45.0f) * dt;
-    
-    //per_object_uniforms.material.diffuse += Vec3{0.0f, 0.0f, input->vertical * dt};
-    Vec3 move = input.move;
-    for(int i = 0; i < 5; i++) {
-        Entity* e = &entities[i];
-        if(!character_selected) {
-            e->position.x += move.x * 3.0f * dt;
-            e->position.y += move.y * 3.0f * dt;
-            e->position.z -= move.z * 3.0f * dt;
+    {
+        if(grounded) {
+            player_velocity.x = 0;
+            player_velocity.z = 0;
         }
-        e->orientation = rotation(cubes_rotation, cubes_rotation);
+        player_velocity += g_acceleration * dt;
+        if(character_selected) {
+            float actual_move_seed = move_speed;
+            if(grounded) {
+                if(input.move.y == 1) {
+                    player_velocity.y += jump_speed;
+                    grounded = false;
+                }
+            } else {
+                actual_move_seed = 0.005f * move_speed; // Air move speed.
+            }
+            player_velocity += actual_move_seed * normalize(Vec3{input.move.x, 0, -input.move.z});
+        }
+
+        // Integrate velocity
+        player->entity->position += player_velocity * dt;
+
+        // Handle collisions
+        if(player->entity->position.y < 1.5f) {
+            player_velocity.y = 0;
+            player->entity->position.y = 1.5f;
+            grounded = true;
+        }
     }
 
-    /*light.position = {
-        cosf(time.since_start * 0.75f) * 2,
-        sinf(time.since_start * 0.75f) * 2,
-        -6.0f
-    };*/
+    update_camera(non_scaled_dt);
+
+    /*for(int i = 0; i < count_Ground; i++) {
+        Entity* e = grounds[i].entity;
+        e->orientation = rotation(cubes_rotation, cubes_rotation);
+        e->scale = abs(sin(my_time.since_start));
+    }*/
 }

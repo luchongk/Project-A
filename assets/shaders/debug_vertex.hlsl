@@ -2,6 +2,7 @@
 struct VOut {
     float4 position : SV_POSITION;
     float4 color : COLOR;
+    float2 uv : UV;
 };
 
 cbuffer global : register(b0) {
@@ -16,13 +17,12 @@ cbuffer per_object : register(b3) {
     matrix world;
 }
 
-VOut main(float4 position : POSITION, float4 color : COLOR)
+VOut main(float4 position : POSITION, float4 color : COLOR, float2 uv : UV)
 {
     VOut output;
     float4 world_position = mul(world, position);
     output.position = mul(projection, mul(view, world_position));
-
-    output.color    = color;
+    output.color = color;
 
     return output;
 }

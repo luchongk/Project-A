@@ -113,9 +113,9 @@ String find_from_left(String to_find, String context) {
 }
 
 bool starts_with(String start, String str) {
-    auto length = min(start.count, str.count);
+    if(start.count > str.count) return false;
     
-    return memcmp(start.data, str.data, length) == 0;
+    return memcmp(start.data, str.data, start.count) == 0;
 }
 
 #endif

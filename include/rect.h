@@ -17,7 +17,7 @@ Rect cut_left  (Rect* to_cut, float percentage);
 Rect cut_right (Rect* to_cut, float percentage);
 
 Rect pad_rect     (Rect to_pad, float percentage);
-Rect pad_leftright(Rect to_pad, float percentage);
-Rect pad_topbottom(Rect to_pad, float percentage);
+Rect pad_left_right(Rect to_pad, float percentage);
+Rect pad_top_bottom(Rect to_pad, float percentage);
 
 #endif

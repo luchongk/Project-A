@@ -3,9 +3,9 @@
 #include "array.h"
 
 static bool sd_initted = false;
-static int sd_current_shader;
-static uint sd_main_shader;
-static uint sd_text_shader;
+static ShaderProgram* sd_current_shader;
+static ShaderProgram* sd_main_shader;
+static ShaderProgram* sd_text_shader;
 static GraphicsBuffer*  sd_vertex_buffer;
 static Array<VertexPCU> sd_vertices;
 
@@ -30,17 +30,17 @@ void sd_flush() {
     
     set_vertex_buffer(sd_vertex_buffer);
     modify_buffer(sd_vertex_buffer, sizeof(VertexPCU) * sd_vertices.count, sd_vertices.data);
-    draw(sd_vertices.count);
+    draw(0, sd_vertices.count);
     
     array_reset(&sd_vertices);
 
-    sd_current_shader = -1;
+    sd_current_shader = nullptr;
 }
 
 static void set_shader_for_shapes() {
     if(!sd_initted) sd_init();
 
-    if(sd_current_shader != (int)sd_main_shader) {
+    if(sd_current_shader != sd_main_shader) {
         sd_flush();
         set_shader(sd_main_shader);
         set_texture(0, white_pixel);
@@ -51,7 +51,7 @@ static void set_shader_for_shapes() {
 static void set_shader_for_text() {
     if(!sd_initted) sd_init();
 
-    if(sd_current_shader != (int)sd_text_shader) {
+    if(sd_current_shader != sd_text_shader) {
         sd_flush();
         set_shader(sd_text_shader);
         set_texture(0, sd_font_texture);

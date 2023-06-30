@@ -1,52 +1,82 @@
 #include "entities.h"
 
-Camera camera;
-Light light;
-Entity entities[10];
-int entities_count = 0;
+Entity entities[MAX_ENTITIES];
+int entity_count = 0;
 
-static void make_entity(Vec3 position) {
-    Entity* e = &entities[entities_count];
-    e->scale = 2.0f;
+Camera* main_camera;
+Light* light;
+Ground* player;
+
+EntityType EntityPool<Camera>::type = EntityType::CAMERA;
+EntityType EntityPool<Light>::type  = EntityType::LIGHT;
+EntityType EntityPool<Ground>::type = EntityType::GROUND;
+
+static Entity* make_entity(EntityType type, Vec3 position, float scale, Mesh* mesh, Material* material) {
+    Entity* e = &entities[entity_count];
+    e->type        = type;
+    e->scale       = scale;
     e->orientation = Matrix::ident;
-    e->position = position;
-    e->mesh = &weird_mesh;
-    e->material.ambient   = {0.1f, 0.07f, 0.01f};
-    e->material.diffuse   = {0.05f, 0.025f, 0.005f};
-    e->material.specular  = {1.0f, 0.7f, 0.0f};
-    //e->material.specular  = {0.0f, 0.0f, 0.0f};
-    e->material.shininess = 32.0f;
+    e->position    = position;
+    e->mesh        = mesh;
+    e->material    = material;
 
-    ++entities_count;
+    ++entity_count;
+
+    return e;
+}
+
+template<typename T>
+static T* make_entity(Vec3 position, float scale, Mesh* mesh, Material* material) {
+    auto e = make_entity(EntityPool<T>::type, position, scale, mesh, material);
+    T* specific = &EntityPool<T>::pool[EntityPool<T>::count++];
+    specific->entity = e;
+    e->specific_data = specific;
+
+    return specific;
+}
+
+static Ground* make_ground(Vec3 position, float width, float height, float depth) {
+    auto ground = make_entity<Ground>(position, 1, &cube_mesh, &MATERIAL_GROUND);
+    ground->dimensions = Vec3{width, height, depth};
+    return ground;
 }
 
 void reset_scene() {
-    camera.position = {-7.0f, 3.5f, -6.0f};
-    camera.pitch = 0.403062f;
-    camera.yaw = 2.05159f;
-
-    light = {};
-    light.position = {0, 0, 0};
-    light.scale = .05f;
-    light.orientation = Matrix::ident;
-    light.diffuse  = {1.0f, 1.0f, 1.0f};
-    light.ambient  = {0.03f, 0.03f, 0.03f};
-    light.specular = {1.0f, 1.0f, 1.0f};
-    light.mesh = &cube_mesh;
-
     cubes_rotation = 0;
-    entities_count = 0;
-    make_entity({0.0f, 0.0f, 0.0f});
-    //make_entity({2.0f, 5.0f, -15.0f});
-    //make_entity({-1.5f, -2.2f, -2.5f});
-    //make_entity({-3.8f, -2.0f, -12.3f});
-    //make_entity({2.4f, -0.4f, -3.5f});
+    entity_count = 0;
+
+    main_camera = make_entity<Camera>({0, 5, 7}, 1, nullptr, nullptr);
+    main_camera->yaw = to_radians(180);
+    main_camera->pitch = to_radians(-25);
+    main_camera->entity->specific_data = &main_camera;
+
+    light = make_entity<Light>({-2, 3, 3}, 0.1f, &cube_mesh, &MATERIAL_LIGHT);
+    light->ambient  = {0.0005f, 0.0005f, 0.0005f};
+    light->diffuse  = {1.0f, 1.0f, 1.0f};
+    light->specular = {1.0f, 1.0f, 1.0f};
+    light->entity->specific_data = &light;
+
+    make_ground({0, 0, 0}, 20, 1, 3);
+    auto origin = make_ground({0, 0, 0}, 1.1f, 1.1f, 1.1f);
+    origin->entity->material = &MATERIAL_GROUND2;
+
+    player = make_ground({0, 5.0f, 0}, 1, 2, 1);
+    player->entity->material = &MATERIAL_GROUND2;
 }
 
+// @Speed: Can we calculate world-view matrix at once or do we need them to be separate?
 Matrix get_world_matrix(Entity* entity) {
-    Matrix localToWorld = translation(entity->position);
-    localToWorld = scale(localToWorld, entity->scale);
-    localToWorld *= entity->orientation;
+    Matrix localToWorld = entity->orientation;
+
+    if(entity->type == EntityType::GROUND) {
+        auto ground = (Ground*)entity->specific_data;
+        localToWorld = scale(localToWorld, entity->scale * ground->dimensions);
+    }
+    else {
+        localToWorld = scale(localToWorld, entity->scale);
+    }
+
+    localToWorld = translate(localToWorld, entity->position);
 
     return localToWorld;
 }

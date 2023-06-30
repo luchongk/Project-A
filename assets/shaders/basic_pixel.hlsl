@@ -1,3 +1,4 @@
+Texture2D _texture2;
 
 cbuffer per_frame : register(b1) {
     float3 view_pos : packoffset(c4);
@@ -10,15 +11,17 @@ cbuffer per_frame : register(b1) {
     float time : packoffset(c8.w);
 }
 
-cbuffer per_object : register(b3) {
-    matrix world : packoffset(c0);
+cbuffer per_material : register(b2) {
     struct Material {
         float3 ambient;
         float3 diffuse;
         float3 specular;
         float shininess;
-    } material : packoffset(c4);
-    float3 position : packoffset(c7.y);
+    } material;
+}
+
+cbuffer per_object : register(b3) {
+    matrix world : packoffset(c0);
 }
 
 Texture2D _texture;
@@ -41,6 +44,7 @@ float4 main(float3 world_position : POSITION, float3 normal : NORMAL, float2 uv 
     // Specular
     float3 view_dir    = normalize(view_pos - world_position);
     float3 halfway_dir = normalize(light_dir + view_dir);
+    
     // This is Blinn-Phong, so we use the halfway vector. For plain old Phong use reflect_dir = reflect(-light_dir, norm) instead of halfway_dir.
     // Also, we modulate specular_portion by diffuse_portion to prevent it from having a value greater than 0 when the normal is facing away from the light direction.
     // We could also achieve that by wrapping the specular calculation in "if(diffuse_portion > 0) {...}", which would be correct, but doing so leads to specular highlights popping in and out
@@ -50,13 +54,23 @@ float4 main(float3 world_position : POSITION, float3 normal : NORMAL, float2 uv 
     float3 specular         = specular_portion * light.specular * material.specular;
     float3 color            = ambient + (diffuse + specular) * attenuation;
     color *= _texture.Sample(_sampler, uv);
-
+    
+    //color = color * pow(cos(2*time) * 0.5 + 0.5, 2.2);
+    
     // Gamma correction
-    //color = pow(color, 1.0 / 2.2);
-    color = max(1.055 * pow(color, 0.416666667) - 0.055, 0);
-
-    // Fade in/out based on percieved brightness (non linear, thats why it goes after gamma correction).
-    color = color * (cos(4 * time) * 0.5 + 0.5);
+    color = pow(color, 1.0 / 2.2);
 
     return float4(color, 1);
 }
+
+//
+//
+// (color ^ (1 / 2.2)) * sin(time) = (color * f(t)) ^ (1 / 2.2)
+//
+// (color * (sin(time))^2.2) ^ (1 / 2.2) = (color * f(t)) ^ (1 / 2.2)
+//
+// color * sin(time)^2.2 = color * f(t)
+//
+// sin(time)^2.2 = f(t)
+//
+//

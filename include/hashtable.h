@@ -7,7 +7,7 @@
 
 //Will use FNV-1a for now
 #define FNV1_32A_INIT 0x811c9dc5
-#define FNV_32_PRIME 0x01000193
+#define FNV_32_PRIME  0x01000193
 
 u32 fnv1_32a_hash(u8* to_hash, u64 length)
 {
@@ -216,7 +216,7 @@ void grow(HashTable<K,V>* table) {
     s64 old_allocated = table->allocated;
 
     if(table->allocator) {
-        table->entries = (HashTable<K,V>::Entry*)table->allocator(
+        table->entries = (typename HashTable<K,V>::Entry*)table->allocator(
             table->entries,
             0,
             sizeof(HashTable<K,V>::Entry) * new_size,

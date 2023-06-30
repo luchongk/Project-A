@@ -30,7 +30,7 @@ float normalize_angle(float angle) {
     return angle;
 }
 
-constexpr float radians(float degrees) {
+constexpr float to_radians(float degrees) {
     return PI * degrees / 180;
 }
 

@@ -45,7 +45,9 @@ float length(Vec2 v) {
 }
 
 Vec2 normalize(Vec2 v) {
-    return v / length(v);
+    float v_length = length(v);
+    if(v_length < 0.0001) return Vec2{};
+    return v / v_length;
 }
 
 Vec2 parse_vec2(String s) {
@@ -128,12 +130,14 @@ float length(Vec3 v) {
 }
 
 Vec3 normalize(Vec3 v) {
-    return v / length(v);
+    float v_length = length(v);
+    if(v_length < 0.0001) return Vec3{};
+    return v / v_length;
 }
 
 Vec3 angles_to_vec(float yaw, float pitch) {
     Vec3 result;
-    result.x = sinf(-yaw) * cosf(pitch);
+    result.x = sinf(yaw) * cosf(pitch);
     result.y = sinf(pitch);
     result.z = cosf(yaw) * cosf(pitch);
     result = normalize(result);

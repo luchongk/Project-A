@@ -38,21 +38,14 @@ struct Event {
     };
 };
 
-
-enum class KeyState : u8 {
-    NONE,
-    DOWN,
-    UP
-};
-
 struct PlayerInput {
-    bool mouse_interacting_with_ui = false;
     Vec2 mouse_pos_pixels;
     Vec2 mouse_pos_normalized;
     Vec2 mouse_delta_pixels;
     Vec2 mouse_delta_normalized;
     Vec3 move;
     float rotation;
+    bool jump;
 };
 
 extern PlayerInput input;

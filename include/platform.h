@@ -2,7 +2,7 @@
 #define PLATFORM_H
 
 #ifdef _WIN32
-    #define WIN32_LEAN_AND_MEAN
+    //#define WIN32_LEAN_AND_MEAN
     #define NOMINMAX
     #include "Windows.h"
 #endif
@@ -20,7 +20,6 @@ struct OSWindow {
     //@Cleanup These should probably be state flags
     bool focused;
     bool fullscreen;
-    bool borderless;
 };
 
 extern Array<Event> events;
@@ -35,7 +34,7 @@ void os_poll_events();
 void os_set_mouse_to_center(OSWindow* window);
 void os_show_mouse(bool show);
 //bool os_is_fullscreen(OSWindow* window);
-void os_set_fullscreen(OSWindow* window, bool fullscreen, bool borderless);
-String os_read_entire_file(String path);
+void os_set_fullscreen(OSWindow* window, bool fullscreen);
+bool os_read_entire_file(String path, Array<u8>* bytes);
 
 #endif

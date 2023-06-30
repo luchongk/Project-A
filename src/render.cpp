@@ -27,40 +27,39 @@ struct PerFrameUniforms {
 
 struct PerObjectUniforms {
     Matrix world;
-    struct {
-        Vec3 ambient;
-        float padding;
-        Vec3 diffuse;
-        float padding2;
-        Vec3 specular;
-        float shininess;
-    } material;
-    Vec3 position;
-    float padding;
 };
 
 Mesh weird_mesh;
 Mesh cube_mesh;
 
-uint pbr_shader;
-uint light_shader;
-uint debug_shader;
+ShaderProgram* basic_shader;
+ShaderProgram* light_shader;
+ShaderProgram* debug_shader;
 
-static GraphicsBuffer* weird_vertex_buffer;
-static GraphicsBuffer* weird_index_buffer;
-static GraphicsBuffer* cube_vertex_buffer;
-static GraphicsBuffer* cube_index_buffer;
+Texture* grid_texture;
+Texture* test_texture;
+
+MaterialBasic  MATERIAL_GROUND;
+MaterialBasic  MATERIAL_GROUND2;
+MaterialNoData MATERIAL_LIGHT;
+
+Vec3 background = {0,0.02f,0.08f};
+
+Framebuffer* onscreen_framebuffer;
+
+static GraphicsBuffer* static_vertex_buffer;
+static GraphicsBuffer* static_index_buffer;
+
 static GraphicsBuffer* debug_vertex_buffer;
 
 static GraphicsBuffer* global_uniform_buffer;
 static GraphicsBuffer* per_frame_uniform_buffer;
+static GraphicsBuffer* per_material_uniform_buffer;
 static GraphicsBuffer* per_object_uniform_buffer;
 
 static GlobalUniforms    global_uniforms;
 static PerFrameUniforms  per_frame_uniforms;
 static PerObjectUniforms per_object_uniforms;
-
-static Texture* grid_texture;
 
 void set_projection(int width, int height) {
     global_uniforms.projection = perspective(width, height);
@@ -68,112 +67,152 @@ void set_projection(int width, int height) {
 }
 
 void init_renderer(OSWindow* window) {
-    pbr_shader   = compile_shader("assets\\shaders\\basic_vertex.hlsl"_s, "assets\\shaders\\basic_pixel.hlsl"_s, VertexFormat::PNU);
+    onscreen_framebuffer = create_onscreen_framebuffer((int)window->size.x, (int)window->size.y);
+    
+    basic_shader = compile_shader("assets\\shaders\\basic_vertex.hlsl"_s, "assets\\shaders\\basic_pixel.hlsl"_s, VertexFormat::PNU);
     light_shader = compile_shader("assets\\shaders\\basic_vertex.hlsl"_s, "assets\\shaders\\light_cube_pixel.hlsl"_s, VertexFormat::PNU);
     debug_shader = compile_shader("assets\\shaders\\debug_vertex.hlsl"_s, "assets\\shaders\\ui_pixel.hlsl"_s, VertexFormat::PCU);
 
-    load_obj("assets\\models\\weirdchamp.obj"_s, &weird_mesh);
+    grid_texture = create_texture_from_file("assets\\textures\\uv_grid_white.png"_s);
 
-    Array<VertexPNU> vertices;
-    for(uint i = 0; i < weird_mesh.vertices.count; i++) {
-        array_add(&vertices, {weird_mesh.vertices[i], weird_mesh.normals[i], weird_mesh.uvs[i]});
+    // Material initialization
+    {
+        MATERIAL_GROUND.shader = basic_shader;
+        MATERIAL_GROUND.pixel_textures[MaterialBasic::_TEXTURE_INDEX] = white_pixel;
+        MATERIAL_GROUND.ambient  = {1.0f, 1.0f, 1.0f};
+        MATERIAL_GROUND.diffuse  = {1.0f, 1.0f, 1.0f};
+        MATERIAL_GROUND.specular = {1.0f, 1.0f, 1.0f};
+        MATERIAL_GROUND.shininess = 32.0f;
+
+        MATERIAL_GROUND2.shader = basic_shader;
+        MATERIAL_GROUND2.pixel_textures[MaterialBasic::_TEXTURE_INDEX] = white_pixel;
+        MATERIAL_GROUND2.ambient  = {0.0f, 0.0f, 0.0f};
+        MATERIAL_GROUND2.diffuse  = {0.0f, 1.0f, 0.0f};
+        MATERIAL_GROUND2.specular = {0.0f, 0.0f, 0.0f};
+        MATERIAL_GROUND2.shininess = 1.0f;
+
+        MATERIAL_LIGHT.shader = light_shader;
     }
-    
-    weird_vertex_buffer = create_vertex_buffer(GraphicsBufferUsage::STATIC, VertexFormat::PNU, vertices.count, vertices.data);
-    weird_index_buffer  = create_index_buffer(GraphicsBufferUsage::STATIC, weird_mesh.indices.count, weird_mesh.indices.data);
-    
-    load_obj("assets\\models\\cube.obj"_s, &cube_mesh);
 
-    vertices.count = 0;
-    for(uint i = 0; i < cube_mesh.vertices.count; i++) {
-        array_add(&vertices, {cube_mesh.vertices[i], cube_mesh.normals[i], cube_mesh.uvs[i]});
+    // Static mesh loading. @Speed: Doing a multiple unnecessary buffer copies
+    {
+        load_obj("assets\\models\\weirdchamp.obj"_s, &weird_mesh);
+        load_obj("assets\\models\\cube.obj"_s, &cube_mesh);
+
+        Array<VertexPNU> vertices;
+        vertices.allocator = linear_allocator;
+        vertices.allocator_data = &temporary_storage;
+        Array<uint> indices;
+        indices.allocator = linear_allocator;
+        indices.allocator_data = &temporary_storage;
+
+        cube_mesh.vertex_base = vertices.count;
+        cube_mesh.index_base = indices.count;
+        for(uint i = 0; i < cube_mesh.vertices.count; i++) {
+            array_add(&vertices, {cube_mesh.vertices[i], cube_mesh.normals[i], cube_mesh.uvs[i]});
+        }
+
+        For(cube_mesh.indices) {
+            array_add(&indices, *it);
+        }
+
+        weird_mesh.vertex_base = vertices.count;
+        weird_mesh.index_base = indices.count;
+        for(uint i = 0; i < weird_mesh.vertices.count; i++) {
+            array_add(&vertices, {weird_mesh.vertices[i], weird_mesh.normals[i], weird_mesh.uvs[i]});
+        }
+
+        For(weird_mesh.indices) {
+            array_add(&indices, *it);
+        }
+
+        static_vertex_buffer = create_vertex_buffer(GraphicsBufferUsage::STATIC, VertexFormat::PNU, vertices.count, vertices.data);
+        static_index_buffer  = create_index_buffer(GraphicsBufferUsage::STATIC, indices.count, indices.data);
+
+        debug_vertex_buffer = create_vertex_buffer(GraphicsBufferUsage::DYNAMIC, VertexFormat::PCU, 256);
     }
-    
-    cube_vertex_buffer = create_vertex_buffer(GraphicsBufferUsage::STATIC, VertexFormat::PNU, vertices.count, vertices.data);
-    cube_index_buffer  = create_index_buffer(GraphicsBufferUsage::STATIC, cube_mesh.indices.count, cube_mesh.indices.data);
-
-    debug_vertex_buffer = create_vertex_buffer(GraphicsBufferUsage::DYNAMIC, VertexFormat::PCU, 10000);
     
     global_uniform_buffer = create_uniform_buffer(GraphicsBufferUsage::STATIC, sizeof(GlobalUniforms));
     set_projection((int)window->size.x, (int)window->size.y);
 
-    per_frame_uniform_buffer  = create_uniform_buffer(GraphicsBufferUsage::DYNAMIC, sizeof(PerFrameUniforms));
-    per_object_uniform_buffer = create_uniform_buffer(GraphicsBufferUsage::DYNAMIC, sizeof(PerObjectUniforms));
+    per_frame_uniform_buffer    = create_uniform_buffer(GraphicsBufferUsage::DYNAMIC, sizeof(PerFrameUniforms));
+    per_object_uniform_buffer   = create_uniform_buffer(GraphicsBufferUsage::DYNAMIC, sizeof(PerObjectUniforms));
+    per_material_uniform_buffer = create_uniform_buffer(GraphicsBufferUsage::DYNAMIC, 160);  //@Cleanup :Hardcoded: Hardcoded size. Figure out a good one.
 
     set_uniform_buffer(UniformBufferSlot::PER_SETTINGS, global_uniform_buffer);
-    set_uniform_buffer(UniformBufferSlot::PER_FRAME, per_frame_uniform_buffer);
-    set_uniform_buffer(UniformBufferSlot::PER_OBJECT, per_object_uniform_buffer);
+    set_uniform_buffer(UniformBufferSlot::PER_FRAME,    per_frame_uniform_buffer);
+    set_uniform_buffer(UniformBufferSlot::PER_MATERIAL, per_material_uniform_buffer);
+    set_uniform_buffer(UniformBufferSlot::PER_OBJECT,   per_object_uniform_buffer);
 
     set_primitive_type(GraphicsPrimitiveType::TRIANGLE);
-
-    //grid_texture = create_texture_from_file("assets\\textures\\uv_grid_white.png"_s);
 
     ui_init();
 }
 
 void render(OSWindow* window) {
-    bind_framebuffer();
+    bind_framebuffer(onscreen_framebuffer);
+
     set_blend(false);
     set_depth(true);
     
-    auto srgb = powf(0.1f, 1.0f / 2.2f);
-    clear_color_buffer(srgb, srgb, srgb);
+    clear_color_buffer(background.r, background.g, background.b);
     clear_depth_buffer();
-
-    per_frame_uniforms.view_pos = camera.position;
-    per_frame_uniforms.view = look_to(camera.position, camera.forward, Vec3{0,1,0});
     
-    per_frame_uniforms.light.position = light.position;
-    per_frame_uniforms.light.diffuse  = light.diffuse;
-    per_frame_uniforms.light.ambient  = light.ambient;
-    per_frame_uniforms.light.specular = light.specular;
-    
-    per_frame_uniforms.time = time.since_start;
-
+    per_frame_uniforms.light.position = light->entity->position;
+    per_frame_uniforms.light.diffuse  = light->diffuse;
+    per_frame_uniforms.light.ambient  = light->ambient;
+    per_frame_uniforms.light.specular = light->specular;
+    per_frame_uniforms.time = my_time.since_start;
     modify_buffer(per_frame_uniform_buffer, sizeof(per_frame_uniforms), &per_frame_uniforms);
 
-    // LIGHT DRAW
-    set_shader(light_shader);
+    set_vertex_buffer(static_vertex_buffer);
+    set_index_buffer(static_index_buffer);
 
-    per_object_uniforms.world = get_world_matrix(&light);
-    modify_buffer(per_object_uniform_buffer, sizeof(per_object_uniforms), &per_object_uniforms);
+    for(int i = 0; i < entity_count; i++) {
+        Entity* e = &entities[i];
 
-    set_vertex_buffer(cube_vertex_buffer);
-    set_index_buffer(cube_index_buffer);
-    draw_indexed(light.mesh->indices.count);
-    
-    // CUBES DRAW
-    set_shader(pbr_shader);
-    set_texture(0, white_pixel);
-
-    //@Factor: All this should probably be in a draw_entity function.
-    set_vertex_buffer(weird_vertex_buffer);
-    set_index_buffer(weird_index_buffer);
-    for(int i = 0; i < entities_count; i++) {
-        per_object_uniforms.material.ambient   = entities[i].material.ambient;
-        per_object_uniforms.material.diffuse   = entities[i].material.diffuse;
-        per_object_uniforms.material.specular  = entities[i].material.specular;
-        per_object_uniforms.material.shininess = entities[i].material.shininess;
-        per_object_uniforms.position = entities[i].position;
+        if(!e->mesh || !e->material) continue;
         
-        per_object_uniforms.world = get_world_matrix(&entities[i]);
-        
+        Material* material = e->material;
+        if(material->shader == nullptr) {
+            printf("Tried to draw an entity with null shader\n");
+            continue;
+        }
+
+        //@Speed: Sort by shader/material instead!
+        if(current_shader != material->shader) {
+            set_shader(material->shader);
+        }
+            
+        for(uint j = 0; j < material->shader->pixel_texture_slots.count; j++) {
+            set_texture(material->shader->pixel_texture_slots[j], material->pixel_textures[j]);
+        }
+
+        if(material->constants_size > 0) {
+            assert(material->constants_size < 160); // See :Hardcoded
+            modify_buffer(per_material_uniform_buffer, material->constants_size, get_material_constants(material));
+        }
+
+        per_object_uniforms.world = get_world_matrix(e);
         modify_buffer(per_object_uniform_buffer, sizeof(per_object_uniforms), &per_object_uniforms);
-        draw_indexed(entities[i].mesh->indices.count);
+
+        draw_indexed(e->mesh->vertex_base, e->mesh->index_base, e->mesh->indices.count);
     }
 
-#if DEBUG
 #if 0
+    // TODO: This is a good example of something we could do in a geometry shader, whenever we support those anyways...
     set_primitive_type(GraphicsPrimitiveType::LINE);
     set_vertex_buffer(debug_vertex_buffer);
     set_shader(debug_shader);
     Array<VertexPCU> vertices;
-    for(int i = 0; i < entities_count; i++) {
-        vertices.count = 0;
-        per_object_uniforms.world = get_world_matrix(&entities[i]);
+    for(int i = 0; i < entity_count; i++) {
+        array_reset(&vertices);
         
         Entity* entity = &entities[i];
-        for(int j = 0; j < entity->mesh->indices.count; j++) {
+        if(!entity->mesh) continue;
+        per_object_uniforms.world = get_world_matrix(&entities[i]);
+        
+        for(uint j = 0; j < entity->mesh->indices.count; j++) {
             uint index = entity->mesh->indices[j];
             VertexPCU v;
             v.color = {1,0,0,1};
@@ -187,10 +226,9 @@ void render(OSWindow* window) {
         
         modify_buffer(debug_vertex_buffer, vertices.count * sizeof(VertexPCU), vertices.data);
         modify_buffer(per_object_uniform_buffer, sizeof(per_object_uniforms), &per_object_uniforms);
-        draw(vertices.count);
+        draw(0, vertices.count);
     }
     set_primitive_type(GraphicsPrimitiveType::TRIANGLE);
-#endif
 #endif
 
     if(ui_visible) ui_render();
@@ -199,7 +237,7 @@ void render(OSWindow* window) {
 }
 
 void end_renderer() {
-    //release_texture(grid_texture);
+    release_texture(grid_texture);
     release_texture(sd_font_texture);
     end_graphics();
 }
