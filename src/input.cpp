@@ -82,7 +82,6 @@ static void handle_key_event(EventKey* event) {
             case 'R': {
                 if(pressed && !ui_current_action.widget) {
                     reset_scene();
-                    cubes_rotation = 0;
                     my_time.start_stamp = os_get_timestamp();
                     my_time.since_start = 0;
                     ui_reset();
@@ -108,6 +107,27 @@ static void handle_key_event(EventKey* event) {
                 break;
             }
 
+            case '1': {
+                input.action_1 = pressed;
+                break;
+            }
+
+            case '2': {
+                input.action_2 = pressed;
+                break;
+            }
+
+            case '3': {
+                input.action_3 = pressed;
+                break;
+            }
+
+            case '4': {
+                if(pressed) do_step = true;
+                input.action_4 = pressed;
+                break;
+            }
+
             case VK_F9: {
                 if(pressed) {
                     bool is_fullscreen = window->fullscreen;
@@ -121,6 +141,14 @@ static void handle_key_event(EventKey* event) {
                     bool is_fullscreen = window->fullscreen;
                     os_set_fullscreen(window, !is_fullscreen);
                 }
+                break;
+            }
+        }
+    }
+    else {
+        switch(keycode) {
+            case '4': {
+                do_step = true;
                 break;
             }
         }
@@ -160,6 +188,8 @@ bool handle_input(Array<Event>* events) {
         os_set_mouse_to_center(window);
     }*/
 
+    input.scroll = 0; //@Hack: Review which key/mouse events need resetting vs which don't.
+
     ui_update_hot();
 
     For(*events) {
@@ -174,6 +204,11 @@ bool handle_input(Array<Event>* events) {
 
             case EventType::TEXT: {
                 handle_text_event(&it->text);
+                break;
+            }
+
+            case EventType::SCROLL: {
+                input.scroll = it->scroll.amount;
                 break;
             }
 

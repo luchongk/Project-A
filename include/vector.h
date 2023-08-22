@@ -1,6 +1,9 @@
 #ifndef VECTOR_H
 #define VECTOR_H
 
+#include "math.h"
+#include "strings.h"
+
 //Vector2
 
 union Vec2 {
@@ -15,8 +18,21 @@ Vec2 operator+(const Vec2& u, const Vec2& v) {
     return Vec2{u.x + v.x, u.y + v.y};
 }
 
+Vec2 operator-(const Vec2& u, const Vec2& v) {
+    return Vec2{u.x - v.x, u.y - v.y};
+}
+
+Vec2 operator-(const Vec2& u) {
+    return Vec2{-u.x, -u.y};
+}
+
 Vec2 operator+=(Vec2& u, const Vec2& v) {
     u = u + v;
+    return u;
+}
+
+Vec2 operator-=(Vec2& u, const Vec2& v) {
+    u = u - v;
     return u;
 }
 
@@ -38,6 +54,10 @@ Vec2 operator*(const float& scalar, const Vec2& v) {
 
 Vec2 operator/(const Vec2& v, const float& scalar) {
     return Vec2{v.x / scalar, v.y / scalar};
+}
+
+float dot(const Vec2& u, const Vec2& v) {
+    return u.x * v.x + u.y * v.y;
 }
 
 float length(Vec2 v) {
@@ -62,6 +82,10 @@ Vec2 parse_vec2(String s) {
 //Vector3
 
 union Vec3 {
+    struct {
+        Vec2 v;
+        float z2;
+    };
     struct {
         float x;
         float y;
@@ -159,6 +183,10 @@ Vec3 parse_vec3(String s) {
 //Vector4
 
 union Vec4 {
+    struct {
+        Vec3 v;
+        float w;
+    };
     struct {
         float x;
         float y;

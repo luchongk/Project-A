@@ -341,15 +341,10 @@ void ui_update() {
                     auto slide_distance  = input.mouse_pos_normalized.x - slider_rect.x - slider_rect.width * 0.05f;
                     slider->target_value = clamp(slide_distance / slide_max, 0.0f, 1.0f);
                 }
-                
-                if(fabs(slider->target_value - *slider->value) < 0.001f) {
-                    *slider->value = slider->target_value;
-                    if(ui_current_action.widget != it) {
-                        keep_updating = false;
-                    }
-                }
-                else {
-                    *slider->value += (slider->target_value - *slider->value) * my_time.dt * 10;
+
+                *slider->value = exp_interpolate(*slider->value, slider->target_value, my_time.dt, 20);
+                if(*slider->value == slider->target_value && ui_current_action.widget != it) {
+                    keep_updating = false;
                 }
 
                 break;

@@ -1,75 +1,108 @@
 #include "entities.h"
 
+const int MAX_ENTITIES = 100;
+
 Entity entities[MAX_ENTITIES];
 int entity_count = 0;
 
+Ground pool_Ground[MAX_ENTITIES];
+int count_Ground = 0;
+
+Camera pool_Camera[MAX_ENTITIES];
+int count_Camera = 0;
+
+Light pool_Light[MAX_ENTITIES];
+int count_Light = 0;
+
+Player pool_Player[MAX_ENTITIES];
+int count_Player = 0;
+
 Camera* main_camera;
 Light* light;
-Ground* player;
+Player* main_player;
+Player* player2;
 
-EntityType EntityPool<Camera>::type = EntityType::CAMERA;
-EntityType EntityPool<Light>::type  = EntityType::LIGHT;
-EntityType EntityPool<Ground>::type = EntityType::GROUND;
-
-static Entity* make_entity(EntityType type, Vec3 position, float scale, Mesh* mesh, Material* material) {
-    Entity* e = &entities[entity_count];
-    e->type        = type;
+Entity* create_entity(Vec3 position, float scale, Mesh* mesh, Material* material) {
+    Entity* e = &entities[entity_count++];
+    e->type        = EntityType::UNINITIALIZED;
     e->scale       = scale;
     e->orientation = Matrix::ident;
     e->position    = position;
     e->mesh        = mesh;
     e->material    = material;
 
-    ++entity_count;
-
     return e;
 }
 
-template<typename T>
-static T* make_entity(Vec3 position, float scale, Mesh* mesh, Material* material) {
-    auto e = make_entity(EntityPool<T>::type, position, scale, mesh, material);
-    T* specific = &EntityPool<T>::pool[EntityPool<T>::count++];
-    specific->entity = e;
-    e->specific_data = specific;
-
+inline void* create_entity_of_type(EntityType type, u8* pool, int* count, int size, Vec3 position, float scale, Mesh* mesh, Material* material) {
+    void* specific = pool + size * (*count);
+    (*count)++;
+    
+    auto e = create_entity(position, scale, mesh, material);
+    e->type = type;
+    e->type_specific_data = specific;
+    
+    *((Entity**)specific) = e;
     return specific;
 }
 
-static Ground* make_ground(Vec3 position, float width, float height, float depth) {
-    auto ground = make_entity<Ground>(position, 1, &cube_mesh, &MATERIAL_GROUND);
+Ground* create_ground(Vec3 position, float width, float height, float depth) {
+    auto ground = CREATE_ENTITY(Ground, position, 1, &cube_mesh, &MATERIAL_GROUND);
     ground->dimensions = Vec3{width, height, depth};
+    ground->entity->collider.shape = ColliderShape::BOX;
+    ground->entity->collider.box.min = -vec2(ground->dimensions) / 2;
+    ground->entity->collider.box.max = vec2(ground->dimensions) / 2;
     return ground;
+}
+
+Player* create_player(Vec3 position, float width, float height, float depth) {
+    auto player = CREATE_ENTITY(Player, position, 1, &cube_mesh, &MATERIAL_PLAYER);
+    player->dimensions = Vec3{width, height, depth};
+    player->entity->collider.shape = ColliderShape::BOX;
+    player->entity->collider.box.min = -vec2(player->dimensions) / 2;
+    player->entity->collider.box.max = vec2(player->dimensions) / 2;
+    return player;
 }
 
 void reset_scene() {
     cubes_rotation = 0;
     entity_count = 0;
+    count_Camera = 0;
+    count_Light = 0;
+    count_Ground = 0;
+    count_Player = 0;
+    do_the_thing_cooldown = 0;
 
-    main_camera = make_entity<Camera>({0, 5, 7}, 1, nullptr, nullptr);
+    main_camera = CREATE_ENTITY(Camera, (Vec3{-6, 5, 7}), 1, nullptr, nullptr);
     main_camera->yaw = to_radians(180);
     main_camera->pitch = to_radians(-25);
-    main_camera->entity->specific_data = &main_camera;
+    main_camera->entity->type_specific_data = &main_camera;
 
-    light = make_entity<Light>({-2, 3, 3}, 0.1f, &cube_mesh, &MATERIAL_LIGHT);
+    light = CREATE_ENTITY(Light, (Vec3{-2, 3, 3}), 0.1f, &cube_mesh, &MATERIAL_LIGHT);
     light->ambient  = {0.0005f, 0.0005f, 0.0005f};
     light->diffuse  = {1.0f, 1.0f, 1.0f};
     light->specular = {1.0f, 1.0f, 1.0f};
-    light->entity->specific_data = &light;
+    light->entity->type_specific_data = &light;
 
-    make_ground({0, 0, 0}, 20, 1, 3);
-    auto origin = make_ground({0, 0, 0}, 1.1f, 1.1f, 1.1f);
-    origin->entity->material = &MATERIAL_GROUND2;
+    main_player = create_player({0, 1.0f, 0}, 1, 2, 1);
 
-    player = make_ground({0, 5.0f, 0}, 1, 2, 1);
-    player->entity->material = &MATERIAL_GROUND2;
+    player2 = create_player({0, 5.0f, 0}, 1, 2, 1);
+    player2->entity->material = &MATERIAL_PLAYER2;
+
+    auto player3 = create_player({2, 5.0f, 0}, 1, 2, 1);
+    player3->entity->material = &MATERIAL_PLAYER2;
+
+    create_ground({0, -0.5f, 0}, 20, 1, 3);
+    create_ground({0, 15.0f, 0}, 20, 1, 3);
+    create_ground({-10, 7.5f, 0}, 1, 15, 3);
 }
 
 // @Speed: Can we calculate world-view matrix at once or do we need them to be separate?
 Matrix get_world_matrix(Entity* entity) {
     Matrix localToWorld = entity->orientation;
 
-    if(entity->type == EntityType::GROUND) {
-        auto ground = (Ground*)entity->specific_data;
+    if(entity->type == EntityType::Ground || entity->type == EntityType::Player) { //@Hack: Fix this stupidness.
+        auto ground = (Ground*)entity->type_specific_data;
         localToWorld = scale(localToWorld, entity->scale * ground->dimensions);
     }
     else {
@@ -79,4 +112,12 @@ Matrix get_world_matrix(Entity* entity) {
     localToWorld = translate(localToWorld, entity->position);
 
     return localToWorld;
+}
+
+AABB get_transformed_collider(Entity* entity) {
+    AABB aabb;
+    aabb.min = vec2(entity->position) + entity->collider.box.min;
+    aabb.max = vec2(entity->position) + entity->collider.box.max;
+
+    return aabb;
 }

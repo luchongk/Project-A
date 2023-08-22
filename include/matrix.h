@@ -68,7 +68,7 @@ Matrix from_columns(Vec3 cols[3]) {
     };
 }
 
-Vec3 position(const Matrix& m) {
+Vec3 matrix_position(const Matrix& m) {
     return Vec3{m.elems[3], m.elems[7], m.elems[11]};
 }
 

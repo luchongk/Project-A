@@ -5,6 +5,7 @@ enum class EventType {
     QUIT,
     KEY,
     TEXT,
+    SCROLL,
     WINDOW,
 };
 
@@ -24,6 +25,10 @@ struct EventText {
     char character;
 };
 
+struct EventScroll {
+    int amount;
+};
+
 struct EventWindow {
     EventWindowType type;
     OSWindow* window;
@@ -34,6 +39,7 @@ struct Event {
     union {
         EventKey key;
         EventText text;
+        EventScroll scroll;
         EventWindow window;
     };
 };
@@ -45,7 +51,11 @@ struct PlayerInput {
     Vec2 mouse_delta_normalized;
     Vec3 move;
     float rotation;
-    bool jump;
+    int scroll;
+    bool action_1;
+    bool action_2;
+    bool action_3;
+    bool action_4;
 };
 
 extern PlayerInput input;

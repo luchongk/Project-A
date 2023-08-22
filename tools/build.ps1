@@ -23,6 +23,7 @@ tools\faster-vcvars.ps1 $platform
 # -Fobin\Debug\                 Object files folder
 # -Fdbin\Debug\                 Debug files folder
 # -Faasm\                       Assembly files folder
+# -P							Preprocessor output only
 # /link
 # /MACHINE:X64
 # -LIBPATH:lib                  Add library folder
@@ -51,6 +52,7 @@ $compile_exe_opts =
 	"-Fo$exec_folder\",
 	"-Fd$exec_folder\",
 #	"-Fa$exec_folder\",
+#	"-P",
 	"-D_CRT_SECURE_NO_WARNINGS",
 	"-DUNICODE",
 	"-D_UNICODE" +

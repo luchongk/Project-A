@@ -4,21 +4,18 @@
 #include "obj_loader.h"
 #include "matrix.h"
 #include "render.h"
+#include "physics.h"
+
+#define CREATE_ENTITY(type, position, scale, mesh, material) (type*)create_entity_of_type(EntityType::type, (u8*)pool_##type, &count_##type, sizeof(type), (position), (scale), (mesh), (material))
 
 ENUM(EntityType,
-    CAMERA,
-    LIGHT,
-    GROUND,
+    UNINITIALIZED,
+    // These need to match the name of the entity type!
+    Camera,
+    Light,
+    Ground,
+    Player,
 )
-
-const int MAX_ENTITIES = 100;
-
-template<typename T>
-struct EntityPool {
-    static EntityType type;
-    inline static T pool[MAX_ENTITIES];
-    inline static int count;
-};
 
 struct Entity {
     EntityType type;
@@ -27,7 +24,14 @@ struct Entity {
     Matrix orientation;
     Mesh* mesh;
     Material* material;
-    void* specific_data;
+    Collider collider;
+    void* type_specific_data;
+};
+
+struct Camera {
+    Entity* entity;
+    float yaw;
+    float pitch;
 };
 
 struct Light {
@@ -37,35 +41,44 @@ struct Light {
     Vec3 specular;
 };
 
-struct Camera {
-    Entity* entity;
-    float yaw;
-    float pitch;
-};
-
 struct Ground {
     Entity* entity; //@Cleanup: This will probably be an ID instead of a pointer later.
     Vec3 dimensions;
 };
 
-extern const int MAX_ENTITIES;
+struct Player {
+    Entity* entity;
+    Vec3 dimensions;
+    Vec3 velocity;
+    bool grounded = false;
+    bool jumped_this_frame = false;
+};
+
 extern Entity entities[];
 extern int entity_count;
 
 extern Ground pool_Ground[];
 extern int count_Ground;
 
+extern Player pool_Player[];
+extern int count_Player;
+
 extern Camera* main_camera;
 extern Light* light;
 
-extern Ground* player;
+extern Player* main_player;
+extern Player* player2;
 
 void reset_scene();
 Matrix get_world_matrix(Entity* entity);
 
 template<typename T>
 T* down_cast(Entity* entity) {
-    return (T*)entity->specific_data;
+    return (T*)entity->type_specific_data;
 }
+
+Ground* create_ground(Vec3 position, float width, float height, float depth);
+
+AABB get_transformed_collider(Entity* entity);
 
 #endif

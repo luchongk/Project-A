@@ -1,6 +1,8 @@
 #ifndef MATH_H
 #define MATH_H
 
+#include "stdio.h"
+
 const float PI = 3.141592741f;
 const float TAU = 6.28318548f;
 
@@ -32,6 +34,22 @@ float normalize_angle(float angle) {
 
 constexpr float to_radians(float degrees) {
     return PI * degrees / 180;
+}
+
+float exp_interpolate(float current, float target, float dt, float snappiness = 10) {
+    auto difference = target - current;
+
+    if(fabs(difference) < 0.001f) {
+        return target;
+    }
+    
+    auto increment = difference * snappiness * dt;
+    // Prevent overshooting
+    if(fabs(increment) - fabs(difference) > 0) {
+        return target;
+    }
+    
+    return current + increment;
 }
 
 #endif

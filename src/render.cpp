@@ -40,7 +40,8 @@ Texture* grid_texture;
 Texture* test_texture;
 
 MaterialBasic  MATERIAL_GROUND;
-MaterialBasic  MATERIAL_GROUND2;
+MaterialBasic  MATERIAL_PLAYER;
+MaterialBasic  MATERIAL_PLAYER2;
 MaterialNoData MATERIAL_LIGHT;
 
 Vec3 background = {0,0.02f,0.08f};
@@ -84,12 +85,14 @@ void init_renderer(OSWindow* window) {
         MATERIAL_GROUND.specular = {1.0f, 1.0f, 1.0f};
         MATERIAL_GROUND.shininess = 32.0f;
 
-        MATERIAL_GROUND2.shader = basic_shader;
-        MATERIAL_GROUND2.pixel_textures[MaterialBasic::_TEXTURE_INDEX] = white_pixel;
-        MATERIAL_GROUND2.ambient  = {0.0f, 0.0f, 0.0f};
-        MATERIAL_GROUND2.diffuse  = {0.0f, 1.0f, 0.0f};
-        MATERIAL_GROUND2.specular = {0.0f, 0.0f, 0.0f};
-        MATERIAL_GROUND2.shininess = 1.0f;
+        MATERIAL_PLAYER.shader = basic_shader;
+        MATERIAL_PLAYER.pixel_textures[MaterialBasic::_TEXTURE_INDEX] = white_pixel;
+        MATERIAL_PLAYER.ambient  = {0.0f, 0.0f, 0.0f};
+        MATERIAL_PLAYER.diffuse  = {0.0f, 1.0f, 0.0f};
+        MATERIAL_PLAYER.specular = {0.0f, 0.0f, 0.0f};
+        MATERIAL_PLAYER.shininess = 1.0f;
+
+        MATERIAL_PLAYER2 = MATERIAL_PLAYER;
 
         MATERIAL_LIGHT.shader = light_shader;
     }

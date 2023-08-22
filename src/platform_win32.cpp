@@ -1,10 +1,12 @@
 #include <iostream>
 #include <cstdio>
+#include "platform.h"
 #include "iostream"
 #include "strings.h"
 #include "graphics.h"
 #include "input.h"
 #include "memory.h"
+#include "timeapi.h"
 
 struct Win32Window {
     OSWindow common;
@@ -387,6 +389,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             e.key.is_repeat = false;
             array_add(&events, e);
             
+            break;
+        }
+
+        case WM_MOUSEWHEEL: {
+            Event e;
+            e.type = EventType::SCROLL;
+            e.scroll.amount = (short)(wParam >> 16) / WHEEL_DELTA;
+            array_add(&events, e);
             break;
         }
 
