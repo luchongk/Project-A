@@ -119,8 +119,8 @@ void main() {
             // This part is not in the video, but I'm testing the idea of not running the simulation until next frame if the remainder is too small.
             // It should make things a bit more robust without having too much impact on the visuals.
             //if(accum > 0.0001f) {
-                simulate(accum);
-                accum = 0;
+              simulate(accum);
+              accum = 0;
             //}
         }
 

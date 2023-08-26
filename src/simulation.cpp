@@ -183,7 +183,7 @@ int static_contacts_count = 0;
 CollisionContact dynamic_contacts[64];
 int dynamic_contacts_count = 0;
 void solve_collisions2() {
-    for(int k = 0; k < 4; k++) {
+    for(int k = 0; k < 10; k++) {
         static_contacts_count = 0;
         dynamic_contacts_count = 0;
         //for(int i = count_Player - 1; i >= 0; i--) {
@@ -221,10 +221,9 @@ void solve_collisions2() {
             auto& player  = contact.player;
             auto& other_entity = contact.other_entity;
             
+            if(contact.penetration < 0.001f) continue;
+
             player->entity->position += Vec3{contact.normal * (contact.penetration / 2 + 0.0001f)};
-            if(contact.normal.y == 1) {
-                player->grounded = true;
-            }
 
             other_entity->position -= Vec3{contact.normal * (contact.penetration / 2 + 0.0001f)};
             auto other_player = (Player*)other_entity->type_specific_data;
@@ -234,6 +233,7 @@ void solve_collisions2() {
                 auto relative_speed_along_normal = dot(relative_velocity, contact.normal);
                 if(relative_speed_along_normal > 0) {
                     player->velocity += Vec3{contact.normal * relative_speed_along_normal};
+                    player->grounded = true;
                 }
             } else if(contact.normal.y == -1) {
                 other_player->grounded = true;
@@ -243,8 +243,11 @@ void solve_collisions2() {
                 }
             }
             else {
-                player->velocity -= Vec3{contact.normal * dot(vec2(player->velocity), contact.normal)};
-                other_player->velocity += Vec3{contact.normal * dot(vec2(other_player->velocity), contact.normal)};
+                float d = dot(vec2(player->velocity), contact.normal);
+                if(d < 0) player->velocity -= Vec3{contact.normal * d};
+
+                d = dot(vec2(other_player->velocity), contact.normal);
+                if(d < 0) other_player->velocity += Vec3{contact.normal * d};
             }
             //printf("Overlapped: contact %d. e1: %p. e2: %p. grounded: %d normal: (%f,%f). penetration: %f \n", i, player->entity, other_entity, player->grounded, contact.normal.x, contact.normal.y, contact.penetration);
         }
