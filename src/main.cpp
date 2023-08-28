@@ -106,8 +106,8 @@ void main() {
             // this is the solution I'm using for now.
             //
             // 2) If we really cared about determinism we could instead use a fixed time-step as before, but instead of using the remainder to run the actual simulation that changes the state of the world, we would run a throwaway simulation
-            // just for knowing where to render the objects and discard those changes after. We would then keep that remainder in the accumulator to be re-simulated in the next frame to keep simulation consistent.
-            // A potential problem that I can think for this solution is that player input for the throwaway will be different from next frame's real simulation input, since input read usally happens after render and before update.
+            // just for knowing where to render the objects and discard those changes after. We would then keep that remainder in the accumulator to be re-simulated in the next frame to keep the simulation consistent.
+            // A potential problem that I can think for this solution is that player input for the throwaway will be different from next frame's real simulation input, since input reading usally happens after render() and before update().
             // There might be some complicated way to correlate inputs to simulation steps but I haven't put much thought into it. At least for pre-recorded input this solution should play the same every time it's run.
 
             accum += my_time.dt * my_time.sim_scale;
@@ -118,10 +118,10 @@ void main() {
 
             // This part is not in the video, but I'm testing the idea of not running the simulation until next frame if the remainder is too small.
             // It should make things a bit more robust without having too much impact on the visuals.
-            //if(accum > 0.0001f) {
-              simulate(accum);
-              accum = 0;
-            //}
+            if(accum > 0.0001f) {
+                simulate(accum);
+                accum = 0;
+            }
         }
 
         update_camera(my_time.dt);

@@ -10,10 +10,16 @@ struct String : ArrayView<u8> {
     }
 };
 
-String from_cstring(char* cstring, int count) {
+String from_cstring(char* cstring, int count = 0) {
     String result;
-    result.count = count;
     result.data = (u8*)cstring;
+    
+    if(count > 0) {
+        result.count = count;
+    }
+    else {
+        result.count = (u32)strlen(cstring);
+    }
 
     return result;
 }

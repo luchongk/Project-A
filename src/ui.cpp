@@ -23,6 +23,7 @@ Array<UIWidget>     ui_elements;
 Array<UIPanel>      ui_panels;
 Array<UIButton>     ui_buttons;
 Array<UISlider>     ui_sliders;
+Array<UIText>       ui_texts;
 Array<UITextField>  ui_text_fields;
 
 UIWidget* ui_hot       = nullptr;
@@ -104,6 +105,18 @@ UISlider* ui_create_slider(Rect rect, String name, float* value = nullptr) {
     return slider;
 }
 
+UIText* ui_create_text(Rect rect, String name, char* text) {
+    UIWidget* widget = ui_create_element(rect, UIWidgetType::TEXT, name);
+    
+    UIText t{};
+    t.widget = widget;
+    auto field  = array_add(&ui_texts, t);
+    field->text = (u8*)text;
+    widget->type_data = field;
+
+    return field;
+}
+
 UITextField* ui_create_text_field(Rect rect, String name) {
     UIWidget* widget = ui_create_element(rect, UIWidgetType::TEXT_FIELD, name);
     
@@ -175,12 +188,16 @@ void ui_init() {
     add_to_panel(panel, button->widget);
 
     rect.y += rect.height;
-    auto field = ui_create_text_field(rect, "FIELD_PEPEGA"_s);
-    add_to_panel(panel, field->widget);
+    auto text = ui_create_text(rect, "TEXT_VELOCITY_0"_s, velocity_strings[0]);
+    add_to_panel(panel, text->widget);
 
-    rect.y += rect.height * 2;
-    field = ui_create_text_field(rect, "FIELD_PEPEGA2"_s);
-    add_to_panel(panel, field->widget);
+    rect.y += rect.height;
+    text = ui_create_text(rect, "TEXT_VELOCITY_1"_s, velocity_strings[1]);
+    add_to_panel(panel, text->widget);
+
+    rect.y += rect.height;
+    text = ui_create_text(rect, "TEXT_VELOCITY_2"_s, velocity_strings[2]);
+    add_to_panel(panel, text->widget);
     
     ui_visible = true;
 }
@@ -434,6 +451,19 @@ static void draw_slider(UIWidget* widget, UIPanel* panel) {
     core_draw_button(button, slider->button_color, slider->button_color, true, pressed);
 }
 
+static void draw_text(UIWidget* widget, UIPanel* panel) {
+    auto text_widget = (UIText*)widget->type_data;
+
+    auto field_rect = relative_to_screen(panel->widget->rect, widget->rect);
+
+    Vec2 origin = {field_rect.x, field_rect.y + field_rect.height};
+    
+    String text;
+    text.data  = text_widget->text;
+    text.count = (u32)strlen((char*)text_widget->text);
+    draw_text(text, origin, field_rect.height, {1,1,1,1});
+}
+
 static void draw_text_field(UIWidget* widget, UIPanel* panel) {
     auto field = (UITextField*)widget->type_data;
 
@@ -479,6 +509,11 @@ static void draw_panel(UIPanel* panel) {
                 break;
             }
 
+            case UIWidgetType::TEXT: {
+                draw_text(child, panel);
+                break;
+            }
+            
             case UIWidgetType::TEXT_FIELD: {
                 draw_text_field(child, panel);
                 break;

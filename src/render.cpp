@@ -5,6 +5,8 @@
 #include "ui.h"
 #include "simple_draw.h"
 
+char velocity_strings[3][128];
+
 struct GlobalUniforms {
     Matrix projection;
 };
@@ -234,7 +236,12 @@ void render(OSWindow* window) {
     set_primitive_type(GraphicsPrimitiveType::TRIANGLE);
 #endif
 
-    if(ui_visible) ui_render();
+    if(ui_visible) {
+        for(int i = 0; i < count_Player; i++) {
+            sprintf(velocity_strings[i], "Pos %d: (%f,%f,%f)", i, pool_Player[i].entity->position.x, pool_Player[i].entity->position.y, pool_Player[i].entity->position.z);
+        }
+        ui_render();
+    }
 
     swap_buffers();
 }

@@ -78,7 +78,7 @@ void simulate(float dt) {
     for(int i = 0; i < count_Player; i++) {
         auto player = &pool_Player[i];
         auto move = i == 0 ? input.move : Vec3{-1,0,0};
-        auto my_grounded_speed = grounded_speed;
+        auto my_grounded_speed = grounded_speed;//i == 0 ? grounded_speed : 2 * grounded_speed;
 
         if(player->entity->position.y < -50) {
             player->velocity = {};
@@ -127,142 +127,123 @@ void simulate(float dt) {
         pool_Player[i].grounded = false;
     }
 
-    void solve_collisions2();
-    solve_collisions2();
-}
+    void solve_collisions3();
+    solve_collisions3();
 
-void solve_collisions1() {
-    for(int k = 0; k < 1; k++) {
-        //for(int i = count_Player - 1; i >= 0; i--) {
-        for(int i = 0; i < count_Player; i++) {
-            auto player = &pool_Player[i];
-            auto mat = (MaterialBasic*)player->entity->material;
-
-            for(int j = entity_count - 1; j >= 0; j--) {
-                auto other_entity = &entities[j];
-                if(other_entity == player->entity) continue;
-                //if(other_entity == pool_Player[])
-                if(other_entity->collider.shape == ColliderShape::NONE) continue;
-
-                AABB player_aabb = get_transformed_collider(player->entity);
-                AABB other_aabb  = get_transformed_collider(other_entity);
-                CollisionContact contact;
-                bool overlap = collide_aabb_aabb(&player_aabb, &other_aabb, &contact);
-
-                if(overlap) {
-                    auto was_grounded = player->grounded;
-                    player->entity->position += Vec3{contact.normal * (contact.penetration + 0.0001f)};
-                    if(contact.normal.y == 1) {
-                        player->grounded = true;
-                    }
-
-                    if(other_entity->type == EntityType::Player) {
-                        auto other_player = (Player*)other_entity->type_specific_data;
-                        if(contact.normal.y == 1) {
-                            auto relative_velocity = vec2(other_player->velocity - player->velocity);
-                            auto relative_speed_along_normal = dot(relative_velocity, contact.normal);
-                            if(relative_speed_along_normal > 0) {
-                                player->velocity += Vec3{contact.normal * relative_speed_along_normal};
-                            }
-                        } else {
-                            player->velocity -= Vec3{contact.normal * dot(vec2(player->velocity), contact.normal)};
-                        }
-                    }
-                    else {
-                        player->velocity -= Vec3{contact.normal * dot(vec2(player->velocity), contact.normal)};
-                    }
-                    printf("Overlapped: player %d. grounded: %d normal: (%f,%f). penetration: %f \n", i, player->grounded, contact.normal.x, contact.normal.y, contact.penetration);
-                }
-            }
+    /*for(int i = 0; i < count_Player; i++) {
+        if(pool_Player[0].velocity.y != 0) {
+            printf("%f\n", pool_Player[0].velocity.y);
         }
-    }
+    }*/
 }
 
 CollisionContact static_contacts[64];
 int static_contacts_count = 0;
 CollisionContact dynamic_contacts[64];
 int dynamic_contacts_count = 0;
-void solve_collisions2() {
-    for(int k = 0; k < 10; k++) {
-        static_contacts_count = 0;
-        dynamic_contacts_count = 0;
-        //for(int i = count_Player - 1; i >= 0; i--) {
-        for(int i = 0; i < entity_count; i++) {
-            if(entities[i].type != EntityType::Player) continue;
-            
-            Player* player = nullptr;
-            for(int s = 0; s < count_Player; s++) {
-                if(pool_Player[s].entity == &entities[i]) {
-                    player = &pool_Player[s];
-                    break;
-                }
-            }
 
-            for(int j = entity_count - 1; j > i; j--) {
-                auto other_entity = &entities[j];
-                if(other_entity == player->entity) continue;
-                if(other_entity->collider.shape == ColliderShape::NONE) continue;
-
-                AABB player_aabb = get_transformed_collider(player->entity);
-                AABB other_aabb  = get_transformed_collider(other_entity);
-                CollisionContact* contacts = other_entity->type == EntityType::Player ? dynamic_contacts : static_contacts;
-                int* contacts_count = other_entity->type == EntityType::Player ? &dynamic_contacts_count : &static_contacts_count;
-                bool overlap = collide_aabb_aabb(&player_aabb, &other_aabb, &contacts[*contacts_count]);
-                if(overlap) {
-                    contacts[*contacts_count].player = player;
-                    contacts[*contacts_count].other_entity = other_entity;
-                    (*contacts_count)++;
-                }
+void solve_collisions3() {
+    static_contacts_count = 0;
+    dynamic_contacts_count = 0;
+    //for(int i = count_Player - 1; i >= 0; i--) {
+    for(int i = 0; i < entity_count; i++) {
+        if(entities[i].type != EntityType::Player) continue;
+        
+        Player* player = nullptr;
+        for(int s = 0; s < count_Player; s++) {
+            if(pool_Player[s].entity == &entities[i]) {
+                player = &pool_Player[s];
+                break;
             }
         }
 
+        for(int j = entity_count - 1; j > i; j--) {
+            auto other_entity = &entities[j];
+            if(other_entity == player->entity) continue;
+            if(other_entity->collider.shape == ColliderShape::NONE) continue;
+
+            AABB player_aabb = get_transformed_collider(player->entity);
+            AABB other_aabb  = get_transformed_collider(other_entity);
+            CollisionContact* contacts = other_entity->type == EntityType::Player ? dynamic_contacts : static_contacts;
+            int* contacts_count = other_entity->type == EntityType::Player ? &dynamic_contacts_count : &static_contacts_count;
+            bool overlap = collide_aabb_aabb(&player_aabb, &other_aabb, &contacts[*contacts_count]);
+            if(overlap) {
+                contacts[*contacts_count].player = player;
+                contacts[*contacts_count].other_entity = other_entity;
+                (*contacts_count)++;
+            }
+        }
+    }
+
+    for(int k = 0; k < 10; k++) {
         for(int i = 0; i < dynamic_contacts_count; i++) {
             auto& contact = dynamic_contacts[i];
             auto& player  = contact.player;
             auto& other_entity = contact.other_entity;
             
-            if(contact.penetration < 0.001f) continue;
-
-            player->entity->position += Vec3{contact.normal * (contact.penetration / 2 + 0.0001f)};
-
-            other_entity->position -= Vec3{contact.normal * (contact.penetration / 2 + 0.0001f)};
-            auto other_player = (Player*)other_entity->type_specific_data;
-            auto relative_velocity = vec2(other_player->velocity - player->velocity);
-            
-            if(contact.normal.y == 1) {
-                auto relative_speed_along_normal = dot(relative_velocity, contact.normal);
-                if(relative_speed_along_normal > 0) {
-                    player->velocity += Vec3{contact.normal * relative_speed_along_normal};
-                    player->grounded = true;
-                }
-            } else if(contact.normal.y == -1) {
-                other_player->grounded = true;
-                auto relative_speed_along_normal = dot(relative_velocity, contact.normal);
-                if(relative_speed_along_normal > 0) {
-                    other_player->velocity -= Vec3{contact.normal * relative_speed_along_normal};
-                }
+            AABB player_aabb = get_transformed_collider(player->entity);
+            AABB other_aabb  = get_transformed_collider(other_entity);
+            bool overlap = collide_aabb_aabb(&player_aabb, &other_aabb, &contact);
+            //printf("\n", player_aabb.min, player_aabb.max, other_aabb.min, other_aabb.max, contact.penetration);
+            if(overlap) {
+                player->entity->position += Vec3{contact.normal * (contact.penetration / 2)};
+                other_entity->position   -= Vec3{contact.normal * (contact.penetration / 2)};
             }
-            else {
-                float d = dot(vec2(player->velocity), contact.normal);
-                if(d < 0) player->velocity -= Vec3{contact.normal * d};
-
-                d = dot(vec2(other_player->velocity), contact.normal);
-                if(d < 0) other_player->velocity += Vec3{contact.normal * d};
-            }
-            //printf("Overlapped: contact %d. e1: %p. e2: %p. grounded: %d normal: (%f,%f). penetration: %f \n", i, player->entity, other_entity, player->grounded, contact.normal.x, contact.normal.y, contact.penetration);
         }
 
         for(int i = 0; i < static_contacts_count; i++) {
             auto& contact = static_contacts[i];
             auto& player  = contact.player;
 
-            player->entity->position += Vec3{contact.normal * (contact.penetration / 2 + 0.0001f)};
-            if(contact.normal.y == 1) {
+            AABB player_aabb = get_transformed_collider(player->entity);
+            AABB other_aabb = get_transformed_collider(contact.other_entity);
+            bool overlap = collide_aabb_aabb(&player_aabb, &other_aabb, &contact);
+            if(overlap) {
+                player->entity->position += Vec3{contact.normal * contact.penetration};
+            }
+        }
+    }
+
+    for(int i = 0; i < dynamic_contacts_count; i++) {
+        auto& contact = dynamic_contacts[i];
+        auto& player  = contact.player;
+        auto& other_entity = contact.other_entity;
+
+        auto other_player = (Player*)other_entity->type_specific_data;
+        auto relative_velocity = vec2(other_player->velocity - player->velocity);
+        
+        if(contact.normal.y == 1) {
+            auto relative_speed_along_normal = dot(relative_velocity, contact.normal);
+            if(relative_speed_along_normal > 0) {
+                player->velocity += Vec3{contact.normal * relative_speed_along_normal};
                 player->grounded = true;
             }
-
-            player->velocity -= Vec3{contact.normal * dot(vec2(player->velocity), contact.normal)};
-            //printf("Overlapped: contact %d. e1: %p. e2: STATIC. grounded: %d normal: (%f,%f). penetration: %f \n", i, player->entity, player->grounded, contact.normal.x, contact.normal.y, contact.penetration);
+        } else if(contact.normal.y == -1) {
+            other_player->grounded = true;
+            auto relative_speed_along_normal = dot(relative_velocity, contact.normal);
+            if(relative_speed_along_normal > 0) {
+                other_player->velocity -= Vec3{contact.normal * relative_speed_along_normal};
+            }
         }
+        else {
+            float d = dot(vec2(player->velocity), contact.normal);
+            if(d < 0) player->velocity -= Vec3{contact.normal * d};
+
+            d = dot(vec2(other_player->velocity), contact.normal);
+            if(d > 0) other_player->velocity -= Vec3{contact.normal * d};
+        }
+        //printf("Overlapped: contact %d. e1: %p. e2: %p. grounded: %d normal: (%f,%f). penetration: %f \n", i, player->entity, other_entity, player->grounded, contact.normal.x, contact.normal.y, contact.penetration);
+    }
+
+    for(int i = 0; i < static_contacts_count; i++) {
+        auto& contact = static_contacts[i];
+        auto& player  = contact.player;
+
+        if(contact.normal.y == 1) {
+            player->grounded = true;
+        }
+
+        player->velocity -= Vec3{contact.normal * dot(vec2(player->velocity), contact.normal)};
+        //printf("Overlapped: contact %d. e1: %p. e2: STATIC. grounded: %d normal: (%f,%f). penetration: %f \n", i, player->entity, player->grounded, contact.normal.x, contact.normal.y, contact.penetration);
     }
 }

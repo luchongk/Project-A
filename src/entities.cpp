@@ -84,7 +84,7 @@ void reset_scene() {
     light->specular = {1.0f, 1.0f, 1.0f};
     light->entity->type_specific_data = &light;
 
-    main_player = create_player({0, 1.0f, 0}, 1, 2, 1);
+    main_player = create_player({0, 0.5f, 0}, 1, 2, 1);
 
     player2 = create_player({0, 5.0f, 0}, 1, 2, 1);
     player2->entity->material = &MATERIAL_PLAYER2;

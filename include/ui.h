@@ -10,6 +10,7 @@ enum class UIWidgetType {
     PANEL,
     BUTTON,
     SLIDER,
+    TEXT,
     TEXT_FIELD,
 };
 
@@ -86,6 +87,11 @@ struct UISlider {
     float target_value;
 };
 
+struct UIText {
+    UIWidget* widget;
+    u8* text;
+};
+
 struct UITextField {
     UIWidget* widget;
     char value[64];
@@ -109,6 +115,7 @@ extern Array<UIPanel>     ui_panels;
 extern Array<UIButton>    ui_buttons;
 extern Array<UISlider>    ui_sliders;
 extern Array<UITextField> ui_text_fields;
+extern Array<UIText>      ui_texts;
 extern UIWidget* ui_hot;
 extern UIPanel*  ui_hot_panel;
 extern UIAction  ui_current_action;
