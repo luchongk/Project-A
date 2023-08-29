@@ -91,6 +91,9 @@ void reset_scene() {
 
     auto player3 = create_player({2, 5.0f, 0}, 1, 2, 1);
     player3->entity->material = &MATERIAL_PLAYER2;
+    
+    player3 = create_player({1.5, 5.0f, 0}, 1, 2, 1);
+    player3->entity->material = &MATERIAL_PLAYER2;
 
     create_ground({0, -0.5f, 0}, 20, 1, 3);
     create_ground({0, 15.0f, 0}, 20, 1, 3);

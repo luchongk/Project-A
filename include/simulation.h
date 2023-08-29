@@ -5,6 +5,7 @@
 extern float cubes_rotation;
 extern bool paused;
 extern bool character_selected;
+char velocity_strings[64][128];
 
 void simulate(float dt);
 

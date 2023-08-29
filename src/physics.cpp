@@ -3,16 +3,16 @@
 
 bool collide_aabb_aabb(AABB* a, AABB* b, CollisionContact* contact) {
     float penetration_x_left = b->max.x - a->min.x;
-    if(penetration_x_left < 0) return false;
+    if(penetration_x_left <= 0) return false;
 
     float penetration_x_right = a->max.x - b->min.x;
-    if(penetration_x_right < 0) return false;
+    if(penetration_x_right <= 0) return false;
 
     float penetration_y_down = b->max.y - a->min.y;
-    if(penetration_y_down < 0) return false;
+    if(penetration_y_down <= 0) return false;
 
     float penetration_y_up = a->max.y - b->min.y;
-    if(penetration_y_up < 0) return false;
+    if(penetration_y_up <= 0) return false;
 
     float penetration_x = min(penetration_x_left, penetration_x_right);
     float penetration_y = min(penetration_y_down, penetration_y_up);

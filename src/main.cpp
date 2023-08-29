@@ -38,6 +38,8 @@ static void update_time() {
     my_time.last_frame_stamp = now;
 }
 
+float elapsed_max = 0;
+
 void main() {
     init_arena(&temporary_storage, megabytes(1), malloc(megabytes(1)));
 
@@ -111,6 +113,7 @@ void main() {
             // There might be some complicated way to correlate inputs to simulation steps but I haven't put much thought into it. At least for pre-recorded input this solution should play the same every time it's run.
 
             accum += my_time.dt * my_time.sim_scale;
+            auto t = os_get_timestamp();
             while(accum >= sim_dt) {
                 simulate(sim_dt);
                 accum -= sim_dt;
@@ -122,6 +125,10 @@ void main() {
                 simulate(accum);
                 accum = 0;
             }
+            
+            auto elapsed = os_elapsed_time(t, os_get_timestamp());
+            elapsed_max = max(elapsed_max, elapsed);
+            printf("%f\n", elapsed);
         }
 
         update_camera(my_time.dt);
