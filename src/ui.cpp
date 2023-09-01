@@ -51,9 +51,11 @@ static void ui_end_action() {
 
 void ui_reset() {
     array_reset(&ui_elements);
-    array_reset(&ui_buttons);
     array_reset(&ui_panels);
+    array_reset(&ui_buttons);
     array_reset(&ui_sliders);
+    array_reset(&ui_text_fields);
+    array_reset(&ui_texts);
 
     ui_init();
 }
@@ -143,7 +145,12 @@ static bool on_click_resume(UIWidget* widget, EventKey* event) {
 }
 
 void ui_init() {
-    array_reserve(&ui_elements, 64);
+    array_reserve(&ui_elements,    128);
+    array_reserve(&ui_panels,      16);
+    array_reserve(&ui_buttons,     16);
+    array_reserve(&ui_sliders,     16);
+    array_reserve(&ui_text_fields, 16);
+    array_reserve(&ui_texts,       16);
     ui_end_action();
 
     Rect rect = {0.01f, 0.01f, 0.2f, 0.4f};
@@ -301,15 +308,13 @@ bool ui_handle_key_event(EventKey* event) {
     if(!ui_visible || !ui_focused) return false;
 
     auto widget = ui_focused;
-
     switch(widget->type) {
         case UIWidgetType::TEXT_FIELD: {
             auto field = (UITextField*)widget->type_data;
             auto keycode = event->keycode;
-            
             if(event->pressed) {
-                if(keycode == VK_BACK) {
-                    if(field->count > 0) field->count--;
+                if(keycode == VK_BACK && field->count > 0) {
+                    field->count--;
                 }
             }
 
@@ -324,11 +329,9 @@ bool ui_handle_text_event(EventText* event) {
     if(!ui_focused) return false;
 
     auto widget = ui_focused;
-
     switch(widget->type) {
         case UIWidgetType::TEXT_FIELD: {
             auto field = (UITextField*)widget->type_data;
-
             if(field->count < 64) {
                 field->value[field->count++] = event->character;
             }

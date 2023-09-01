@@ -49,8 +49,10 @@ struct Ground {
 struct Player {
     Entity* entity;
     Vec3 dimensions;
+    Vec3 move;
     Vec3 velocity;
     bool grounded = false;
+    bool was_grounded = false;
     bool jumped_this_frame = false;
 };
 

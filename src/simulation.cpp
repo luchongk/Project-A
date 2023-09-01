@@ -66,7 +66,7 @@ float zoom_snappiness = 10.0f;
 
 // Player movement
 const Vec3 g_acceleration = {0, 3 * -9.8f, 0};
-float grounded_speed = 3;
+float grounded_speed = 5;
 float jump_speed = 12;
 
 static void update_camera(float dt) {
@@ -129,8 +129,7 @@ void simulate(float dt) {
     // Calculate movement
     for(int i = 0; i < count_Player; i++) {
         auto player = &pool_Player[i];
-        auto move = i == 0 ? input.move : Vec3{-1,0,0};
-        auto my_grounded_speed = grounded_speed;
+        player->move = i == 0 ? input.move : Vec3{-1,0,0};
 
         if(player->entity->position.y < -50) {
             player->velocity = {};
@@ -148,21 +147,19 @@ void simulate(float dt) {
         // Update impulses before integration, since the input we are currently processing actually happened last frame.
 
         //if(character_selected) {
-            if(move.y == 1 && player->grounded) {
-                player->velocity.y += 15;
-                player->grounded = false;
-            }
-
+            player->jumped_this_frame = false;
+            auto normalized_move = normalize(Vec3{player->move.x, 0, -player->move.z});
             if(player->grounded) {
-                player->velocity.x = 0;
-                player->velocity.z = 0;
+                if(player->move.y == 1) {
+                    if(player->velocity.y < jump_speed) player->velocity.y = jump_speed;
+                    player->jumped_this_frame = true;
+                }
+                else {
+                    player->velocity.x = grounded_speed * normalized_move.x;
+                    player->velocity.z = grounded_speed * normalized_move.z;
+                }
             }
-
-            auto normalized_move = normalize(Vec3{move.x, 0, -move.z});
-            if(player->grounded) {
-                player->velocity.x = my_grounded_speed * normalized_move.x;
-                player->velocity.z = my_grounded_speed * normalized_move.z;
-            } else {
+            else {
                 player->velocity.x += 5 * normalized_move.x * dt;
                 player->velocity.z += 5 * normalized_move.z * dt;
             }
@@ -176,11 +173,12 @@ void simulate(float dt) {
     }
 
     for(int i = 0; i < count_Player; i++) {
+        pool_Player[i].was_grounded = pool_Player[i].grounded;
         pool_Player[i].grounded = false;
     }
 
-    void solve_collisions3();
-    solve_collisions3();
+    void solve_collisions3(float dt);
+    solve_collisions3(dt);
 }
 
 CollisionContact static_contacts[64];
@@ -238,7 +236,7 @@ void find_new_contacts(Player* player) {
     }
 }
 
-void solve_collisions3() {
+void solve_collisions3(float dt) {
     static_contacts_count = 0;
     dynamic_contacts_count = 0;
     //for(int i = count_Player - 1; i >= 0; i--) {
@@ -290,6 +288,14 @@ void solve_collisions3() {
                 player->entity->position += Vec3{contact.normal * (contact.penetration / 2)};
                 other_entity->position   -= Vec3{contact.normal * (contact.penetration / 2)};
 
+                auto other_player = (Player*)other_entity->type_specific_data;
+                if(contact.normal.y == 1 && !player->jumped_this_frame) {
+                    player->grounded = true;
+                }
+                else if(contact.normal.y == -1 && !player->jumped_this_frame) {
+                    other_player->grounded = true;
+                }
+
 #if DEBUG_PHYSICS
                 printf("===CHANGE===\n");
                 printf("%f\n", player->entity->position.x);
@@ -298,7 +304,7 @@ void solve_collisions3() {
 #endif
 
                 find_new_contacts(player);
-                find_new_contacts((Player*)other_entity->type_specific_data);
+                find_new_contacts(other_player);
             }
         }
 
@@ -314,6 +320,10 @@ void solve_collisions3() {
             bool overlap = collide_aabb_aabb(&player_aabb, &other_aabb, &contact);
             if(overlap) {
                 player->entity->position += Vec3{contact.normal * contact.penetration};
+
+                if(contact.normal.y == 1 && !player->jumped_this_frame) {
+                    player->grounded = true;
+                }
 
 #if DEBUG_PHYSICS
                 printf("===CHANGE===\n");
@@ -335,46 +345,35 @@ void solve_collisions3() {
     printf("===\n");
 #endif
 
-    for(int i = 0; i < dynamic_contacts_count; i++) {
-        auto& contact = dynamic_contacts[i];
-        auto player  = contact.player;
-        auto other_entity = contact.other_entity;
-
-        auto other_player = (Player*)other_entity->type_specific_data;
-        auto relative_velocity = vec2(other_player->velocity - player->velocity);
-        
-        if(contact.normal.y == 1) {
+    for(int k = 0; k < 10; k++) {
+        for(int i = 0; i < dynamic_contacts_count; i++) {
+            auto& contact = dynamic_contacts[i];
+            auto player  = contact.player;
+            auto other_player = (Player*)contact.other_entity->type_specific_data;
+            
+            auto relative_velocity = vec2(player->velocity - other_player->velocity);
             auto relative_speed_along_normal = dot(relative_velocity, contact.normal);
-            if(relative_speed_along_normal > 0) {
-                player->velocity += Vec3{contact.normal * relative_speed_along_normal};
-                player->grounded = true;
-            }
-        } else if(contact.normal.y == -1) {
-            other_player->grounded = true;
-            auto relative_speed_along_normal = dot(relative_velocity, contact.normal);
-            if(relative_speed_along_normal > 0) {
-                other_player->velocity -= Vec3{contact.normal * relative_speed_along_normal};
-            }
-        }
-        else {
-            float d = dot(vec2(player->velocity), contact.normal);
-            if(d < 0) player->velocity -= Vec3{contact.normal * d};
+            auto relative_velocity_along_normal = Vec3{contact.normal * relative_speed_along_normal};
 
-            d = dot(vec2(other_player->velocity), contact.normal);
-            if(d > 0) other_player->velocity -= Vec3{contact.normal * d};
+            if(relative_speed_along_normal < 0) {
+                if(contact.normal.y != -1) {
+                    player->velocity -= relative_velocity_along_normal;
+                }
+                if(contact.normal.y != 1) {
+                    other_player->velocity += relative_velocity_along_normal;
+                }
+            }            
         }
-        //printf("Overlapped: contact %d. e1: %p. e2: %p. grounded: %d normal: (%f,%f). penetration: %f \n", i, player->entity, other_entity, player->grounded, contact.normal.x, contact.normal.y, contact.penetration);
+
+        for(int i = 0; i < static_contacts_count; i++) {
+            auto& contact = static_contacts[i];
+            auto player  = contact.player;
+
+            float speed_along_normal = dot(vec2(player->velocity), contact.normal);
+            if(speed_along_normal < 0) player->velocity -= Vec3{contact.normal * speed_along_normal};
+            //printf("Overlapped: contact %d. e1: %p. e2: STATIC. grounded: %d normal: (%f,%f). penetration: %f \n", i, player->entity, player->grounded, contact.normal.x, contact.normal.y, contact.penetration);
+        }
     }
 
-    for(int i = 0; i < static_contacts_count; i++) {
-        auto& contact = static_contacts[i];
-        auto player  = contact.player;
-
-        if(contact.normal.y == 1) {
-            player->grounded = true;
-        }
-
-        player->velocity -= Vec3{contact.normal * dot(vec2(player->velocity), contact.normal)};
-        //printf("Overlapped: contact %d. e1: %p. e2: STATIC. grounded: %d normal: (%f,%f). penetration: %f \n", i, player->entity, player->grounded, contact.normal.x, contact.normal.y, contact.penetration);
-    }
+    //printf("%f %f\n", pool_Player[0].velocity.x, dt);
 }

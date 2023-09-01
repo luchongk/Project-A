@@ -38,8 +38,6 @@ static void update_time() {
     my_time.last_frame_stamp = now;
 }
 
-float elapsed_max = 0;
-
 void main() {
     init_arena(&temporary_storage, megabytes(1), malloc(megabytes(1)));
 
@@ -75,19 +73,11 @@ void main() {
         auto sim_dt = my_time.simulation_dt;
         if(paused) {
             if(do_step) {
-                for(int i = 0; i < count_Player; i++) {
-                    auto mat = (MaterialBasic*)pool_Player[i].entity->material;
-                    mat->diffuse = Vec3{0,1,0};
-                }
-                do_step = false;
                 simulate(sim_dt);
+                do_step = false;
             }
         }
         else {
-            for(int i = 0; i < count_Player; i++) {
-                auto mat = (MaterialBasic*)pool_Player[i].entity->material;
-                mat->diffuse = Vec3{0,1,0};
-            }
             // @Journey 07/05/2023: After struggling with this topic for a few years I think I finally got a good understanding of it.
             // The basics of the problem are described here: https://gafferongames.com/post/fix_your_timestep . (Come back after reading that)
             // It describes the problem well but the solution the article arrives to is not a good one in my opinion.
@@ -125,10 +115,6 @@ void main() {
                 simulate(accum);
                 accum = 0;
             }
-            
-            auto elapsed = os_elapsed_time(t, os_get_timestamp());
-            elapsed_max = max(elapsed_max, elapsed);
-            printf("%f\n", elapsed);
         }
 
         update_camera(my_time.dt);
