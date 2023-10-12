@@ -1,5 +1,3 @@
-Texture2D _texture2;
-
 cbuffer per_frame : register(b1) {
     float3 view_pos : packoffset(c4);
     struct Light {

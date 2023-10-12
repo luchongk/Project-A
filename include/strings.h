@@ -4,11 +4,7 @@
 #include "array.h"
 #include "maths.h"
 
-struct String : ArrayView<u8> {
-    u8& operator[](int i) {
-        return this->data[i];
-    }
-};
+struct String : ArrayView<u8> {};
 
 String from_cstring(char* cstring, int count = 0) {
     String result;
@@ -38,7 +34,6 @@ String new_string(int count) {
     String result;
     result.count = count;
     result.data = bytes;
-
     return result;
 }
 
@@ -49,22 +44,16 @@ String operator ""_s(const char* str, size_t size) {
 bool equals(String a, String b) {
     if(a.count != b.count) return false;
 
-    return strncmp((const char*)a.data, (const char*)b.data, a.count) == 0;
-}
-
-int compare(String a, String b) {
-    if(a.count < b.count) return -1;
-    if(a.count > b.count) return 1;
-
-    if(a.count == 0) return 0;
+    for(uint i = 0; i < a.count; i++) {
+        if(a[i] != b[i]) return false;
+    }
     
-    s64 length = min(a.count, b.count);
-    return strncmp((const char*)a.data, (const char*)b.data, length);
+    return true;
 }
 
 String advance(String s, uint amount) {
     amount = min(amount, s.count);
-    s.data += amount;
+    s.data  += amount;
     s.count -= amount;
 
     return s;
@@ -72,7 +61,7 @@ String advance(String s, uint amount) {
 
 String eat_until(u8 until, String* context) {
     String result;
-    result.data = context->data;
+    result.data  = context->data;
     result.count = 0;
 
     For(*context) {
@@ -80,7 +69,7 @@ String eat_until(u8 until, String* context) {
         result.count++;
     }
 
-    context->data += result.count;
+    context->data  += result.count;
     context->count -= result.count;
 
     return result;
@@ -99,21 +88,28 @@ String eat_line(String* s) {
 }
 
 String find_from_left(String to_find, String context) {
+    assert(to_find.count > 0);
+
     String result;
+    if(to_find.count > context.count) return result;
 
-    uint bytes_left = context.count;
-    For(context) {
-        if(memcmp(it, to_find.data, min(bytes_left, to_find.count)) == 0) {
-            result.data = it;
-            result.count = bytes_left;
+    for(uint i = 0; i < context.count - to_find.count + 1; i++) {
+        if(context[i] == to_find[0]) {
+            bool equal = true;
+            for(uint j = 1; j < to_find.count; j++) {
+                if(context[i+j] != to_find[j]) {
+                    equal = false;
+                    break;
+                }
+            }
 
-            return result;
+            if(equal) {
+                result.data  = &context[i];
+                result.count = context.count - i + 1;
+                return result;
+            }
         }
-        bytes_left--;
     }
-
-    result.data = nullptr;
-    result.count = 0;
 
     return result;
 }

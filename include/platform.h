@@ -16,8 +16,10 @@ struct OSWindow {
     //@Cleanup make this integer vectors and remove all the unnecessary casting everywhere
     Vec2 position;
     Vec2 size;
+    Vec2 saved_windowed_size;   //Only valid when in fullscreen
     
-    //@Cleanup These should probably be state flags
+    //@Cleanup These should flags
+    bool minimized;
     bool focused;
     bool fullscreen;
 };

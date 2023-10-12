@@ -37,7 +37,7 @@ $ignored_warnings = "4100", "4127", "4201", "4458", "4706", "4505", "4459" , "47
 $exec_folder = if($release) { "bin\Release" } else { "bin\Debug" }
 
 $compile_exe_opts = 
-	"-nologo", 
+	#"-nologo", 
 	"-std:c++20",
 	"-Zi", 
 	"-Zc:offsetof-", 
@@ -46,7 +46,13 @@ $compile_exe_opts =
 #	"-WX",
 	"-W4" +
 	($ignored_warnings | % { "-wd$_" }) +
-	$(if($release) { "-MT", "-O2" } else { "-MTd", "-Od" }) +
+	$(if($release) {
+		"-MT",
+		"-O2"
+	} else {
+		"-MTd",
+		"-Od"
+	}) +
     "-GR-" +
 	($includes | % { "-I$_" }) +
 	"-Fo$exec_folder\",

@@ -39,7 +39,7 @@ static void update_time() {
 }
 
 void main() {
-    init_arena(&temporary_storage, megabytes(1), malloc(megabytes(1)));
+    init_arena(&temporary_storage, megabytes(64));
 
     my_time.start_stamp = os_get_timestamp();
     my_time.simulation_dt = 1.0f/144;
@@ -49,8 +49,8 @@ void main() {
     float accum = 0;
 
     window = os_create_window(1600, 800, "PepegaClap"_s);
-    os_set_fullscreen(window, true);
-    
+    //os_set_fullscreen(window, true);
+
     reset_scene();
     
     init_renderer(window);
@@ -58,8 +58,6 @@ void main() {
     wait_for_vblank();
 
     while(true) {
-        reset_arena(&temporary_storage);
-
         update_time();
 
         //u64 before = os_get_timestamp();
@@ -103,7 +101,6 @@ void main() {
             // There might be some complicated way to correlate inputs to simulation steps but I haven't put much thought into it. At least for pre-recorded input this solution should play the same every time it's run.
 
             accum += my_time.dt * my_time.sim_scale;
-            auto t = os_get_timestamp();
             while(accum >= sim_dt) {
                 simulate(sim_dt);
                 accum -= sim_dt;
@@ -127,6 +124,8 @@ void main() {
         }*/
 
         wait_for_vblank();
+
+        reset_arena(&temporary_storage);
 
 #if 0
     printf_s("last frame: %f ms\n", my_time.dt * 1000);

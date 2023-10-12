@@ -22,23 +22,23 @@ Light* light;
 Player* main_player;
 Player* player2;
 
-Entity* create_entity(Vec3 position, float scale, Mesh* mesh, Material* material) {
+Entity* create_entity(Vec3 position, float scale, Model* model, Material* material) {
     Entity* e = &entities[entity_count++];
     e->type        = EntityType::UNINITIALIZED;
     e->scale       = scale;
     e->orientation = Matrix::ident;
     e->position    = position;
-    e->mesh        = mesh;
+    e->model       = model;
     e->material    = material;
 
     return e;
 }
 
-inline void* create_entity_of_type(EntityType type, u8* pool, int* count, int size, Vec3 position, float scale, Mesh* mesh, Material* material) {
+inline void* create_entity_of_type(EntityType type, u8* pool, int* count, int size, Vec3 position, float scale, Model* model, Material* material) {
     void* specific = pool + size * (*count);
     (*count)++;
     
-    auto e = create_entity(position, scale, mesh, material);
+    auto e = create_entity(position, scale, model, material);
     e->type = type;
     e->type_specific_data = specific;
     
@@ -47,7 +47,7 @@ inline void* create_entity_of_type(EntityType type, u8* pool, int* count, int si
 }
 
 Ground* create_ground(Vec3 position, float width, float height, float depth) {
-    auto ground = CREATE_ENTITY(Ground, position, 1, &cube_mesh, &MATERIAL_GROUND);
+    auto ground = CREATE_ENTITY(Ground, position, 1, &model_cube, &MATERIAL_GROUND);
     ground->dimensions = Vec3{width, height, depth};
     ground->entity->collider.shape = ColliderShape::BOX;
     ground->entity->collider.box.min = -vec2(ground->dimensions) / 2;
@@ -55,12 +55,13 @@ Ground* create_ground(Vec3 position, float width, float height, float depth) {
     return ground;
 }
 
-Player* create_player(Vec3 position, float width, float height, float depth) {
-    auto player = CREATE_ENTITY(Player, position, 1, &cube_mesh, &MATERIAL_PLAYER);
-    player->dimensions = Vec3{width, height, depth};
+Player* create_player(Vec3 position, float width, float height, float depth, Model* model = &model_male) {
+    auto player = CREATE_ENTITY(Player, position, 1, model, &MATERIAL_PLAYER);
+    player->dimensions = Vec3{1, 1, 1}; //@Cleanup: Not being used
     player->entity->collider.shape = ColliderShape::BOX;
-    player->entity->collider.box.min = -vec2(player->dimensions) / 2;
-    player->entity->collider.box.max = vec2(player->dimensions) / 2;
+    player->entity->collider.box.min = -Vec2{width, height} / 2;
+    player->entity->collider.box.max = Vec2{width, height} / 2;
+    player->velocity = {};
     return player;
 }
 
@@ -78,21 +79,21 @@ void reset_scene() {
     main_camera->pitch = to_radians(-25);
     main_camera->entity->type_specific_data = &main_camera;
 
-    light = CREATE_ENTITY(Light, (Vec3{-2, 3, 3}), 0.1f, &cube_mesh, &MATERIAL_LIGHT);
+    light = CREATE_ENTITY(Light, (Vec3{-2, 3, 3}), 0.1f, &model_cube, &MATERIAL_LIGHT);
     light->ambient  = {0.0005f, 0.0005f, 0.0005f};
     light->diffuse  = {1.0f, 1.0f, 1.0f};
     light->specular = {1.0f, 1.0f, 1.0f};
     light->entity->type_specific_data = &light;
 
-    main_player = create_player({0, 0.5f, 0}, 1, 2, 1);
+    main_player = create_player({0, 0.5f, 0}, 0.65f, 1.8f, 1);
 
-    player2 = create_player({0, 5.0f, 0}, 1, 2, 1);
+    player2 = create_player({-2, 5.0f, 0}, 0.65f, 1.7f, 1, &model_female);
     player2->entity->material = &MATERIAL_PLAYER2;
 
-    auto player3 = create_player({2, 5.0f, 0}, 1, 2, 1);
+    auto player3 = create_player({0, 5.0f, 0}, 0.65f, 1.7f, 1, &model_female);
     player3->entity->material = &MATERIAL_PLAYER2;
     
-    player3 = create_player({1.5, 5.0f, 0}, 1, 2, 1);
+    player3 = create_player({2, 5.0f, 0}, 0.65f, 1.7f, 1, &model_female);
     player3->entity->material = &MATERIAL_PLAYER2;
 
     create_ground({0, -0.5f, 0}, 20, 1, 3);

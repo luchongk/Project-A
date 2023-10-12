@@ -29,15 +29,17 @@ struct PerObjectUniforms {
     Matrix world;
 };
 
-Mesh weird_mesh;
-Mesh cube_mesh;
+Model model_weird;
+Model model_cube;
+Model model_male;
+Model model_female;
 
-ShaderProgram* basic_shader;
-ShaderProgram* light_shader;
-ShaderProgram* debug_shader;
+ShaderProgram* shader_basic;
+ShaderProgram* shader_light;
+ShaderProgram* shader_debug;
 
-Texture* grid_texture;
-Texture* test_texture;
+Texture* texture_grid;
+Texture* texture_test;
 
 MaterialBasic  MATERIAL_GROUND;
 MaterialBasic  MATERIAL_PLAYER;
@@ -67,67 +69,71 @@ void set_projection(int width, int height) {
     modify_buffer(global_uniform_buffer, sizeof(global_uniforms), &global_uniforms);
 }
 
+void copy_model_to_buffers(Model* model, Array<VertexPNU>* vertices, Array<uint>* indices) {
+    For(model->meshes) {
+        it->vertex_base = vertices->count;
+        it->index_base  = indices->count;
+        for(uint i = 0; i < it->vertices.count; i++) {
+            array_add(vertices, {it->vertices[i], it->normals[i], it->uvs[i]});
+        }
+
+        for(uint i = 0; i < it->indices.count; i++) {
+            array_add(indices, it->indices[i]);
+        }
+    }
+}
+
 void init_renderer(OSWindow* window) {
+    init_graphics(window);
+    
     onscreen_framebuffer = create_onscreen_framebuffer((int)window->size.x, (int)window->size.y);
     
-    basic_shader = compile_shader("assets\\shaders\\basic_vertex.hlsl"_s, "assets\\shaders\\basic_pixel.hlsl"_s, VertexFormat::PNU);
-    light_shader = compile_shader("assets\\shaders\\basic_vertex.hlsl"_s, "assets\\shaders\\light_cube_pixel.hlsl"_s, VertexFormat::PNU);
-    debug_shader = compile_shader("assets\\shaders\\debug_vertex.hlsl"_s, "assets\\shaders\\ui_pixel.hlsl"_s, VertexFormat::PCU);
+    shader_basic = compile_shader("assets\\shaders\\basic_vertex.hlsl"_s, "assets\\shaders\\basic_pixel.hlsl"_s,      VertexFormat::PNU);
+    shader_light = compile_shader("assets\\shaders\\basic_vertex.hlsl"_s, "assets\\shaders\\light_cube_pixel.hlsl"_s, VertexFormat::PNU);
+    shader_debug = compile_shader("assets\\shaders\\debug_vertex.hlsl"_s, "assets\\shaders\\ui_pixel.hlsl"_s,         VertexFormat::PCU);
 
-    grid_texture = create_texture_from_file("assets\\textures\\uv_grid_white.png"_s);
+    texture_grid = create_texture_from_file("assets\\textures\\uv_grid_white.png"_s);
 
     // Material initialization
     {
-        MATERIAL_GROUND.shader = basic_shader;
+        MATERIAL_GROUND.shader = shader_basic;
         MATERIAL_GROUND.pixel_textures[MaterialBasic::_TEXTURE_INDEX] = white_pixel;
         MATERIAL_GROUND.ambient  = {1.0f, 1.0f, 1.0f};
         MATERIAL_GROUND.diffuse  = {1.0f, 1.0f, 1.0f};
         MATERIAL_GROUND.specular = {1.0f, 1.0f, 1.0f};
         MATERIAL_GROUND.shininess = 32.0f;
 
-        MATERIAL_PLAYER.shader = basic_shader;
+        MATERIAL_PLAYER.shader = shader_basic;
         MATERIAL_PLAYER.pixel_textures[MaterialBasic::_TEXTURE_INDEX] = white_pixel;
         MATERIAL_PLAYER.ambient  = {0.0f, 0.0f, 0.0f};
-        MATERIAL_PLAYER.diffuse  = {0.0f, 1.0f, 0.0f};
+        MATERIAL_PLAYER.diffuse  = {1.0f, 1.0f, 1.0f};
         MATERIAL_PLAYER.specular = {0.0f, 0.0f, 0.0f};
         MATERIAL_PLAYER.shininess = 1.0f;
 
         MATERIAL_PLAYER2 = MATERIAL_PLAYER;
 
-        MATERIAL_LIGHT.shader = light_shader;
+        MATERIAL_LIGHT.shader = shader_light;
     }
 
-    // Static mesh loading. @Speed: Doing a multiple unnecessary buffer copies
+    // Static mesh loading. @Speed: Doing multiple unnecessary buffer copies. Instead, pass vertices and indices to load_obj and add them directly there.
     {
-        load_obj("assets\\models\\weirdchamp.obj"_s, &weird_mesh);
-        load_obj("assets\\models\\cube.obj"_s, &cube_mesh);
+        load_obj("assets\\models\\weirdchamp.obj"_s, &model_weird);
+        load_obj("assets\\models\\cube.obj"_s,       &model_cube);
+        load_obj("assets\\models\\Male.obj"_s,       &model_male);
+        load_obj("assets\\models\\Female.obj"_s,     &model_female);
 
         Array<VertexPNU> vertices;
         vertices.allocator = linear_allocator;
         vertices.allocator_data = &temporary_storage;
+
         Array<uint> indices;
         indices.allocator = linear_allocator;
         indices.allocator_data = &temporary_storage;
 
-        cube_mesh.vertex_base = vertices.count;
-        cube_mesh.index_base = indices.count;
-        for(uint i = 0; i < cube_mesh.vertices.count; i++) {
-            array_add(&vertices, {cube_mesh.vertices[i], cube_mesh.normals[i], cube_mesh.uvs[i]});
-        }
-
-        For(cube_mesh.indices) {
-            array_add(&indices, *it);
-        }
-
-        weird_mesh.vertex_base = vertices.count;
-        weird_mesh.index_base = indices.count;
-        for(uint i = 0; i < weird_mesh.vertices.count; i++) {
-            array_add(&vertices, {weird_mesh.vertices[i], weird_mesh.normals[i], weird_mesh.uvs[i]});
-        }
-
-        For(weird_mesh.indices) {
-            array_add(&indices, *it);
-        }
+        copy_model_to_buffers(&model_weird,   &vertices, &indices);
+        copy_model_to_buffers(&model_cube,    &vertices, &indices);
+        copy_model_to_buffers(&model_male,    &vertices, &indices);
+        copy_model_to_buffers(&model_female,  &vertices, &indices);
 
         static_vertex_buffer = create_vertex_buffer(GraphicsBufferUsage::STATIC, VertexFormat::PNU, vertices.count, vertices.data);
         static_index_buffer  = create_index_buffer(GraphicsBufferUsage::STATIC, indices.count, indices.data);
@@ -154,7 +160,7 @@ void init_renderer(OSWindow* window) {
 
 void render(OSWindow* window) {
     bind_framebuffer(onscreen_framebuffer);
-
+    
     set_blend(false);
     set_depth(true);
     
@@ -174,7 +180,7 @@ void render(OSWindow* window) {
     for(int i = 0; i < entity_count; i++) {
         Entity* e = &entities[i];
 
-        if(!e->mesh || !e->material) continue;
+        if(!e->model || !e->material) continue;
         
         Material* material = e->material;
         if(material->shader == nullptr) {
@@ -196,17 +202,30 @@ void render(OSWindow* window) {
             modify_buffer(per_material_uniform_buffer, material->constants_size, get_material_constants(material));
         }
 
+#if 0
+        //Render bounding box
+        if(e->collider.shape != ColliderShape::NONE) {
+            auto collider_size = e->collider.box.max - e->collider.box.min;
+            per_object_uniforms.world = scale(Matrix::ident, Vec3{collider_size.x, collider_size.y, 0.1f});
+            per_object_uniforms.world = translate(per_object_uniforms.world, e->position);
+            modify_buffer(per_object_uniform_buffer, sizeof(per_object_uniforms), &per_object_uniforms);
+            draw_indexed(model_cube.meshes[0].vertex_base, model_cube.meshes[0].index_base, model_cube.meshes[0].indices.count);
+        }
+#endif
+        
         per_object_uniforms.world = get_world_matrix(e);
         modify_buffer(per_object_uniform_buffer, sizeof(per_object_uniforms), &per_object_uniforms);
-
-        draw_indexed(e->mesh->vertex_base, e->mesh->index_base, e->mesh->indices.count);
+        
+        For(e->model->meshes) {
+            draw_indexed(it->vertex_base, it->index_base, it->indices.count);
+        }
     }
 
 #if 0
     // TODO: This is a good example of something we could do in a geometry shader, whenever we support those anyways...
     set_primitive_type(GraphicsPrimitiveType::LINE);
     set_vertex_buffer(debug_vertex_buffer);
-    set_shader(debug_shader);
+    set_shader(shader_debug);
     Array<VertexPCU> vertices;
     for(int i = 0; i < entity_count; i++) {
         array_reset(&vertices);
@@ -245,7 +264,8 @@ void render(OSWindow* window) {
 }
 
 void end_renderer() {
-    release_texture(grid_texture);
+    release_texture(texture_grid);
     release_texture(sd_font_texture);
+    release_texture(texture_panel);
     end_graphics();
 }

@@ -3,9 +3,10 @@
 #include "array.h"
 
 static bool sd_initted = false;
-static ShaderProgram* sd_current_shader;
-static ShaderProgram* sd_main_shader;
-static ShaderProgram* sd_text_shader;
+static ShaderProgram*   sd_current_shader;
+static Texture*         sd_current_texture;
+static ShaderProgram*   sd_main_shader;
+static ShaderProgram*   sd_text_shader;
 static GraphicsBuffer*  sd_vertex_buffer;
 static Array<VertexPCU> sd_vertices;
 
@@ -13,9 +14,13 @@ static u8 font_bitmap[512*512];
 static stbtt_bakedchar font_glyphs[96];
 Texture* sd_font_texture;
 
+Texture* texture_panel;
+
 static void sd_init() {
     sd_vertex_buffer = create_vertex_buffer(GraphicsBufferUsage::DYNAMIC, VertexFormat::PCU, 1024);
     sd_main_shader   = compile_shader("assets\\shaders\\ui_vertex.hlsl"_s, "assets\\shaders\\ui_pixel.hlsl"_s, VertexFormat::PCU);
+
+    texture_panel = create_texture_from_file("assets\\textures\\panel.png"_s);
 
     sd_font_texture = load_font_file("assets\\fonts\\Inconsolata.ttf"_s, font_bitmap, font_glyphs);
     sd_text_shader  = compile_shader("assets\\shaders\\ui_vertex.hlsl"_s, "assets\\shaders\\text_pixel.hlsl"_s, VertexFormat::PCU);
@@ -33,29 +38,30 @@ void sd_flush() {
     draw(0, sd_vertices.count);
     
     array_reset(&sd_vertices);
-
     sd_current_shader = nullptr;
 }
 
-static void set_shader_for_shapes() {
+static void set_shader_for_shapes(Texture* texture) {
     if(!sd_initted) sd_init();
 
-    if(sd_current_shader != sd_main_shader) {
+    if(sd_current_shader != sd_main_shader || sd_current_texture != texture) {
         sd_flush();
         set_shader(sd_main_shader);
-        set_texture(0, white_pixel);
         sd_current_shader = sd_main_shader;
+        set_texture(0, texture);
+        sd_current_texture = texture;
     }
 }
 
 static void set_shader_for_text() {
     if(!sd_initted) sd_init();
 
-    if(sd_current_shader != sd_text_shader) {
+    if(sd_current_shader != sd_text_shader || sd_current_texture != sd_font_texture) {
         sd_flush();
         set_shader(sd_text_shader);
-        set_texture(0, sd_font_texture);
         sd_current_shader = sd_text_shader;
+        set_texture(0, sd_font_texture);
+        sd_current_texture = sd_font_texture;
     }
 }
 
@@ -67,7 +73,7 @@ static Vec2 to_normalized_coords(Vec2 p) {
 }
 
 void draw_quad(Vec2 p1, Vec2 p2, Vec2 p3, Vec2 p4, Vec4 color) {
-    set_shader_for_shapes();
+    set_shader_for_shapes(white_pixel);
 
     p1 = to_normalized_coords(p1);
     p2 = to_normalized_coords(p2);
@@ -82,8 +88,8 @@ void draw_quad(Vec2 p1, Vec2 p2, Vec2 p3, Vec2 p4, Vec4 color) {
     array_add(&sd_vertices, { Vec3{p4.x, p4.y}, color });
 }
 
-void draw_quad(Vec2 p1, Vec2 p2, Vec2 p3, Vec2 p4, Vec2 uv1, Vec2 uv2, Vec2 uv3, Vec2 uv4, Vec4 color) {
-    set_shader_for_shapes();
+void draw_quad(Vec2 p1, Vec2 p2, Vec2 p3, Vec2 p4, Vec2 uv1, Vec2 uv2, Vec2 uv3, Vec2 uv4, Vec4 color, Texture* texture = white_pixel) {
+    set_shader_for_shapes(texture);
 
     p1 = to_normalized_coords(p1);
     p2 = to_normalized_coords(p2);
@@ -98,15 +104,18 @@ void draw_quad(Vec2 p1, Vec2 p2, Vec2 p3, Vec2 p4, Vec2 uv1, Vec2 uv2, Vec2 uv3,
     array_add(&sd_vertices, { Vec3{p4.x, p4.y}, color, uv4 });
 }
 
-void draw_rect(Rect rect, Vec4 color) {
-    set_shader_for_shapes();
-
+void draw_rect(Rect rect, Vec4 color, Texture* texture) {
     Vec2 p1 = {rect.x, rect.y};
     Vec2 p2 = {rect.x, rect.y + rect.height};
     Vec2 p3 = {rect.x + rect.width, rect.y + rect.height};
     Vec2 p4 = {rect.x + rect.width, rect.y};
 
-    draw_quad(p1, p2, p3, p4, color);
+    if(!texture) {
+        draw_quad(p1, p2, p3, p4, color);
+    }
+    else {
+        draw_quad(p1, p2, p3, p4, Vec2{0,0}, Vec2{0,1}, Vec2{1,1}, Vec2{1,0}, color, texture);
+    }
 }
 
 static float draw_char(char c, float x, float y, float scale, Vec4 color) {

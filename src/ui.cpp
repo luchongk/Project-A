@@ -156,7 +156,7 @@ void ui_init() {
     Rect rect = {0.01f, 0.01f, 0.2f, 0.4f};
     auto panel = ui_create_panel(rect, "MY_PANEL"_s);
 
-    rect = pad_rect({0,0,1,1}, 0.1f);
+    rect = pad_left_right({0,0,1,1}, 0.2f);
     rect = cut_top(&rect, 0.2f);
     rect = pad_top_bottom(rect, 0.75f);
     auto slider = ui_create_slider(rect, "SLIDER_R"_s, &light->diffuse.r);
@@ -194,7 +194,7 @@ void ui_init() {
     array_add(&button->widget->handlers, {UIEventType::CLICK, on_click_resume});
     add_to_panel(panel, button->widget);
 
-    rect.y += rect.height;
+    rect.y += 2 * rect.height;
     auto text = ui_create_text(rect, "TEXT_VELOCITY_0"_s, velocity_strings[0]);
     add_to_panel(panel, text->widget);
 
@@ -236,7 +236,6 @@ bool ui_handle_click_event(EventKey* event) {
     if(!ui_visible) return false;
 
     auto active = ui_current_action.widget;
-
     if(!active && !ui_hot) {
         ui_end_action();
         ui_focused = nullptr;
@@ -253,10 +252,7 @@ bool ui_handle_click_event(EventKey* event) {
 
         switch(ui_hot->type) {
             case UIWidgetType::SLIDER: {
-                if(event->keycode == VK_LBUTTON) {
-                    array_find_or_add(&updatables, ui_hot);
-                }
-
+                if(event->keycode == VK_LBUTTON) array_find_or_add(&updatables, ui_hot);
                 break;
             }
 
@@ -494,7 +490,7 @@ static void draw_text_field(UIWidget* widget, UIPanel* panel) {
 }
 
 static void draw_panel(UIPanel* panel) {
-    draw_rect(panel->widget->rect, panel->base_color);
+    draw_rect(panel->widget->rect, {0,0.398f,0.598f,1}, texture_panel);
     
     for(uint i = 0; i < panel->children_count; i++) {
         auto child = panel->children[i];
@@ -526,10 +522,9 @@ static void draw_panel(UIPanel* panel) {
 }
 
 void ui_render() {
-    
     For(ui_panels) {
         if(it->visible) draw_panel(it);
     }
-
+    
     sd_flush();
 }

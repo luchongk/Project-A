@@ -164,30 +164,23 @@ static void handle_window_event(EventWindow* event) {
 
     switch(event->type) {
         case EventWindowType::RESIZE: {
-            int width  = (int)window->size.x;
-            int height = (int)window->size.y;
-            set_projection(width, height);
-            set_onscreen_framebuffer_size(width, height);
-            break;
+            if(!window->minimized) {
+                int width  = (int)window->size.x;
+                int height = (int)window->size.y;
+                set_projection(width, height);
+                set_onscreen_framebuffer_size(width, height);
+            }
+            //fallthrough
         }
-
         case EventWindowType::FOCUS_LOST: {
             input.move = {0,0};
             input.rotation = 0;
-            break;
-        }
-        
-        case EventWindowType::FOCUS_GAINED: {
             break;
         }
     }
 }
 
 bool handle_input(Array<Event>* events) {
-    /*if(window->fullscreen && window->focused) {
-        os_set_mouse_to_center(window);
-    }*/
-
     input.scroll = 0; //@Hack: Review which key/mouse events need resetting vs which don't.
 
     ui_update_hot();

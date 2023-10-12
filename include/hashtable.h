@@ -57,7 +57,7 @@ bool keys_are_equal(K key1, K key2) {
 }
 
 bool keys_are_equal(String key1, String key2) {
-    return !compare(key1, key2);
+    return equals(key1, key2);
 }
 
 template<typename K>

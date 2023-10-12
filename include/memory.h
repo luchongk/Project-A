@@ -68,21 +68,31 @@ void free_(T* pointer) {
 
 // Linear Arena allocator //
 
+const u8 INVALID_MEMORY_VALUE = 0xba;
+
 struct LinearArena {
     void* base;
     u64 size;
     u64 used;
 };
 
-static void init_arena(LinearArena* arena, u64 size, void* base) {
-    assert(base && size);
+static void init_arena(LinearArena* arena, u64 size, void* base = nullptr) {
+    assert(size);
+
+    if(!base) arena->base = malloc(size);
+    else arena->base = base;
     
-    arena->base = base;
     arena->size = size;
     arena->used = 0;
 }
 
 static void reset_arena(LinearArena* arena, u64 marker = 0) {
+#if DEBUG
+    for(u64 i = marker; i < arena->used; i++) {
+        *((u8*)arena->base + i) = INVALID_MEMORY_VALUE;
+    }
+#endif
+
     arena->used = marker;
 }
 

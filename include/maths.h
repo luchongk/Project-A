@@ -3,7 +3,7 @@
 
 #include "stdio.h"
 
-const float PI = 3.141592741f;
+const float PI  = 3.141592741f;
 const float TAU = 6.28318548f;
 
 template<typename T>

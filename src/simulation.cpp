@@ -42,20 +42,23 @@
     - Solve contacts as position constraints (I'm not using velocity contrainst, since I don't have "real" physics yet. I may add a velocity constraint solving phase later).
         I see a lot of engines and tutorials (I believe even Box2D) doing this step at the beginning of the frame. I really don't understand why they do that, since solving at
         the beginning and then integrating the positions can potentially leave bodies penetrating before the render phase, so the player might see them. Maybe there's a reason
-        they do that, but since I can't see any for now I'm trying to solve them as close to the end as possible. The solver is an iterative one, and its equivalent to the
-        Non linear Gauss Seidel algorithm, because we iterate multiple times over the constraints (contacts) resolving them while minimizing the distance between the current
-        position and the tentative position of the bodies one at a time, hoping that eventually the system system converges.
+        they do that, but since I can't see any for now I'm trying to solve them as close to the end as possible. The solver is an iterative one, and it's equivalent to the
+        non linear Gauss Seidel algorithm, because we iterate multiple times over the constraints (contacts) resolving them while minimizing the distance between the current
+        position and the tentative position of the bodies one at a time, hoping that the system eventually converges.
 
     - While solving position constraints, since bodies move, new collisions might happen, so every time I move a body I check if that generated any new collisions and add them
         to the contacts array. This might be too slow in the end (or maybe not) but it seems to make the simulation a lot more stable when there are multiple bodies involved.
         I can always go back and optimize or remove this.
 
     - Iterate one more time over the contacts, now adjusting velocities and doing any game logic that depends on them.
+
+    EDIT 9/5/2023: I found out that apparently what I did is almost identical to something called Position Based Dynamics (PBD) and its one of the state of the art ways of
+    doing simulations (there's a bunch of papers by the NVIDIA folks on the subject). It was developed for cloth and soft bodies, but has since been adapted to all kinds
+    of simulations, including rigid bodies. So I guess I'm heading in the right direction, lets keep developing this idea.
 */
 
 //All these are @TEMPORARY
-static float cubes_rotation_dir = 1;
-
+float cubes_rotation_dir = 1;
 float cubes_rotation = 0;
 bool paused = false;
 bool character_selected = true;
@@ -129,7 +132,7 @@ void simulate(float dt) {
     // Calculate movement
     for(int i = 0; i < count_Player; i++) {
         auto player = &pool_Player[i];
-        player->move = i == 0 ? input.move : Vec3{-1,0,0};
+        player->move = i == 0 ? input.move : Vec3{0,0,0};
 
         if(player->entity->position.y < -50) {
             player->velocity = {};
@@ -239,7 +242,6 @@ void find_new_contacts(Player* player) {
 void solve_collisions3(float dt) {
     static_contacts_count = 0;
     dynamic_contacts_count = 0;
-    //for(int i = count_Player - 1; i >= 0; i--) {
     for(int i = 0; i < entity_count; i++) {
         if(entities[i].type != EntityType::Player) continue;
 
@@ -252,8 +254,10 @@ void solve_collisions3(float dt) {
 
             AABB player_aabb = get_transformed_collider(player->entity);
             AABB other_aabb  = get_transformed_collider(other_entity);
+            
             CollisionContact* contacts = other_entity->type == EntityType::Player ? dynamic_contacts : static_contacts;
             int* contacts_count = other_entity->type == EntityType::Player ? &dynamic_contacts_count : &static_contacts_count;
+            
             bool overlap = collide_aabb_aabb(&player_aabb, &other_aabb, &contacts[*contacts_count]);
             if(overlap) {
                 contacts[*contacts_count].player = player;
@@ -273,9 +277,11 @@ void solve_collisions3(float dt) {
 #endif
 
     for(int k = 0; k < 10; k++) {
+        bool early_out = true;
+
         for(int i = 0; i < dynamic_contacts_count; i++) {
-            auto& contact = dynamic_contacts[i];
-            auto player  = contact.player;
+            auto& contact     = dynamic_contacts[i];
+            auto player       = contact.player;
             auto other_entity = contact.other_entity;
             
             AABB player_aabb = get_transformed_collider(player->entity);
@@ -285,9 +291,11 @@ void solve_collisions3(float dt) {
             // between the bodies involved in a contact we already have.
             bool overlap = collide_aabb_aabb(&player_aabb, &other_aabb, &contact);
             if(overlap) {
+                early_out = false;
                 player->entity->position += Vec3{contact.normal * (contact.penetration / 2)};
                 other_entity->position   -= Vec3{contact.normal * (contact.penetration / 2)};
 
+                //TODO: Proper grounded checking
                 auto other_player = (Player*)other_entity->type_specific_data;
                 if(contact.normal.y == 1 && !player->jumped_this_frame) {
                     player->grounded = true;
@@ -310,17 +318,19 @@ void solve_collisions3(float dt) {
 
         for(int i = 0; i < static_contacts_count; i++) {
             auto& contact = static_contacts[i];
-            auto player  = contact.player;
+            auto player   = contact.player;
 
             AABB player_aabb = get_transformed_collider(player->entity);
-            AABB other_aabb = get_transformed_collider(contact.other_entity);
+            AABB other_aabb  = get_transformed_collider(contact.other_entity);
             
             // @Speed: There's no need to do a full collide here, we only want to update the separation
             // between the bodies involved in a contact we already have.
             bool overlap = collide_aabb_aabb(&player_aabb, &other_aabb, &contact);
             if(overlap) {
+                early_out = false;
                 player->entity->position += Vec3{contact.normal * contact.penetration};
 
+                //TODO: Proper grounded checking
                 if(contact.normal.y == 1 && !player->jumped_this_frame) {
                     player->grounded = true;
                 }
@@ -334,6 +344,8 @@ void solve_collisions3(float dt) {
                 find_new_contacts(player);
             }
         }
+
+        if(early_out) break;
     }
 
 #if DEBUG_PHYSICS
@@ -348,7 +360,7 @@ void solve_collisions3(float dt) {
     for(int k = 0; k < 10; k++) {
         for(int i = 0; i < dynamic_contacts_count; i++) {
             auto& contact = dynamic_contacts[i];
-            auto player  = contact.player;
+            auto player   = contact.player;
             auto other_player = (Player*)contact.other_entity->type_specific_data;
             
             auto relative_velocity = vec2(player->velocity - other_player->velocity);
@@ -367,13 +379,10 @@ void solve_collisions3(float dt) {
 
         for(int i = 0; i < static_contacts_count; i++) {
             auto& contact = static_contacts[i];
-            auto player  = contact.player;
+            auto player   = contact.player;
 
             float speed_along_normal = dot(vec2(player->velocity), contact.normal);
             if(speed_along_normal < 0) player->velocity -= Vec3{contact.normal * speed_along_normal};
-            //printf("Overlapped: contact %d. e1: %p. e2: STATIC. grounded: %d normal: (%f,%f). penetration: %f \n", i, player->entity, player->grounded, contact.normal.x, contact.normal.y, contact.penetration);
         }
     }
-
-    //printf("%f %f\n", pool_Player[0].velocity.x, dt);
 }

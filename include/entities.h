@@ -22,7 +22,7 @@ struct Entity {
     Vec3 position;
     float scale;
     Matrix orientation;
-    Mesh* mesh;
+    Model* model;
     Material* material;
     Collider collider;
     void* type_specific_data;
@@ -50,7 +50,7 @@ struct Player {
     Entity* entity;
     Vec3 dimensions;
     Vec3 move;
-    Vec3 velocity;
+    Vec3 velocity = {0,0,0};
     bool grounded = false;
     bool was_grounded = false;
     bool jumped_this_frame = false;

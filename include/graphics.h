@@ -64,7 +64,7 @@ struct Framebuffer;
 extern ShaderProgram* current_shader;
 extern Texture* white_pixel;
 
-bool init_graphics(HWND hwnd);
+bool init_graphics(OSWindow* window);
 
 void end_graphics();
 

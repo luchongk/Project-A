@@ -5,8 +5,8 @@
 #include "vector.h"
 #include "strings.h"
 
-struct Mesh;
+struct Model;
 
-void load_obj(String file_path, Mesh* mesh);
+void load_obj(String file_path, Model* model);
 
 #endif

@@ -48,6 +48,10 @@ struct Mesh {
     uint index_base;
 };
 
+struct Model {
+    Array<Mesh> meshes;
+};
+
 void init_renderer();
 void end_renderer();
 void set_projection(int width, int height);
@@ -56,9 +60,11 @@ struct ::OSWindow;
 
 void render(OSWindow* window);
 
-extern Mesh weird_mesh;
-extern Mesh cube_mesh;
-extern Texture* grid_texture;
+extern Model model_weird;
+extern Model model_cube;
+extern Model model_male;
+extern Model model_female;
+extern Texture* texture_grid;
 
 extern MaterialBasic  MATERIAL_GROUND;
 extern MaterialNoData MATERIAL_LIGHT;

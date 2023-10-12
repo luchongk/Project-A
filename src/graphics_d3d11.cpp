@@ -107,8 +107,8 @@ static void maybe_create_input_layout(VertexFormat format, ID3DBlob* bytecode, S
     }
 }
 
-bool init_graphics(HWND _hwnd) {
-    hwnd = _hwnd;
+bool init_graphics(OSWindow* window) {
+    hwnd = ((Win32Window*)window)->handle;
 
     ID3D11Device* dev11;
     ID3D11DeviceContext* devcon11;
@@ -634,7 +634,7 @@ Texture* create_texture_from_bitmap(void* data, int width, int height) {
 }
 
 Texture* create_texture_from_file(String path) {
-    stbi_set_flip_vertically_on_load(true);  
+    //stbi_set_flip_vertically_on_load(true);
     
     int width, height, nrChannels;
     unsigned char *image_data = stbi_load((const char*)path.data, &width, &height, &nrChannels, 0);

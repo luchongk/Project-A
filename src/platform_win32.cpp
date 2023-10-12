@@ -24,8 +24,7 @@ static float desired_width;
 static float desired_height;
 
 static LARGE_INTEGER timer_frequency;
-
-Array<Event> events;
+Array<Event> events;    //@Cleanup: This should live in input.h
 
 OSWindow* os_create_window(int width, int height, String title) {
     RECT wr = {0, 0, width, height};                    // set the size, but not the position
@@ -45,11 +44,7 @@ OSWindow* os_create_window(int width, int height, String title) {
                                 wr.right - wr.left,
                                 wr.bottom - wr.top,
                                 nullptr, nullptr, app_instance, nullptr);
-                                
     if(!hwnd) return nullptr;
-
-    //@Cleanup: Graphics should not be a dependency of platform code!
-    if(!init_graphics(hwnd)) return nullptr;
 
     Win32Window* window = alloc_<Win32Window>();
     window->common = {
@@ -62,9 +57,8 @@ OSWindow* os_create_window(int width, int height, String title) {
     window->device = GetDC(hwnd);
 
     SetPropA(hwnd, "window_data", window);
-    
     ShowWindow(hwnd, SW_SHOW);
-    
+
     return (OSWindow*)window;
 }
 
@@ -79,10 +73,9 @@ float os_elapsed_time(u64 from_stamp, u64 to_stamp) {
     return (to_stamp - from_stamp) / (float)timer_frequency.QuadPart;
 }
 
-//? Should we move this to input.h?
+//@Cleanup pass in input/events by parameter so they can live in input.h
 void os_poll_events(OSWindow* window) {
     input.mouse_delta_pixels = {0,0};
-
     array_reset(&events);
     
     MSG msg{};
@@ -135,7 +128,7 @@ void os_set_fullscreen(OSWindow* window, bool fullscreen) {
     HWND hwnd = ((Win32Window*)window)->handle;
     
     if(fullscreen && !window->fullscreen) {
-        window->fullscreen = true;
+        window->saved_windowed_size = window->size;
 
         MONITORINFOEX mi;
         mi.cbSize = sizeof(mi);
@@ -151,13 +144,13 @@ void os_set_fullscreen(OSWindow* window, bool fullscreen) {
             RECT my_rect = {mi.rcMonitor.left, mi.rcMonitor.top, mi.rcMonitor.right, mi.rcMonitor.bottom};
             ClipCursor(&my_rect);
         }
+
+        window->fullscreen = true;
     }
     else if(!fullscreen && window->fullscreen) {
-        window->fullscreen = false;
-
         SetWindowLong(hwnd, GWL_STYLE, WS_VISIBLE | WS_CLIPSIBLINGS | default_window_style);
 
-        RECT wr = {0, 0, (int)window->size.x, (int)window->size.y}; // set the size, but not the position
+        RECT wr = {0, 0, (int)window->saved_windowed_size.x, (int)window->saved_windowed_size.y}; // set the size, but not the position
         AdjustWindowRect(&wr, default_window_style, false);         // adjust the size
 
         SetWindowPos(hwnd, HWND_NOTOPMOST,
@@ -166,6 +159,7 @@ void os_set_fullscreen(OSWindow* window, bool fullscreen) {
                         SWP_FRAMECHANGED);
 
         ClipCursor(nullptr);
+        window->fullscreen = false;
     }
 }
 
@@ -210,8 +204,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         }
 
         case WM_SIZE: {
-            //TODO: Handle window minimization.
-
             if(in_sizemove) {
                 desired_width  = (float)LOWORD(lParam);
                 desired_height = (float)HIWORD(lParam);
@@ -220,10 +212,16 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 window->size.x = (float)LOWORD(lParam);
                 window->size.y = (float)HIWORD(lParam);
 
+                if(window->size.x == 0 && window->size.y == 0) {
+                    window->minimized = true;
+                }
+                else {
+                    window->minimized = false;
+                }
+
                 Event e;
                 e.type = EventType::WINDOW;
                 e.window.window = window;
-                
                 e.window.type = EventWindowType::RESIZE;
                 array_add(&events, e);
             }
@@ -304,13 +302,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 window->focused = true;
                 
                 if(window->fullscreen) {
-                    RECT monitor = {0, 0, 1920, 1080};  //@Cleanup: Save monitor size for this.
+                    RECT monitor = {0, 0, (s32)window->size.x, (s32)window->size.y};
                     ClipCursor(&monitor);
                 }
             }
             
             array_add(&events, e);
-            
             break;
         }
 
@@ -344,7 +341,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             //@Temporary: We are casting mouse positions to float until we have an integer Vector type.
             input.mouse_pos_pixels.x = (short)(lParam & 0xFFFF);
             input.mouse_pos_pixels.y = (short)(lParam >> 16);
-            
             break;
         }
 
@@ -405,9 +401,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             RAWINPUT raw;
             
             GetRawInputData((HRAWINPUT)lParam, RID_INPUT, &raw, &dwSize, sizeof(RAWINPUTHEADER));
-
-            if(raw.header.dwType == RIM_TYPEMOUSE) 
-            {
+            if(raw.header.dwType == RIM_TYPEMOUSE) {
                 input.mouse_delta_pixels.x += raw.data.mouse.lLastX;
                 input.mouse_delta_pixels.y -= raw.data.mouse.lLastY;
             }
@@ -423,7 +417,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 }
 
 void main();
-#include <strsafe.h>
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR lpCmdLine, int nCmdShow) {
     setvbuf(stdout, nullptr, _IONBF, BUFSIZ);
