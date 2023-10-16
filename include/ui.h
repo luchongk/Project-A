@@ -6,18 +6,18 @@
 
 struct UIWidget;
 
-enum class UIWidgetType {
+ENUM(UIWidgetType,
     PANEL,
     BUTTON,
     SLIDER,
     TEXT,
     TEXT_FIELD,
-};
+);
 
-enum class UIEventType {
+ENUM(UIEventType,
     CLICK,
     TEXT
-};
+);
 
 struct UIEventHandler {
     UIEventType type;
@@ -110,7 +110,7 @@ bool is_mouse_over(Rect rect);
 
 extern bool ui_visible;
 // I don't think these should be dynamic, but lets have them be that for now.
-extern Array<UIWidget>    ui_elements;
+extern Array<UIWidget>    ui_widgets;
 extern Array<UIPanel>     ui_panels;
 extern Array<UIButton>    ui_buttons;
 extern Array<UISlider>    ui_sliders;

@@ -11,6 +11,9 @@ void update_input(OSWindow* window) {
 
     input.mouse_pos_normalized   = input.mouse_pos_pixels   / window->size;
     input.mouse_delta_normalized = input.mouse_delta_pixels / window->size;
+    input.scroll = 0; //@Hack: Review which key/mouse events need resetting vs which don't.
+
+    ui_update_hot();
 }
 
 static void handle_key_event(EventKey* event) {
@@ -21,7 +24,7 @@ static void handle_key_event(EventKey* event) {
         bool handled = ui_handle_click_event(event);
         if(handled) return;
         
-        if(!event->pressed) std::cout << "Clicked the screen!" << std::endl;
+        if(!event->pressed) printf("Clicked the screen!\n");
     }
 
     bool handled = ui_handle_key_event(event);
@@ -181,10 +184,6 @@ static void handle_window_event(EventWindow* event) {
 }
 
 bool handle_input(Array<Event>* events) {
-    input.scroll = 0; //@Hack: Review which key/mouse events need resetting vs which don't.
-
-    ui_update_hot();
-
     For(*events) {
         switch(it->type) {
             case EventType::QUIT: return true;

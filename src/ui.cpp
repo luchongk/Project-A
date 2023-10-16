@@ -19,7 +19,7 @@
 
 bool ui_visible = false;
 
-Array<UIWidget>     ui_elements;
+Array<UIWidget>     ui_widgets;
 Array<UIPanel>      ui_panels;
 Array<UIButton>     ui_buttons;
 Array<UISlider>     ui_sliders;
@@ -50,7 +50,7 @@ static void ui_end_action() {
 }
 
 void ui_reset() {
-    array_reset(&ui_elements);
+    array_reset(&ui_widgets);
     array_reset(&ui_panels);
     array_reset(&ui_buttons);
     array_reset(&ui_sliders);
@@ -65,7 +65,7 @@ static UIWidget* ui_create_element(Rect rect, UIWidgetType type, String name) {
     e.rect = rect;
     e.name = name;
     e.type = type;
-    return array_add(&ui_elements, e);
+    return array_add(&ui_widgets, e);
 }
 
 UIPanel* ui_create_panel(Rect rect, String name) {
@@ -130,22 +130,8 @@ UITextField* ui_create_text_field(Rect rect, String name) {
     return field;
 }
 
-static bool on_click_resume(UIWidget* widget, EventKey* event) {
-    /*{
-        // Hide UI.
-        ui_visible = false;
-        ui_current_action.widget = nullptr;
-    }*/
-
-    {
-        widget->visible = false;
-    }
-
-    return true;
-}
-
 void ui_init() {
-    array_reserve(&ui_elements,    128);
+    array_reserve(&ui_widgets,    128);
     array_reserve(&ui_panels,      16);
     array_reserve(&ui_buttons,     16);
     array_reserve(&ui_sliders,     16);
@@ -191,7 +177,10 @@ void ui_init() {
     rect.y += rect.height;
     auto button = ui_create_button(rect, "BUTTON_RESUME"_s);
     button->base_color = {0,0,0,1};
-    array_add(&button->widget->handlers, {UIEventType::CLICK, on_click_resume});
+    array_add(&button->widget->handlers, {UIEventType::CLICK, [](UIWidget* widget, EventKey* event) {
+        widget->visible = false;
+        return true;
+    }});
     add_to_panel(panel, button->widget);
 
     rect.y += 2 * rect.height;

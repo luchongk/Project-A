@@ -15,7 +15,7 @@ ENUM(EntityType,
     Light,
     Ground,
     Player,
-)
+);
 
 struct Entity {
     EntityType type;

@@ -31,9 +31,7 @@ ArrayView<T> make_view(T array[], int count) {
 template<typename T>
 struct Array : public ArrayView<T> {
     uint allocated = 0;
-
-    Allocator allocator = nullptr;
-    void* allocator_data = nullptr;
+    Allocator allocator = {};
 
     Array() = default;
     
@@ -46,8 +44,8 @@ struct Array : public ArrayView<T> {
 
 template<typename T>
 void array_resize(Array<T>* array, int new_size) {
-    if(array->allocator) {
-        array->data = (T*)array->allocator(array->data, sizeof(T) * array->allocated, sizeof(T) * new_size, array->allocator_data);
+    if(array->allocator.handler) {
+        array->data = (T*)array->allocator.handler(array->data, sizeof(T) * array->allocated, sizeof(T) * new_size, array->allocator.data);
     }
     else {
         array->data = realloc_<T>(array->data, array->allocated, new_size);

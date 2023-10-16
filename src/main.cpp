@@ -39,7 +39,7 @@ static void update_time() {
 }
 
 void main() {
-    init_arena(&temporary_storage, megabytes(64));
+    arena_init(&temporary_storage, megabytes(64));
 
     my_time.start_stamp = os_get_timestamp();
     my_time.simulation_dt = 1.0f/144;
@@ -49,7 +49,7 @@ void main() {
     float accum = 0;
 
     window = os_create_window(1600, 800, "PepegaClap"_s);
-    //os_set_fullscreen(window, true);
+    os_set_fullscreen(window, true);
 
     reset_scene();
     
@@ -125,7 +125,7 @@ void main() {
 
         wait_for_vblank();
 
-        reset_arena(&temporary_storage);
+        arena_reset(&temporary_storage);
 
 #if 0
     printf_s("last frame: %f ms\n", my_time.dt * 1000);

@@ -229,10 +229,7 @@ void grow(HashTable<K,V>* table) {
 
     table->allocated = new_size;
     table->count = 0;
-
-    for(int i = 0; i < table->allocated; i++) {
-        table->entries[i].hash = 0;
-    }
+    table_clear(table);
 
     if(old_entries) {
         for(int i = 0; i < old_allocated; i++) {
@@ -243,6 +240,13 @@ void grow(HashTable<K,V>* table) {
         }
 
         free_(old_entries);
+    }
+}
+
+template<typename K, typename V>
+void table_clear(HashTable<K,V>* table) {
+    for(int i = 0; i < table->allocated; i++) {
+        table->entries[i].hash = 0;
     }
 }
 

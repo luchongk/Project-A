@@ -1,7 +1,5 @@
-#include <iostream>
 #include <cstdio>
 #include "platform.h"
-#include "iostream"
 #include "strings.h"
 #include "graphics.h"
 #include "input.h"

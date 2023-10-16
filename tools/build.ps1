@@ -37,7 +37,7 @@ $ignored_warnings = "4100", "4127", "4201", "4458", "4706", "4505", "4459" , "47
 $exec_folder = if($release) { "bin\Release" } else { "bin\Debug" }
 
 $compile_exe_opts = 
-	#"-nologo", 
+	"-nologo", 
 	"-std:c++20",
 	"-Zi", 
 	"-Zc:offsetof-", 
@@ -65,7 +65,6 @@ $compile_exe_opts =
 	$(if($release) { } else { "-DDEBUG" })
 
 $link_opts = 
-	"-link",
 	"-SUBSYSTEM:WINDOWS",
 	"-MACHINE:X$platform",
 	"-LIBPATH:lib",
@@ -77,8 +76,4 @@ if($debug_build_command) {
 	echo "cl.exe $compile_exe_opts -Fe$exec_folder\$project.exe src\main.cpp $link_opts`n"
 }
 
-cl.exe $compile_exe_opts "-Fe$exec_folder\$project.exe" src\main.cpp $link_opts
-
-# Only return the error if we are not running the game,
-# because compilation of the .exe always fails when we are running
-if(($LASTEXITCODE -ne 0) -and !(Get-Process $project -ErrorAction SilentlyContinue)) { exit 1 }
+cl.exe $compile_exe_opts "-Fe$exec_folder\$project.exe" src\main.cpp "-link" $link_opts

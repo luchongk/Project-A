@@ -9,9 +9,7 @@ struct ObjVertex {
 };
 
 void load_obj(String path, Model* model) {
-    default_allocator = linear_allocator;
-    default_allocator_data = &temporary_storage;
-
+    default_allocator = linear_allocator(&temporary_storage);
     model->meshes.allocator = malloc_allocator;
 
     Array<u8> bytes;
@@ -115,10 +113,7 @@ void load_obj(String path, Model* model) {
         cursor = find_from_left("o "_s, cursor);
     }
 
-    reset_arena(&temporary_storage);
-
+    arena_reset(&temporary_storage);
     default_allocator = malloc_allocator;
-    default_allocator_data = nullptr;
-
     return;
 }

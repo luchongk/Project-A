@@ -123,18 +123,16 @@ void init_renderer(OSWindow* window) {
         load_obj("assets\\models\\Female.obj"_s,     &model_female);
 
         Array<VertexPNU> vertices;
-        vertices.allocator = linear_allocator;
-        vertices.allocator_data = &temporary_storage;
+        vertices.allocator = linear_allocator(&temporary_storage);
 
         Array<uint> indices;
-        indices.allocator = linear_allocator;
-        indices.allocator_data = &temporary_storage;
+        indices.allocator = linear_allocator(&temporary_storage);
 
         copy_model_to_buffers(&model_weird,   &vertices, &indices);
         copy_model_to_buffers(&model_cube,    &vertices, &indices);
         copy_model_to_buffers(&model_male,    &vertices, &indices);
         copy_model_to_buffers(&model_female,  &vertices, &indices);
-
+        
         static_vertex_buffer = create_vertex_buffer(GraphicsBufferUsage::STATIC, VertexFormat::PNU, vertices.count, vertices.data);
         static_index_buffer  = create_index_buffer(GraphicsBufferUsage::STATIC, indices.count, indices.data);
 

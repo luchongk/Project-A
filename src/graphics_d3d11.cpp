@@ -1,5 +1,3 @@
-#include <iostream>
-
 #include "graphics.h"
 #include "strings.h"
 #include "memory.h"
