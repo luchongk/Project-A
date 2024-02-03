@@ -19,4 +19,6 @@ extern Time my_time;
 extern OSWindow* window;
 extern LinearArena temporary_storage;
 
+const float ORTHOGRAPHIC_VIEW_WIDTH = 20.0f;    // In world units.
+
 #endif

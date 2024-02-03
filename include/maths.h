@@ -16,6 +16,10 @@ T min(T a, T b) {
     return a < b ? a : b;
 }
 
+template <typename T> int sign(T val) {
+    return (T(0) < val) - (val < T(0));
+}
+
 template<typename T>
 T clamp(T to_clamp, T min_value, T max_value) {
     return max(min(to_clamp, max_value), min_value);
@@ -32,7 +36,7 @@ float normalize_angle(float angle) {
     return angle;
 }
 
-constexpr float to_radians(float degrees) {
+constexpr float radians(float degrees) {
     return PI * degrees / 180;
 }
 

@@ -14,15 +14,18 @@ struct Win32Window {
 
 static char window_class_name[]  = "Project_A";
 static int  default_window_style = WS_OVERLAPPEDWINDOW;
-static bool mouse_visible        = true;
+static LARGE_INTEGER timer_frequency;
+
+//@Cleanup: I think most (if not all) things below here should live inside OSWindow if we want to support multiple windows at some point.
 
 // These are used during the sizing of a window (as in clicking and dragging the borders) to keep track of some state that Windows™ doesn't want to keep track of for us.
 static bool  in_sizemove = false;
-static float desired_width;
-static float desired_height;
+static int desired_width;
+static int desired_height;
 
-static LARGE_INTEGER timer_frequency;
-Array<Event> events;    //@Cleanup: This should live in input.h
+Array<Event> events;
+bool pressed_keys[256]; //TODO: Make a button flags to use instead of bool to know if a button was just pressed, just released, etc.
+static bool mouse_visible = true;
 
 OSWindow* os_create_window(int width, int height, String title) {
     RECT wr = {0, 0, width, height};                    // set the size, but not the position
@@ -47,7 +50,7 @@ OSWindow* os_create_window(int width, int height, String title) {
     Win32Window* window = alloc_<Win32Window>();
     window->common = {
         200, 100,
-        (float)width, (float)height,
+        width, height,
         false,
         false,
     };
@@ -73,7 +76,6 @@ float os_elapsed_time(u64 from_stamp, u64 to_stamp) {
 
 //@Cleanup pass in input/events by parameter so they can live in input.h
 void os_poll_events(OSWindow* window) {
-    input.mouse_delta_pixels = {0,0};
     array_reset(&events);
     
     MSG msg{};
@@ -192,6 +194,12 @@ void os_write_file(String path, String to_write) {
     CloseHandle(file);
 }
 
+bool os_is_key_pressed(int vk_code) {
+    if(vk_code <= 0) return false;
+    
+    return pressed_keys[vk_code];
+}
+
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     OSWindow* window = (OSWindow*)GetPropA(hwnd, "window_data");
 
@@ -203,12 +211,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
         case WM_SIZE: {
             if(in_sizemove) {
-                desired_width  = (float)LOWORD(lParam);
-                desired_height = (float)HIWORD(lParam);
+                desired_width  = LOWORD(lParam);
+                desired_height = HIWORD(lParam);
             }
             else {
-                window->size.x = (float)LOWORD(lParam);
-                window->size.y = (float)HIWORD(lParam);
+                window->size.x = LOWORD(lParam);
+                window->size.y = HIWORD(lParam);
 
                 if(window->size.x == 0 && window->size.y == 0) {
                     window->minimized = true;
@@ -229,8 +237,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
         case WM_MOVE: {
             if(in_sizemove) {
-                window->position.x = (float)LOWORD(lParam);
-                window->position.y = (float)HIWORD(lParam);
+                window->position.x = LOWORD(lParam);
+                window->position.y = HIWORD(lParam);
             }
             break;
         }
@@ -240,7 +248,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
         //Don't let ALT key freeze the window but still handle exiting with ALT+F4
         case WM_SYSKEYDOWN: {
-            if(wParam == VK_F4) PostQuitMessage(0);
+            if(wParam == VK_F4) DestroyWindow(((Win32Window*)window)->handle);
             break;
         }
 
@@ -268,7 +276,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             e.key.pressed   = false;
             e.key.is_repeat = false;
             array_add(&events, e);
-            
+
+            pressed_keys[vk_code] = false;
             break;
         }
 
@@ -282,7 +291,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             e.key.pressed   = true;
             e.key.is_repeat = was_down;
             array_add(&events, e);
-            
+
+            pressed_keys[vk_code] = true;
             break;
         }
 
@@ -294,6 +304,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             if(LOWORD(wParam) == WA_INACTIVE) {
                 e.window.type = EventWindowType::FOCUS_LOST;
                 window->focused = false;
+                memset(pressed_keys, false, sizeof(pressed_keys));
             }
             else {
                 e.window.type = EventWindowType::FOCUS_GAINED;
@@ -318,7 +329,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
         case WM_EXITSIZEMOVE: {
             in_sizemove = false;
-            input.mouse_delta_pixels = {0,0};
+            input.mouse_raw_motion = {0,0};
 
             if(desired_width != window->size.x || desired_height != window->size.y) {
                 window->size.x = desired_width;
@@ -336,7 +347,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         }
 
         case WM_MOUSEMOVE: {
-            //@Temporary: We are casting mouse positions to float until we have an integer Vector type.
             input.mouse_pos_pixels.x = (short)(lParam & 0xFFFF);
             input.mouse_pos_pixels.y = (short)(lParam >> 16);
             break;
@@ -400,8 +410,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             
             GetRawInputData((HRAWINPUT)lParam, RID_INPUT, &raw, &dwSize, sizeof(RAWINPUTHEADER));
             if(raw.header.dwType == RIM_TYPEMOUSE) {
-                input.mouse_delta_pixels.x += raw.data.mouse.lLastX;
-                input.mouse_delta_pixels.y -= raw.data.mouse.lLastY;
+                input.mouse_raw_motion.x += raw.data.mouse.lLastX;
+                input.mouse_raw_motion.y -= raw.data.mouse.lLastY;
             }
 
             return DefWindowProcA(hwnd, uMsg, wParam, lParam);

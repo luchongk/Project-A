@@ -43,25 +43,29 @@ static int shader_count;
 
 static const int MAX_BUFFER_COUNT = 16;
 static GraphicsBuffer buffers[MAX_BUFFER_COUNT];
-static int buffer_count;
+static int buffers_count = 0;
 
-static ID3D11InputLayout* input_layouts[VertexFormat::COUNT];
+static ID3D11InputLayout* input_layouts[VERTEX_FORMAT_COUNT];
 
 static const int MAX_FRAMEBUFFER_COUNT = 4;
 static Framebuffer framebuffers[MAX_FRAMEBUFFER_COUNT];
-static int framebuffer_count;
+static int framebuffers_count;
 static Framebuffer* current_framebuffer = nullptr;
 static Framebuffer* swapchain_framebuffer = nullptr;
 
+static const int MAX_TEXTURE_COUNT = 64;
+static ID3D11ShaderResourceView* texture_views[MAX_TEXTURE_COUNT];
+static int textures_count;
+
 ShaderProgram* current_shader = nullptr;
-//static GraphicsBuffer* current_vertex_buffer = nullptr;
-Texture* white_pixel;
-Texture* texture_not_found;
+Texture* texture_not_found = (Texture*)texture_views[0];
+Texture* white_pixel = (Texture*)texture_views[1];
 
 static uint get_format_stride(VertexFormat format) {
     switch(format) {
-        case VertexFormat::PCU: return sizeof(VertexPCU);
-        case VertexFormat::PNU: return sizeof(VertexPNU);
+        case VERTEX_FORMAT_PCU:  return sizeof(VertexPCU);
+        case VERTEX_FORMAT_PNU:  return sizeof(VertexPNU);
+        case VERTEX_FORMAT_PCNU: return sizeof(VertexPCNU);
         
         default: assert(!"UNREACHABLE");
     }
@@ -70,12 +74,10 @@ static uint get_format_stride(VertexFormat format) {
 }
 
 static void maybe_create_input_layout(VertexFormat format, ID3DBlob* bytecode, ShaderProgram* program) {
-    if(input_layouts[program->input_format]) {
-        return;
-    }
+    if(input_layouts[program->input_format]) return;
 
     switch(format) {
-        case VertexFormat::PCU: {
+        case VERTEX_FORMAT_PCU: {
             D3D11_INPUT_ELEMENT_DESC attributes[] = {
                 {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0,                            0, D3D11_INPUT_PER_VERTEX_DATA, 0},
                 {"COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
@@ -83,12 +85,12 @@ static void maybe_create_input_layout(VertexFormat format, ID3DBlob* bytecode, S
             };
 
             HRESULT error;
-            error = device->CreateInputLayout(attributes, 3, bytecode->GetBufferPointer(), bytecode->GetBufferSize(), &input_layouts[VertexFormat::PCU]);
+            error = device->CreateInputLayout(attributes, 3, bytecode->GetBufferPointer(), bytecode->GetBufferSize(), &input_layouts[VERTEX_FORMAT_PCU]);
             
             break;
         }
 
-        case VertexFormat::PNU: {
+        case VERTEX_FORMAT_PNU: {
             D3D11_INPUT_ELEMENT_DESC attributes[] = {
                 {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0,                            0, D3D11_INPUT_PER_VERTEX_DATA, 0},
                 {"NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
@@ -96,7 +98,7 @@ static void maybe_create_input_layout(VertexFormat format, ID3DBlob* bytecode, S
             };
 
             HRESULT error;
-            error = device->CreateInputLayout(attributes, 3, bytecode->GetBufferPointer(), bytecode->GetBufferSize(), &input_layouts[VertexFormat::PNU]);
+            error = device->CreateInputLayout(attributes, 3, bytecode->GetBufferPointer(), bytecode->GetBufferSize(), &input_layouts[VERTEX_FORMAT_PNU]);
 
             break;
         }
@@ -196,24 +198,26 @@ bool init_graphics(OSWindow* window) {
         texture_desc.CPUAccessFlags = 0;
         texture_desc.MiscFlags = 0;
 
-        ID3D11Texture2D *texture_white;
-        error = device->CreateTexture2D(&texture_desc, nullptr, &texture_white);
-
-        error = device->CreateShaderResourceView(texture_white, nullptr, (ID3D11ShaderResourceView**)&white_pixel);
-        
-        u8 white[4] = {255,255,255,255};
-        device_context->UpdateSubresource(texture_white, 0, 0, white, 4, 0);
-
         ID3D11Texture2D *texture_magenta;
         error = device->CreateTexture2D(&texture_desc, nullptr, &texture_magenta);
 
         error = device->CreateShaderResourceView(texture_magenta, nullptr, (ID3D11ShaderResourceView**)&texture_not_found);
+        texture_views[textures_count++] = (ID3D11ShaderResourceView*)texture_not_found;
         
         u8 magenta[4] = {255,0,255,255};
         device_context->UpdateSubresource(texture_magenta, 0, 0, magenta, 4, 0);
+        texture_magenta->Release();
+
+        ID3D11Texture2D *texture_white;
+        error = device->CreateTexture2D(&texture_desc, nullptr, &texture_white);
+
+        error = device->CreateShaderResourceView(texture_white, nullptr, (ID3D11ShaderResourceView**)&white_pixel);
+        texture_views[textures_count++] = (ID3D11ShaderResourceView*)white_pixel;
+        
+        u8 white[4] = {255,255,255,255};
+        device_context->UpdateSubresource(texture_white, 0, 0, white, 4, 0);
 
         texture_white->Release();
-        texture_magenta->Release();
     }
         
     return true;
@@ -223,12 +227,12 @@ void end_graphics() {
     //HRESULT error;
     //error = swap_chain->SetFullscreenState(false, nullptr);
 
-    for(int i = 0; i < buffer_count; i++) {
+    for(int i = 0; i < buffers_count; i++) {
         buffers[i].d3d->Release();
     }
 
-    for(int i = 0; i < VertexFormat::COUNT; i++) {
-        input_layouts[i]->Release();
+    for(int i = 0; i < VERTEX_FORMAT_COUNT; i++) {
+        if(input_layouts[i]) input_layouts[i]->Release();
     }
     
     for(int i = 0; i < shader_count; i++) {
@@ -236,7 +240,7 @@ void end_graphics() {
         shaders[i].vertex_shader->Release();
     }
 
-    for(int i = 0; i < framebuffer_count; i++) {
+    for(int i = 0; i < framebuffers_count; i++) {
         framebuffers[i].depth_stencil->Release();
         framebuffers[i].render_target->Release();
         if(&framebuffers[i] != swapchain_framebuffer) {
@@ -244,8 +248,10 @@ void end_graphics() {
         }
     }
 
-    ((ID3D11ShaderResourceView*)white_pixel)->Release();
-    ((ID3D11ShaderResourceView*)texture_not_found)->Release();
+    for(int i = 0; i < textures_count; i++) {
+        texture_views[i]->Release();
+    }
+
     sampler_state->Release();
     rasterizer_state->Release();
     depth_stencil_state_off->Release();
@@ -324,18 +330,16 @@ ShaderProgram* compile_shader(String vertex_path, String pixel_path, VertexForma
     ID3D10Blob* bytecode;
     static wchar_t path_wide[256];
 
-    // VERTEX SHADER
-    // We use D3DCOMPILE_PACK_MATRIX_ROW_MAJOR below, the opposite of what is adviced by the D3D documentation because we also use the opposite vector convention (column vector instead of row vector) in our shaders.
+    // ROW MAJOR vs COLUMN MAJOR STORAGE.
     //
-    // We prefer column vectors as this is what mathematical notation uses, but the problem is that doing mul(matrix, vector) with a column major matrix is slower than doing it with a row major matrix.
-    // This is because mul(matrix, vector) with a row major matrix compiles down to 4 dot product instructions (1 dot product per matrix row) while the same operation with a column major matrix compiles to 1 MUL and 3 MADs, which is generally slower.
-    // The opposite is true if you are using a row vector convention in your shader code. 
+    // mul(matrix, vector) with row major storage compiles down to 4 dot product instructions (1 dot product per matrix row) while the same operation with column major storage compiles to 1 MUL and 3 MADs.
+    // The opposite is true if you are using a row vector convention (mul(vector, matrix)) in your shader code. Apparently, on modern hardware there's no difference in performance between the two sets of instructions, as mentioned
+    // by Fabian Giesen in a comment in one of his posts: https://fgiesen.wordpress.com/2012/02/12/row-major-vs-column-major-row-vectors-vs-column-vectors/.
     //
-    // So basically, the choice of using D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR (the default) or D3DCOMPILE_PACK_MATRIX_ROW_MAJOR boils down to what convention for vectors you are going to use:
-    //
-    // mul(vector, matrix) -> D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR is best
-    // mul(matrix, vector) -> D3DCOMPILE_PACK_MATRIX_ROW_MAJOR    is best
+    // So basically, there's no important differences between D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR (the default) or D3DCOMPILE_PACK_MATRIX_ROW_MAJOR.
+    // I'm going to use the latter just because I want to use column vector notation in my shader code, and translating that to 4 dot products in assembly reads better than the other option.
 
+    // VERTEX SHADER
     mbstowcs(path_wide, (const char*)vertex_path.data, 256);
     error = D3DCompileFromFile(path_wide, nullptr, nullptr, "main", "vs_5_0", D3DCOMPILE_PACK_MATRIX_ROW_MAJOR, 0, &bytecode, &errors);
     if (error) {
@@ -383,11 +387,6 @@ void set_shader(ShaderProgram* p) {
     current_shader = p;
 }
 
-/*void set_fullscreen(bool fullscreen) {
-    HRESULT error;
-    error = swap_chain->SetFullscreenState(fullscreen, nullptr);
-}*/
-
 static void create_onscreen_render_target_view() {
     HRESULT error;
     ID3D11Texture2D* pBuffer;
@@ -425,7 +424,7 @@ static ID3D11DepthStencilView* create_depth_stencil_view(int width, int height) 
 
 Framebuffer* create_onscreen_framebuffer(int width, int height) {
     assert(!swapchain_framebuffer); // We support only 1 swapchain for now (and probably forever).
-    assert(framebuffer_count < MAX_FRAMEBUFFER_COUNT);
+    assert(framebuffers_count < MAX_FRAMEBUFFER_COUNT);
 
     // BEGIN STUPID D3D CODE:
     
@@ -466,7 +465,7 @@ Framebuffer* create_onscreen_framebuffer(int width, int height) {
 
     // END STUPID D3D CODE.
 
-    swapchain_framebuffer = &framebuffers[framebuffer_count++];
+    swapchain_framebuffer = &framebuffers[framebuffers_count++];
     create_onscreen_render_target_view();
     swapchain_framebuffer->depth_stencil = create_depth_stencil_view(width, height);
 
@@ -543,9 +542,9 @@ static ID3D11RenderTargetView* create_offscreen_render_target_view(int width, in
 }
 
 Framebuffer* create_offscreen_framebuffer(int width, int height) {
-    assert(framebuffer_count < MAX_FRAMEBUFFER_COUNT);
+    assert(framebuffers_count < MAX_FRAMEBUFFER_COUNT);
 
-    Framebuffer* framebuffer = &framebuffers[framebuffer_count++];
+    Framebuffer* framebuffer = &framebuffers[framebuffers_count++];
     framebuffer->render_target = create_offscreen_render_target_view(width, height, &framebuffer->srv);
     framebuffer->depth_stencil = create_depth_stencil_view(width, height);
 
@@ -599,77 +598,52 @@ void set_blend(bool on) {
     else   device_context->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
 }
 
-Texture* create_texture_from_bitmap(void* data, int width, int height) {
+Texture* create_texture_from_data(void* data, int width, int height, int num_channels, bool generate_mips) {
     D3D11_TEXTURE2D_DESC texture_desc;
     texture_desc.Width = width;
     texture_desc.Height = height;
-    texture_desc.MipLevels = 1;
+    texture_desc.MipLevels = generate_mips ? 0 : 1;
     texture_desc.ArraySize = 1;
-    texture_desc.Format = DXGI_FORMAT_R8_UNORM;
     texture_desc.SampleDesc.Quality = 0;
     texture_desc.SampleDesc.Count = 1;
     texture_desc.Usage = D3D11_USAGE_DEFAULT;
-    texture_desc.BindFlags = D3D11_BIND_SHADER_RESOURCE /*| D3D11_BIND_RENDER_TARGET*/;
+    texture_desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | (generate_mips ? D3D11_BIND_RENDER_TARGET : 0);
     texture_desc.CPUAccessFlags = 0;
-    texture_desc.MiscFlags = 0;
-
-    /*D3D11_SUBRESOURCE_DATA initData;
-    initData.pSysMem = image_data;
-    initData.SysMemPitch = width * nrChannels;*/
+    texture_desc.MiscFlags = generate_mips ? D3D11_RESOURCE_MISC_GENERATE_MIPS : 0;
+    
+    assert(num_channels >= 1 && num_channels <= 4);
+    if(num_channels == 1) {
+        texture_desc.Format = DXGI_FORMAT_R8_UNORM;
+    }
+    else if(num_channels == 2) {
+        texture_desc.Format = DXGI_FORMAT_R8G8_UNORM;
+    }
+    else {
+        texture_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+    }
 
     ID3D11Texture2D *texture;
     HRESULT error;
     error = device->CreateTexture2D(&texture_desc, nullptr, &texture);
 
-    ID3D11ShaderResourceView* texture_view;
-    error = device->CreateShaderResourceView(texture, nullptr, &texture_view);
-    
-    device_context->UpdateSubresource(texture, 0, 0, data, width, 0);
-
+    ID3D11ShaderResourceView** texture_view = &texture_views[textures_count++];
+    error = device->CreateShaderResourceView(texture, nullptr, texture_view);
+    device_context->UpdateSubresource(texture, 0, 0, data, width * num_channels, 0);
     texture->Release();
 
-    return (Texture*)texture_view;
+    if(generate_mips) device_context->GenerateMips(*texture_view);
+
+    return (Texture*)(*texture_view);
 }
 
-Texture* create_texture_from_file(String path) {
+Texture* create_texture_from_file(String path, bool generate_mips) {
     //stbi_set_flip_vertically_on_load(true);
     
-    int width, height, nrChannels;
-    unsigned char *image_data = stbi_load((const char*)path.data, &width, &height, &nrChannels, 0);
+    int width, height, num_channels;
+    unsigned char *image_data = stbi_load((const char*)path.data, &width, &height, &num_channels, 0);
     if (!image_data) return nullptr;
 
-    D3D11_TEXTURE2D_DESC texture_desc;
-    texture_desc.Width = width;
-    texture_desc.Height = height;
-    texture_desc.MipLevels = 0;
-    texture_desc.ArraySize = 1;
-    texture_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-    texture_desc.SampleDesc.Quality = 0;
-    texture_desc.SampleDesc.Count = 1;
-    texture_desc.Usage = D3D11_USAGE_DEFAULT;
-    texture_desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
-    texture_desc.CPUAccessFlags = 0;
-    texture_desc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
-
-    /*D3D11_SUBRESOURCE_DATA initData;
-    initData.pSysMem = image_data;
-    initData.SysMemPitch = width * nrChannels;*/
-
-    ID3D11Texture2D *texture;
-    HRESULT error;
-    error = device->CreateTexture2D(&texture_desc, nullptr, &texture);
-
-    ID3D11ShaderResourceView* texture_view;
-    error = device->CreateShaderResourceView(texture, nullptr, &texture_view);
-    
-    device_context->UpdateSubresource(texture, 0, 0, image_data, width * nrChannels, 0);
-
-    stbi_image_free(image_data);
-    texture->Release();
-
-    device_context->GenerateMips(texture_view);
-
-    return (Texture*)texture_view;
+    return create_texture_from_data(image_data, width, height, num_channels, generate_mips);
 }
 
 void set_texture(uint slot, Texture* texture) {
@@ -679,6 +653,7 @@ void set_texture(uint slot, Texture* texture) {
 }
 
 void release_texture(Texture* texture) {
+    assert(texture);
     ((ID3D11ShaderResourceView*)texture)->Release();
 }
 
@@ -702,14 +677,14 @@ static GraphicsBuffer* create_buffer(D3D11_BIND_FLAG type, GraphicsBufferUsage u
         subresource_data = &srd;
     }
 
-    assert(buffer_count < MAX_BUFFER_COUNT);
-    GraphicsBuffer* buffer = &buffers[buffer_count];
+    assert(buffers_count < MAX_BUFFER_COUNT);
+    GraphicsBuffer* buffer = &buffers[buffers_count];
     buffer->usage = usage;
 
     HRESULT error;
     error = device->CreateBuffer(&buffer_desc, subresource_data, &buffer->d3d);
 
-    buffer_count++;
+    buffers_count++;
 
     return buffer;
 }

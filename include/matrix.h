@@ -152,13 +152,14 @@ Matrix rotation(float yaw, float pitch) {
 }
 
 Matrix look_to(Vec3 pos, Vec3 forward, Vec3 up = {0,1,0}) {
-    Vec3 right = normalize(cross(up, -forward));
-    up = cross(-forward, right);
+    forward = -forward;
+    Vec3 right = normalize(cross(up, forward));
+    up = cross(forward, right);
 
     return Matrix{
            right.x,    right.y,    right.z, -dot(right, pos),
               up.x,       up.y,       up.z, -dot(up, pos),
-        -forward.x, -forward.y, -forward.z, -dot(-forward, pos),
+         forward.x,   forward.y, forward.z, -dot(forward, pos),
                  0,          0,          0, 1,
     };
 }
@@ -169,19 +170,42 @@ inline Matrix look_at(Vec3 pos, Vec3 to, Vec3 up = {0,1,0}) {
     return look_to(pos, forward, up);
 }
 
-Matrix perspective(int width, int height) {
-    // @Journey 04/13/2021: We learned that Direct3D NDC coordinates go from 0 (near plane) to 1 (far plane) in the z-axis.
-    // This means we can't rely on glm::perspective to create a projection matrix for us because OpenGL's convention
-    // is to map z coordinates to values between -1 (near plane) and 1 (far plane). So.. we just learned how to make our own projection matrix!
-    // X and Y axis are treated the same in D3D vs OpenGL (-1 to 1), so we borrowed those rows from glm's matrix.
+// In the following two functions z_near and z_far are taken to be distances to de clipping planes in the viewing
+// direction, as is the usual convention. Therefore, negative values mean the planes lie behind the view origin.
+// This way of defining these parameters has the advantage of being independent from handedness, although here we
+// only support a right-handed system.
 
-    float aspect = (float)width / height;
-    float tanHalfFovy = tan(to_radians(45.0f) / 2);
+Matrix perspective(float width, float height, float y_field_of_view, float z_near, float z_far) {
+    // @Journey 04/13/2021: I learned that Direct3D NDC coordinates go from 0 (near plane) to 1 (far plane) in the z-axis.
+    // This means I can't rely on glm::perspective to create a projection matrix because OpenGL's convention
+    // is to map z coordinates to values between -1 (near plane) and 1 (far plane). So.. I just learned how to make our own projection matrix!
+    // X and Y axis are treated the same in D3D vs OpenGL (-1 to 1), so I borrowed those rows from glm's matrix.
+
+    float aspect = width / height;
+    float tanHalfFovy = tanf(radians(y_field_of_view) / 2);
     return Matrix{
-        1.0f / (aspect * tanHalfFovy),               0.0f,          0.0f,                0.0f,
-                                 0.0f, 1.0f / tanHalfFovy,          0.0f,                0.0f,
-                                 0.0f,               0.0f, -100.0f/99.9f, -100.0f * 0.1f/99.9f,
-                                 0.0f,               0.0f,            -1,                0.0f
+        1.0f/(aspect * tanHalfFovy),             0.0f,                    0.0f,                           0.0f,
+                               0.0f, 1.0f/tanHalfFovy,                    0.0f,                           0.0f,
+                               0.0f,             0.0f, -z_far/(z_far - z_near), -z_far*z_near/(z_far - z_near),
+                               0.0f,             0.0f,                      -1,                           0.0f
+    };
+}
+
+Matrix orthographic(float width, float height, float z_near, float z_far) {
+    return Matrix{
+        2.0f/width,        0.0f,                  0.0f,                         0,
+              0.0f, 2.0f/height,                  0.0f,                         0,
+              0.0f,        0.0f, -1.0f/(z_far - z_near), -z_near/(z_far - z_near),
+              0.0f,        0.0f,                  0.0f,                         1
+    };
+}
+
+Matrix orthographic(float left, float bottom, float right, float top, float z_near, float z_far) {
+    return Matrix{
+        2.0f/(right - left),                0.0f,                  0.0f, (left + right)/(left - right),
+                       0.0f, 2.0f/(top - bottom),                  0.0f, (top + bottom)/(bottom - top),
+                       0.0f,                0.0f, -1.0f/(z_far - z_near),     -z_near/(z_far - z_near),
+                       0.0f,                0.0f,                  0.0f,                             1
     };
 }
 

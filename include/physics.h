@@ -7,10 +7,10 @@
 struct Player;
 struct Entity;
 
-ENUM(ColliderShape,
-    NONE,
-    BOX
-)
+enum ColliderShape {
+    COLLIDER_SHAPE_NONE,
+    COLLIDER_SHAPE_BOX,
+};
 
 struct CollisionContact {
     Player* player;
@@ -25,7 +25,7 @@ struct AABB {
 };
 
 struct Collider {
-    ColliderShape shape = ColliderShape::NONE;
+    ColliderShape shape = COLLIDER_SHAPE_NONE;
     union {
         AABB box;
     };

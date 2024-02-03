@@ -5,9 +5,11 @@
 #include "main.h"
 
 bool do_step = false;
+bool use_perspective = true;
 
 #include "stb_image.cpp"
 #include "stb_truetype.cpp"
+#include "input_callbacks.cpp"
 #include "input.cpp"
 #include "render.cpp"
 #include "physics.cpp"
@@ -18,7 +20,8 @@ bool do_step = false;
 #include "rect.cpp"
 #include "font.cpp"
 #include "simple_draw.cpp"
-#include "ui.cpp"
+//#include "ui.cpp"
+#include "new_ui.cpp"
 
 Time my_time;
 OSWindow* window;
@@ -53,20 +56,19 @@ void main() {
 
     reset_scene();
     
+    init_input();
     init_renderer(window);
 
-    wait_for_vblank();
-
     while(true) {
-        update_time();
+        wait_for_vblank();
 
-        //u64 before = os_get_timestamp();
+        update_time();
         update_input(window);
 
         bool should_quit = handle_input(&events);
         if(should_quit) break;
 
-        ui_update();
+        //ui_update();
        
         auto sim_dt = my_time.simulation_dt;
         if(paused) {
@@ -122,8 +124,6 @@ void main() {
         if(elapsed > 0.002f) {
             printf_s("elapsed: %.4f\n", elapsed);
         }*/
-
-        wait_for_vblank();
 
         arena_reset(&temporary_storage);
 

@@ -2,10 +2,11 @@
 #define RECT_H
 
 struct Rect {
-    float x;
-    float y;
-    float width;
-    float height;
+    union {
+        struct { float x, y; };
+        Vec2 origin; //Bottom left
+    };
+    float w, h;
 };
 
 Rect relative_to_screen(Rect parent, Rect rect);

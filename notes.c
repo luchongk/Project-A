@@ -3,25 +3,26 @@
  * ✓
  * * [✓] Clean up vector.h.
  * 
- * * [] Make some kind of vector3 for ints.
+ * * [✓] Make some kind of vector3 for ints.
  * 
  * * [✓] Math header file.
  * 
  * * [✓] Array type.
  * 
- * * [] LearnOpengl.
+ * * [~] LearnOpengl.
  * 
  * * [] Make Debug UI.
  * 
- * * [] Physics.
+ * * [~] Physics.
+ *    * [✓] AABB
+ *    * [] Raycast
+ *    * [] OBB
  * 
  * * [✓] Get rid of GLM.
  * 
  * * [✓] Temporary Storage.
- * 
- * * [] Position/Rotation interpolation for rendering.
- * 
- * * [] Better input handling. Detect both pressing and holding.
+ *
+ * * [✓] Better input handling. Detect both pressing and holding.
  * 
  * * [] Mouse picking
  */

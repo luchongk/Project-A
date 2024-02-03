@@ -26,6 +26,7 @@ Array<UISlider>     ui_sliders;
 Array<UIText>       ui_texts;
 Array<UITextField>  ui_text_fields;
 
+String ui_hot_id = ""_s;
 UIWidget* ui_hot       = nullptr;
 UIPanel*  ui_hot_panel = nullptr;
 UIAction  ui_current_action;
@@ -46,18 +47,17 @@ bool is_mouse_over(Rect rect) {
 }
 
 static void ui_end_action() {
-    ui_current_action.widget  = nullptr;
+    ui_current_action.widget    = nullptr;
+    ui_current_action.widget_id = ""_s;
 }
 
-void ui_reset() {
+void ui_begin() {
     array_reset(&ui_widgets);
     array_reset(&ui_panels);
     array_reset(&ui_buttons);
     array_reset(&ui_sliders);
     array_reset(&ui_text_fields);
     array_reset(&ui_texts);
-
-    ui_init();
 }
 
 static UIWidget* ui_create_element(Rect rect, UIWidgetType type, String name) {
@@ -139,7 +139,7 @@ void ui_init() {
     array_reserve(&ui_texts,       16);
     ui_end_action();
 
-    Rect rect = {0.01f, 0.01f, 0.2f, 0.4f};
+    /*Rect rect = {0.01f, 0.01f, 0.2f, 0.4f};
     auto panel = ui_create_panel(rect, "MY_PANEL"_s);
 
     rect = pad_left_right({0,0,1,1}, 0.2f);
@@ -193,15 +193,16 @@ void ui_init() {
 
     rect.y += rect.height;
     text = ui_create_text(rect, "TEXT_VELOCITY_2"_s, velocity_strings[2]);
-    add_to_panel(panel, text->widget);
+    add_to_panel(panel, text->widget);*/
     
     ui_visible = true;
 }
 
 void ui_update_hot() {
     ui_hot = nullptr;
+    ui_hot_id = ""_s;
     
-    For(ui_panels) {
+    /*For(ui_panels) {
         Rect rect = it->widget->rect;
         if(it->visible && is_mouse_over(rect)) {
             ui_hot_panel = it;
@@ -211,11 +212,21 @@ void ui_update_hot() {
                 Rect child_rect = relative_to_screen(rect, child->rect);
                 if(child->visible && is_mouse_over(child_rect)) {
                     ui_hot = child;
+                    ui_hot_id = child->name;
                     return;
                 }
             }
 
             ui_hot = it->widget;
+            ui_hot_id = it->widget->name;
+            return;
+        }
+    }*/
+
+    For(ui_widgets) {
+        if(it->visible && is_mouse_over(it->rect)) {
+            ui_hot    = it;
+            ui_hot_id = it->name;
             return;
         }
     }
@@ -236,7 +247,8 @@ bool ui_handle_click_event(EventKey* event) {
     // would occur when clicking while moving the mouse REALLY fast, at which point you are just probably trolling with the UI instead of using it legitimately.
     // Doing it like this saves us from calculating the widget on which each click landed; we just assume all of them land on the hot widget, which is highly likely.
     if(event->pressed) {
-        ui_current_action.widget = ui_hot;
+        ui_current_action.widget    = ui_hot;
+        ui_current_action.widget_id = ui_hot_id;
         ui_focused = ui_hot;
 
         switch(ui_hot->type) {
@@ -331,7 +343,6 @@ bool ui_handle_text_event(EventText* event) {
 void ui_update() {
     for(uint i = 0; i < updatables.count;) {
         auto it = updatables[i];
-
         auto keep_updating = true;  // @Cleanup: This will be the return value for update functions.
 
         switch(it->type) {
@@ -387,36 +398,22 @@ void ui_update() {
     }
 }
 
-static void ui_flush(ShaderProgram* shader) {
-    set_depth(false);
-    set_blend(true);
-    set_shader(shader);
-    set_vertex_buffer(sd_vertex_buffer);
-    modify_buffer(sd_vertex_buffer, sizeof(VertexPCU) * sd_vertices.count, sd_vertices.data);
-    
-    draw(0, sd_vertices.count);
-    set_blend(false);
-    set_depth(true);
-    
-    array_reset(&sd_vertices);
+static void ui_end() {
+    sd_flush();
 }
 
-static void core_draw_button(Rect rect, Vec4 base_color, Vec4 hover_color, bool hovered, bool pressed) {
-    Vec4 color;
+static void core_draw_button(Rect rect, Vec4 color, bool hovered, bool pressed) {
     if(pressed) {
-        color = darken(hover_color, 0.5f);
+        color = darken(color, 0.5f);
     }
     else if(hovered) {
-        color = hover_color;
-    }
-    else {
-        color = base_color;
+        color = lighten(color, 0.5f);
     }
     
     draw_rect(rect, color);
 }
 
-static void draw_button(UIWidget* widget, UIPanel* panel) {
+/*static void draw_button(UIWidget* widget, UIPanel* panel) {
     auto button = (UIButton*)widget->type_data;
     
     bool hovered = widget == ui_hot;
@@ -437,7 +434,7 @@ static void draw_slider(UIWidget* widget, UIPanel* panel) {
     button.x = slider_rect.x + (slider_rect.width - button.width) * *slider->value;
     bool pressed = ui_current_action.widget == widget;
     core_draw_button(button, slider->button_color, slider->button_color, true, pressed);
-}
+}*/
 
 static void draw_text(UIWidget* widget, UIPanel* panel) {
     auto text_widget = (UIText*)widget->type_data;
@@ -457,8 +454,8 @@ static void draw_text_field(UIWidget* widget, UIPanel* panel) {
 
     auto field_rect = relative_to_screen(panel->widget->rect, widget->rect);
     
-    auto selected_rect = pad_rect(field_rect, -0.2f);
-    if(ui_focused == widget) draw_rect(selected_rect, {0,0,1,1});
+    auto focused_rect = pad_rect(field_rect, -0.2f);
+    if(ui_focused == widget) draw_rect(focused_rect, {0,0,1,1});
     draw_rect(field_rect, {0.3f, 0.3f, 0.3f, 1.0f});
 
     String text = from_cstring(field->value, field->count);
@@ -488,12 +485,12 @@ static void draw_panel(UIPanel* panel) {
 
         switch(child->type) {
             case UIWidgetType::BUTTON: {
-                draw_button(child, panel);
+                //draw_button(child, panel);
                 break;
             }
 
             case UIWidgetType::SLIDER: {
-                draw_slider(child, panel);
+                //draw_slider(child, panel);
                 break;
             }
 
@@ -509,11 +506,39 @@ static void draw_panel(UIPanel* panel) {
         }
     }
 }
-
+void ui_button(Rect rect, Vec4 color, String name);
 void ui_render() {
-    For(ui_panels) {
+    /*For(ui_panels) {
         if(it->visible) draw_panel(it);
     }
     
-    sd_flush();
+    sd_flush();*/
+    ui_begin();
+    ui_button({input.mouse_pos_normalized.x, input.mouse_pos_normalized.y, 0.4f, 0.4f}, {1,0,0,1}, "My_batton"_s);
+    ui_end();
+}
+
+//@Slow: Use hash table if needed.
+/*UIWidget* get_or_create_widget(Rect rect, String name) {
+    For(ui_widgets) {
+        if(equals(it->name, name)) return it;
+    }
+
+    return array_add(&ui_widgets, {rect, name});
+}*/
+
+void ui_button(Rect rect, Vec4 color, String name) {
+    array_add(&ui_widgets, {rect, name});
+    bool hovered = equals(name, ui_hot_id);
+    bool pressed = equals(name, ui_current_action.widget_id);
+    
+    //Rect rect = relative_to_screen(panel->widget->rect, widget->rect);
+    if(pressed) {
+        color = darken(color, 0.5f);
+    }
+    else if(hovered) {
+        color = lighten(color, 0.5f);
+    }
+    
+    draw_rect(rect, color);
 }

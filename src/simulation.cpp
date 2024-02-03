@@ -1,5 +1,5 @@
 #include "entities.h"
-#include "ui.h"
+//#include "ui.h"
 
 /*
     @Journey 8/29/2023: Ok, computational physics is hard! The math part isn't that bad, but the algorithmic part...
@@ -66,122 +66,162 @@ float camera_distance_target = 10;
 float camera_distance = 10;
 float zoom_sensitivity = 2.5f;
 float zoom_snappiness = 10.0f;
+Vec2i saved_mouse_pos = {0,0};
 
 // Player movement
 const Vec3 g_acceleration = {0, 3 * -9.8f, 0};
-float grounded_speed = 5;
+float grounded_speed = 10;
 float jump_speed = 12;
 
 static void update_camera(float dt) {
-    float delta_yaw = -input.mouse_delta_pixels.x * to_radians(2.0f) * dt;
+    float delta_yaw = -input.mouse_raw_motion.x * radians(2.0f) * dt;
     main_camera->yaw = normalize_angle(main_camera->yaw + delta_yaw);
     
-    float delta_pitch = input.mouse_delta_pixels.y * to_radians(2.0f) * dt;
-    main_camera->pitch = clamp(main_camera->pitch + delta_pitch, to_radians(-89), to_radians(89));
+    float delta_pitch = input.mouse_raw_motion.y * radians(2.0f) * dt;
+    main_camera->pitch = clamp(main_camera->pitch + delta_pitch, radians(-89), radians(89));
 
     Vec3 forward = angles_to_vec(main_camera->yaw, main_camera->pitch);
 
-    Vec3 final_camera_position;
-    if(!character_selected) {
-        if(input.move.x != 0) {
-            main_camera->entity->position += normalize(cross(Vec3{0,1,0}, -forward)) * 3.0f * input.move.x * dt;
+    if(using_perspective) {
+        if(character_selected) {
+            main_camera->target.x = exp_interpolate(main_camera->target.x, main_player->entity->position.x, dt);
+            main_camera->target.y = exp_interpolate(main_camera->target.y, main_player->entity->position.y, dt);
+            main_camera->target.z = main_player->entity->position.z;
+            static auto last_player_pos = 0.0f;
+            auto player_dx = (main_player->entity->position.x - last_player_pos) / dt;
+            last_player_pos = main_player->entity->position.x;
+            camera_distance_target = fabs(player_dx) * 8;
+            camera_distance_target = clamp(camera_distance_target, 10.0f, 25.0f);
+            camera_distance = exp_interpolate(camera_distance, camera_distance_target, dt, 0.1f);
+            main_camera->entity->position = main_camera->target + normalize(Vec3{0, 4, 7}) * camera_distance;
         }
+        else {
+            if(input.move.x != 0) {
+                main_camera->entity->position += normalize(cross(Vec3{0,1,0}, -forward)) * 5.0f * input.move.x * dt;
+            }
 
-        if(input.move.y != 0) {
-            main_camera->entity->position += Vec3{0,1,0} * 2.0f * input.move.y * dt;
+            if(input.move.y != 0) {
+                main_camera->entity->position += Vec3{0,1,0} * 5.0f * input.move.y * dt;
+            }
+
+            if(input.move.z != 0) {
+                main_camera->entity->position += forward * 5.0f * input.move.z * dt;
+            }
         }
-
-        if(input.move.z != 0) {
-            main_camera->entity->position += forward * 2.0f * input.move.z * dt;
-        }
-
-        final_camera_position = main_camera->entity->position;
     }
-    else {        
-        main_camera->entity->position.x = exp_interpolate(main_camera->entity->position.x, main_player->entity->position.x, dt);
-        main_camera->entity->position.y = exp_interpolate(main_camera->entity->position.y, main_player->entity->position.y, dt);
-        main_camera->entity->position.z = main_player->entity->position.z;
+    else {
+        forward = Vec3::forward;
+        if(character_selected) {
+            main_camera->target.x = exp_interpolate(main_camera->target.x, main_player->entity->position.x, dt);
+            main_camera->target.y = exp_interpolate(main_camera->target.y, main_player->entity->position.y, dt);
+            main_camera->entity->position = main_camera->target + Vec3::back * camera_distance;
+        }
+        else {
+            if(is_key_down(VK_RBUTTON)) {
+                Vec2i new_mouse_pos = input.mouse_pos_pixels;
+                if(input.mouse_pos_pixels.x < 5)                       new_mouse_pos.x = window->size.x - 5;
+                else if(input.mouse_pos_pixels.x > window->size.x - 5) new_mouse_pos.x = 5;
+                
+                if(input.mouse_pos_pixels.y < 5)                       new_mouse_pos.y = window->size.y - 5;
+                else if(input.mouse_pos_pixels.y > window->size.y - 5) new_mouse_pos.y = 5;
 
-        static auto last_player_pos = 0.0f;
-        auto player_dx = (main_player->entity->position.x - last_player_pos) / dt;
-        last_player_pos = main_player->entity->position.x;
-        camera_distance_target = fabs(player_dx) * 8;
-        camera_distance_target = clamp<float>(camera_distance_target, 10, 25);
-        camera_distance = exp_interpolate(camera_distance, camera_distance_target, dt, 0.1f);
-        final_camera_position = main_camera->entity->position + normalize(Vec3{0, 4, 7}) * camera_distance;
+                if(new_mouse_pos != input.mouse_pos_pixels) set_mouse_pos(new_mouse_pos.x, new_mouse_pos.y);
+                
+                //@Cleanup: Store the ratio of world units to pixels somewhere.
+                float pixels_per_world_unit = ORTHOGRAPHIC_VIEW_WIDTH / window->size.x;
+                main_camera->entity->position.x -= input.mouse_delta_pixels.x * pixels_per_world_unit;
+                main_camera->entity->position.y += input.mouse_delta_pixels.y * pixels_per_world_unit;
+                main_camera->target = main_camera->entity->position;
+            }
+        }
     }
 
-    per_frame_uniforms.view_pos = final_camera_position;
-    per_frame_uniforms.view = look_to(final_camera_position, forward);
+    per_frame_uniforms.view_pos = main_camera->entity->position;
+    per_frame_uniforms.view = look_to(main_camera->entity->position, forward);
 }
 
 float do_the_thing_cooldown = 0;
 void simulate(float dt) {
     {
-        cubes_rotation += -input.rotation * to_radians(45.0f) * dt;
+        auto r = is_button_down(INPUT_BUTTON_ROTATE_RIGHT) - is_button_down(INPUT_BUTTON_ROTATE_LEFT);
+        cubes_rotation += -r * radians(45.0f) * dt;
         
-        if(input.action_1) {
+        if(is_button_down(INPUT_BUTTON_WEIRD)) {
             for(int i = 0; i < count_Ground; i++) {
                 Entity* e = pool_Ground[i].entity;
                 e->orientation = rotation(cubes_rotation, cubes_rotation);
-                e->scale = abs(sin(my_time.since_start));
+                e->scale = fabs(sinf(my_time.since_start)) * Vec3{1,1,1};
             }
         }
+    }
+
+    if(is_button_down(INPUT_BUTTON_DO_THE_THING) && do_the_thing_cooldown >= 1.0f) {
+        create_ground(main_player->entity->position, main_player->entity->scale.x, main_player->entity->scale.y, main_player->entity->scale.z);
+        do_the_thing_cooldown = 0;
+    }
+    else {
+        do_the_thing_cooldown = min(do_the_thing_cooldown + dt, 1.0f);
     }
 
     // Calculate movement
     for(int i = 0; i < count_Player; i++) {
         auto player = &pool_Player[i];
-        player->move = i == 0 ? input.move : Vec3{0,0,0};
 
         if(player->entity->position.y < -50) {
             player->velocity = {};
             reset_scene();
-        }
-
-        if(input.action_2 && do_the_thing_cooldown > 2.0f) {
-            create_ground(player->entity->position, player->dimensions.x, player->dimensions.y, player->dimensions.z);
-            do_the_thing_cooldown = 0;
-        }
-        else {
-            do_the_thing_cooldown += dt;
+            return;
         }
         
         // Update impulses before integration, since the input we are currently processing actually happened last frame.
 
-        //if(character_selected) {
-            player->jumped_this_frame = false;
-            auto normalized_move = normalize(Vec3{player->move.x, 0, -player->move.z});
-            if(player->grounded) {
-                if(player->move.y == 1) {
-                    if(player->velocity.y < jump_speed) player->velocity.y = jump_speed;
-                    player->jumped_this_frame = true;
-                }
-                else {
-                    player->velocity.x = grounded_speed * normalized_move.x;
-                    player->velocity.z = grounded_speed * normalized_move.z;
-                }
+        if(i == 0) {
+            if(!paused && using_perspective && !character_selected) continue;
+            player->move = input.move;
+        }
+        else {
+            player->move = Vec3{(float)(is_key_down('L') - is_key_down('J')), (float)is_key_down('I'), 0};
+        }
+
+        player->jumped_this_frame = false;
+        auto target_velocity = player->move * 30;
+        if(player->grounded) {
+            if(player->move.y == 1) {
+                if(player->velocity.y < jump_speed) player->velocity.y += jump_speed;
+                player->jumped_this_frame = true;
             }
             else {
-                player->velocity.x += 5 * normalized_move.x * dt;
-                player->velocity.z += 5 * normalized_move.z * dt;
+                auto acc = 10.0f;
+                if(target_velocity.x == 0 || sign(target_velocity.x) != sign(player->velocity.x)) acc *= 4;
+
+                if(target_velocity.x > player->velocity.x) {
+                    player->velocity.x += acc * dt;
+                    if(player->velocity.x > target_velocity.x) player->velocity.x = target_velocity.x;
+                }
+                else if(target_velocity.x < player->velocity.x) {
+                    player->velocity.x -= acc * dt;
+                    if(player->velocity.x < target_velocity.x) player->velocity.x = target_velocity.x;
+                }
+                player->velocity.z = grounded_speed * player->move.z;
             }
+        }
+        else {
+            player->velocity.x += 5 * player->move.x * dt;
+            player->velocity.z += 5 * player->move.z * dt;
+        }
 
-            // Velocity integration before position integration ("Semi-implicit" Euler)
-            player->velocity += g_acceleration * dt;
-            
-            // Position integration
-            player->entity->position += player->velocity * dt;
-        //}
-    }
+        // Velocity integration before position integration ("Semi-implicit" Euler)
+        player->velocity += g_acceleration * dt;
+        
+        // Position integration
+        player->entity->position += player->velocity * dt;
 
-    for(int i = 0; i < count_Player; i++) {
         pool_Player[i].was_grounded = pool_Player[i].grounded;
         pool_Player[i].grounded = false;
     }
 
-    void solve_collisions3(float dt);
-    solve_collisions3(dt);
+    void solve_collisions(float dt);
+    solve_collisions(dt);
 }
 
 CollisionContact static_contacts[64];
@@ -194,15 +234,15 @@ void find_new_contacts(Player* player) {
     
     for(int e = 0; e < entity_count; e++) {
         if(player->entity == &entities[e]) continue;
-        if(entities[e].collider.shape == ColliderShape::NONE) continue;
+        if(entities[e].collider.shape == COLLIDER_SHAPE_NONE) continue;
 
         AABB other_aabb = get_transformed_collider(&entities[e]);
         CollisionContact maybe_new_contact;
         bool overlap = collide_aabb_aabb(&player_aabb, &other_aabb, &maybe_new_contact);
         if(overlap) {
             bool is_new_contact = true;
-            if(entities[e].type == EntityType::Player) {
-                auto other_p = (Player*)entities[e].type_specific_data;
+            if(entities[e].type == ENTITY_TYPE_Player) {
+                auto other_p = down_cast<Player>(&entities[e]);
                 for(int j = 0; j < dynamic_contacts_count; j++) {
                     if(dynamic_contacts[j].player == player && dynamic_contacts[j].other_entity == &entities[e]) {
                         is_new_contact = false;
@@ -239,24 +279,45 @@ void find_new_contacts(Player* player) {
     }
 }
 
-void solve_collisions3(float dt) {
+bool maybe_resolve_air_collision(bool a_grounded, bool b_grounded, Vec3 relative_velocity_along_normal, float restitution, Vec3* a_velocity, Vec3* b_velocity) {
+    if(a_grounded) {
+        if(b_grounded) {
+            return false;
+        }
+        else {
+            *b_velocity += relative_velocity_along_normal * restitution;
+        }
+    }
+    else if(b_grounded) {
+        *a_velocity -= relative_velocity_along_normal * restitution;
+    }
+    else {
+        auto impulse = relative_velocity_along_normal * (1 + restitution) / 2;
+        *a_velocity -= impulse;
+        *b_velocity += impulse;
+    }
+
+    return true;
+}
+
+void solve_collisions(float dt) {
     static_contacts_count = 0;
     dynamic_contacts_count = 0;
     for(int i = 0; i < entity_count; i++) {
-        if(entities[i].type != EntityType::Player) continue;
+        if(entities[i].type != ENTITY_TYPE_Player) continue;
 
-        Player* player = (Player*)entities[i].type_specific_data;
+        Player* player = down_cast<Player>(&entities[i]);
 
-        for(int j = entity_count - 1; j > i; j--) {
+        for(int j = i + 1; j < entity_count; j++) {
             auto other_entity = &entities[j];
             if(other_entity == player->entity) continue;
-            if(other_entity->collider.shape == ColliderShape::NONE) continue;
+            if(other_entity->collider.shape == COLLIDER_SHAPE_NONE) continue;
 
             AABB player_aabb = get_transformed_collider(player->entity);
             AABB other_aabb  = get_transformed_collider(other_entity);
             
-            CollisionContact* contacts = other_entity->type == EntityType::Player ? dynamic_contacts : static_contacts;
-            int* contacts_count = other_entity->type == EntityType::Player ? &dynamic_contacts_count : &static_contacts_count;
+            CollisionContact* contacts = other_entity->type == ENTITY_TYPE_Player ? dynamic_contacts : static_contacts;
+            int* contacts_count = other_entity->type == ENTITY_TYPE_Player ? &dynamic_contacts_count : &static_contacts_count;
             
             bool overlap = collide_aabb_aabb(&player_aabb, &other_aabb, &contacts[*contacts_count]);
             if(overlap) {
@@ -292,11 +353,13 @@ void solve_collisions3(float dt) {
             bool overlap = collide_aabb_aabb(&player_aabb, &other_aabb, &contact);
             if(overlap) {
                 early_out = false;
+                //? Right now we allow characters pushing each other based on how much interpenetration happend
+                //? Maybe we can use relative velocity to resolve the penetration according to who moved the most?
                 player->entity->position += Vec3{contact.normal * (contact.penetration / 2)};
                 other_entity->position   -= Vec3{contact.normal * (contact.penetration / 2)};
 
                 //TODO: Proper grounded checking
-                auto other_player = (Player*)other_entity->type_specific_data;
+                auto other_player = down_cast<Player>(other_entity);
                 if(contact.normal.y == 1 && !player->jumped_this_frame) {
                     player->grounded = true;
                 }
@@ -357,24 +420,55 @@ void solve_collisions3(float dt) {
     printf("===\n");
 #endif
 
+    //? How can we ensure this converges?
     for(int k = 0; k < 10; k++) {
         for(int i = 0; i < dynamic_contacts_count; i++) {
             auto& contact = dynamic_contacts[i];
             auto player   = contact.player;
-            auto other_player = (Player*)contact.other_entity->type_specific_data;
+            auto other_player = down_cast<Player>(contact.other_entity);
+            Vec3 normal = Vec3{contact.normal};
             
-            auto relative_velocity = vec2(player->velocity - other_player->velocity);
-            auto relative_speed_along_normal = dot(relative_velocity, contact.normal);
-            auto relative_velocity_along_normal = Vec3{contact.normal * relative_speed_along_normal};
+            auto player_speed_along_normal = dot(player->velocity,       normal);
+            auto other_speed_along_normal  = dot(other_player->velocity, normal);
+            auto relative_speed_along_normal = player_speed_along_normal - other_speed_along_normal;
+            
+            // Going away from each other.
+            if(relative_speed_along_normal >= 0) continue;
+            
+            auto relative_velocity_along_normal = relative_speed_along_normal * normal;
 
-            if(relative_speed_along_normal < 0) {
-                if(contact.normal.y != -1) {
-                    player->velocity -= relative_velocity_along_normal;
+            if(player_speed_along_normal < 0) {
+                if(other_speed_along_normal > 0) {
+                    // Going opposite directions
+                    if(normal.y == -1) {
+                        other_player->velocity += relative_velocity_along_normal;
+                    }
+                    else if(normal.y == 1) {
+                        player->velocity -= relative_velocity_along_normal;
+                    }
+                    else {
+                        bool resolved = maybe_resolve_air_collision(player->grounded, other_player->grounded, relative_velocity_along_normal, 0.5f, &player->velocity, &other_player->velocity);
+                        if(!resolved) {
+                            player->velocity       -= player_speed_along_normal * normal;
+                            other_player->velocity -= other_speed_along_normal  * normal;
+                        }
+                    }
                 }
-                if(contact.normal.y != 1) {
+                else {
+                    // Going both opposite to normal
+                    bool resolved = maybe_resolve_air_collision(player->grounded, other_player->grounded, relative_velocity_along_normal, 0.5f, &player->velocity, &other_player->velocity);
+                    if(!resolved) {
+                        player->velocity -= relative_velocity_along_normal;
+                    }
+                }
+            }
+            else if(other_speed_along_normal > 0) {
+                // Going both in direction of normal
+                bool resolved = maybe_resolve_air_collision(player->grounded, other_player->grounded, relative_velocity_along_normal, 0.5f, &player->velocity, &other_player->velocity);
+                if(!resolved) {
                     other_player->velocity += relative_velocity_along_normal;
                 }
-            }            
+            }
         }
 
         for(int i = 0; i < static_contacts_count; i++) {

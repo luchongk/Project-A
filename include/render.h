@@ -11,9 +11,10 @@
 
 struct Material {
     ShaderProgram* shader;
-    Texture* vertex_textures[16];  // Count is in shader.vertex_texture_slots
-    Texture*  pixel_textures[16];  // Count is in shader.pixel_texture_slots
+    Texture* vertex_textures[16];  // Count is the same as for shader.vertex_texture_slots
+    Texture*  pixel_textures[16];  // Count is the same as for shader.pixel_texture_slots
     u64 constants_size;
+    // Constants go after struct
 };
 
 inline void* get_material_constants(Material* material) {
@@ -21,7 +22,7 @@ inline void* get_material_constants(Material* material) {
 }
 
 struct MaterialNoData : Material {
-    MaterialNoData() { constants_size = sizeof(MaterialNoData) - sizeof(Material); }
+    MaterialNoData() { constants_size = 0; }
 };
 
 struct MaterialBasic : Material {
@@ -54,11 +55,12 @@ struct Model {
 
 void init_renderer();
 void end_renderer();
-void set_projection(int width, int height);
 
 struct ::OSWindow;
 
 void render(OSWindow* window);
+void set_orthographic_projection(float width, float height, float z_near = 0.1f, float z_far = 100.0f);
+void set_perspective_projection(float width, float height, float z_near = 0.1f, float z_far = 100.0f);
 
 extern Model model_weird;
 extern Model model_cube;
@@ -68,5 +70,7 @@ extern Texture* texture_grid;
 
 extern MaterialBasic  MATERIAL_GROUND;
 extern MaterialNoData MATERIAL_LIGHT;
+
+extern bool using_perspective;
 
 #endif

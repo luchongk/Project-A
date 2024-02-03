@@ -13,10 +13,9 @@
 struct Event;
 
 struct OSWindow {
-    //@Cleanup make this integer vectors and remove all the unnecessary casting everywhere
-    Vec2 position;
-    Vec2 size;
-    Vec2 saved_windowed_size;   //Only valid when in fullscreen
+    Vec2i position;
+    Vec2i size;
+    Vec2i saved_windowed_size;   //Only valid when in fullscreen
     
     //@Cleanup These should flags
     bool minimized;
@@ -31,12 +30,13 @@ OSWindow* os_create_window(int width, int height, String title = ""_s);
 u64 os_get_timestamp();
 float os_elapsed_time(u64 from_stamp, u64 to_stamp);
 //s64 os_get_timer_frequency();
-void os_poll_events();
+void os_poll_events(OSWindow* window);
 //void os_lock_mouse(OSWindow* window);
 void os_set_mouse_to_center(OSWindow* window);
 void os_show_mouse(bool show);
 //bool os_is_fullscreen(OSWindow* window);
 void os_set_fullscreen(OSWindow* window, bool fullscreen);
 bool os_read_entire_file(String path, Array<u8>* bytes);
+bool os_is_key_pressed(int vk_code);
 
 #endif

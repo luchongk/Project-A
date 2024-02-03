@@ -9,10 +9,6 @@ constexpr void assert(bool condition) { if(!(condition)) { int a = *(int*)0; a; 
 constexpr void assert(bool condition) { }
 #endif
 
-// Enum class values don't get automatically casted to int like regular enum values do. We want that while still having the values behind a namespace, like enum class does.
-// So this is basically a way to get the best of both worlds in this garbage language.
-#define ENUM(name, ...) namespace name##_ { enum name { __VA_ARGS__ };}; using name = name##_::name;
-
 template<class T, size_t N>
 constexpr size_t length(T (&)[N]) { return N; }
 

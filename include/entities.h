@@ -6,32 +6,36 @@
 #include "render.h"
 #include "physics.h"
 
-#define CREATE_ENTITY(type, position, scale, mesh, material) (type*)create_entity_of_type(EntityType::type, (u8*)pool_##type, &count_##type, sizeof(type), (position), (scale), (mesh), (material))
+#define CREATE_ENTITY(type, position, scale, mesh, material) (type*)create_entity_of_type(ENTITY_TYPE_##type, (u8*)pool_##type, &count_##type, sizeof(type), (position), (scale), (mesh), (material))
 
-ENUM(EntityType,
-    UNINITIALIZED,
+enum EntityType {
+    ENTITY_TYPE_UNINITIALIZED,
     // These need to match the name of the entity type!
-    Camera,
-    Light,
-    Ground,
-    Player,
-);
+    ENTITY_TYPE_Camera,
+    ENTITY_TYPE_Light,
+    ENTITY_TYPE_Ground,
+    ENTITY_TYPE_Player,
+};
 
 struct Entity {
+    int id;
     EntityType type;
     Vec3 position;
-    float scale;
+    Vec3 scale;
     Matrix orientation;
     Model* model;
     Material* material;
     Collider collider;
     void* type_specific_data;
 };
+extern Entity entities[];
+extern int entity_count;
 
 struct Camera {
     Entity* entity;
     float yaw;
     float pitch;
+    Vec3 target;
 };
 
 struct Light {
@@ -43,27 +47,21 @@ struct Light {
 
 struct Ground {
     Entity* entity; //@Cleanup: This will probably be an ID instead of a pointer later.
-    Vec3 dimensions;
 };
+extern Ground pool_Ground[];
+extern int count_Ground;
 
 struct Player {
     Entity* entity;
-    Vec3 dimensions;
     Vec3 move;
     Vec3 velocity = {0,0,0};
     bool grounded = false;
     bool was_grounded = false;
     bool jumped_this_frame = false;
 };
-
-extern Entity entities[];
-extern int entity_count;
-
-extern Ground pool_Ground[];
-extern int count_Ground;
-
 extern Player pool_Player[];
 extern int count_Player;
+
 
 extern Camera* main_camera;
 extern Light* light;

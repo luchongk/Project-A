@@ -77,12 +77,12 @@ void array_reset(Array<T>* array) {
 }
 
 template<typename T>
-T* array_find(Array<T>* array, T to_find) {
-    For(*array) {
-        if(*it == to_find) return it;
+int array_find(ArrayView<T>* array, T to_find) {
+    for(int i = 0; i < array->count; i++) {
+        if(array[i] == to_find) return i;
     }
 
-    return nullptr;
+    return -1;
 }
 
 template<typename T>

@@ -65,7 +65,7 @@ String eat_until(u8 until, String* context) {
     result.count = 0;
 
     For(*context) {
-        if(result.count == context->count || *it == until) break;
+        if(*it == until) break;
         result.count++;
     }
 

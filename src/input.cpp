@@ -2,18 +2,41 @@
 #include "simulation.h"
 #include "platform.h"
 #include "entities.h"
-#include "ui.h"
+//#include "ui.h"
 
 PlayerInput input;
 
+void init_input() {
+    register_callbacks();
+    load_keymaps();
+}
+
 void update_input(OSWindow* window) {
+    Vec2i prev_mouse_pos_pixels = input.mouse_pos_pixels;
+    input.mouse_raw_motion   = {0,0};
+    input.mouse_delta_pixels = {0,0};
+    
     os_poll_events(window);
 
-    input.mouse_pos_normalized   = input.mouse_pos_pixels   / window->size;
+    input.mouse_pos_normalized   = input.mouse_pos_pixels / window->size;
+    input.mouse_delta_pixels     = input.mouse_pos_pixels - prev_mouse_pos_pixels;
     input.mouse_delta_normalized = input.mouse_delta_pixels / window->size;
     input.scroll = 0; //@Hack: Review which key/mouse events need resetting vs which don't.
 
-    ui_update_hot();
+    input.move.x = (float)(is_button_down(INPUT_BUTTON_RIGHT)  - is_button_down(INPUT_BUTTON_LEFT));
+    input.move.y = (float)(is_key_down(VK_SPACE)      - is_key_down(VK_SHIFT));
+    input.move.z = (float)(is_button_down(INPUT_BUTTON_BACK)   - is_button_down(INPUT_BUTTON_FORWARD));   // Flipped because -Z is forward.
+    
+    //ui_update_hot();
+}
+
+void set_mouse_pos(int x, int y) {
+    input.mouse_pos_pixels = {x, y};
+    SetCursorPos(x, y);
+}
+
+bool is_key_down(int vk_code) {
+    return os_is_key_pressed(vk_code);
 }
 
 static void handle_key_event(EventKey* event) {
@@ -21,77 +44,19 @@ static void handle_key_event(EventKey* event) {
     bool pressed = event->pressed;
 
     if(keycode == VK_LBUTTON || keycode == VK_RBUTTON) {
-        bool handled = ui_handle_click_event(event);
-        if(handled) return;
+        //bool handled = ui_handle_click_event(event);
+        //if(handled) return;
         
         if(!event->pressed) printf("Clicked the screen!\n");
     }
 
-    bool handled = ui_handle_key_event(event);
-    if(handled) return;
+    //bool handled = ui_handle_key_event(event);
+    //if(handled) return;
 
     bool is_repeat = event->is_repeat;
     
     if(!is_repeat) {
         switch(keycode) {
-            case 'W': {
-                input.move.z += pressed ? 1 : -1;
-                break;
-            }
-
-            case 'S': {
-                input.move.z -= pressed ? 1 : -1;
-                break;
-            }
-            
-            case 'A': {
-                input.move.x -= pressed ? 1 : -1;
-                break;
-            }
-
-            case 'D': {
-                input.move.x += pressed ? 1 : -1;
-                break;
-            }
-
-            case VK_SPACE: {
-                input.move.y += pressed ? 1 : -1;
-                break;
-            }
-
-            case VK_SHIFT: {
-                input.move.y -= pressed ? 1 : -1;
-                break;
-            }
-
-            case 'Q': {
-                input.rotation -= pressed ? 1 : -1;
-                break;
-            }
-
-            case 'E': {
-                input.rotation += pressed ? 1 : -1;
-                break;
-            }
-
-            case 'P': {
-                if(pressed) {
-                    paused = !paused;
-                    //os_show_mouse(paused);
-                }
-                break;
-            }
-
-            case 'R': {
-                if(pressed && !ui_current_action.widget) {
-                    reset_scene();
-                    my_time.start_stamp = os_get_timestamp();
-                    my_time.since_start = 0;
-                    ui_reset();
-                }
-                break;
-            }
-
             case VK_LEFT: {
                 if(pressed) my_time.sim_scale *= 0.5f;
                 break;
@@ -107,27 +72,6 @@ static void handle_key_event(EventKey* event) {
                     //ui_visible = !ui_visible;
                     character_selected = !character_selected;
                 }
-                break;
-            }
-
-            case '1': {
-                input.action_1 = pressed;
-                break;
-            }
-
-            case '2': {
-                input.action_2 = pressed;
-                break;
-            }
-
-            case '3': {
-                input.action_3 = pressed;
-                break;
-            }
-
-            case '4': {
-                if(pressed) do_step = true;
-                input.action_4 = pressed;
                 break;
             }
 
@@ -148,18 +92,10 @@ static void handle_key_event(EventKey* event) {
             }
         }
     }
-    else {
-        switch(keycode) {
-            case '4': {
-                do_step = true;
-                break;
-            }
-        }
-    }
 }
 
 static void handle_text_event(EventText* event) {
-    if(ui_focused) ui_handle_text_event(event);
+    //if(ui_focused) ui_handle_text_event(event);
 }
 
 static void handle_window_event(EventWindow* event) {
@@ -170,14 +106,19 @@ static void handle_window_event(EventWindow* event) {
             if(!window->minimized) {
                 int width  = (int)window->size.x;
                 int height = (int)window->size.y;
-                set_projection(width, height);
                 set_onscreen_framebuffer_size(width, height);
+                
+                if(using_perspective) {
+                    set_perspective_projection((float)window->size.x, (float)window->size.y);
+                }
+                else {
+                    set_orthographic_projection(20, 20.0f * window->size.y / window->size.x);
+                }
             }
             //fallthrough
         }
         case EventWindowType::FOCUS_LOST: {
             input.move = {0,0};
-            input.rotation = 0;
             break;
         }
     }
@@ -189,8 +130,11 @@ bool handle_input(Array<Event>* events) {
             case EventType::QUIT: return true;
             
             case EventType::KEY: {
-                //TODO: Here we would call the keymapper instead of passing the keycode directly to the function below
-                handle_key_event(&it->key);
+                auto button = keymap[it->key.keycode];
+                if(button) {
+                    auto callback = input_buttons[button].callback;
+                    if(callback) callback(it->key.pressed, it->key.is_repeat);
+                }
                 break;
             }
 

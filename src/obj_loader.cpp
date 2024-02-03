@@ -9,30 +9,27 @@ struct ObjVertex {
 };
 
 void load_obj(String path, Model* model) {
-    default_allocator = linear_allocator(&temporary_storage);
-    model->meshes.allocator = malloc_allocator;
-
     Array<u8> bytes;
+    bytes.allocator = linear_allocator(&temporary_storage);
     os_read_entire_file(path, &bytes);
     auto content = (String)bytes;
 
     Array<Vec3> vertices;
-    array_reserve(&vertices, 10000);
+    vertices.allocator = linear_allocator(&temporary_storage);
+    
     Array<Vec2> uvs;
-    array_reserve(&uvs, 10000);
+    uvs.allocator = linear_allocator(&temporary_storage);
+    
     Array<Vec3> normals;
-    array_reserve(&normals, 10000);
+    normals.allocator = linear_allocator(&temporary_storage);
+    
     Array<ObjVertex> face_vertices;
-    array_reserve(&face_vertices, 10000);
+    face_vertices.allocator = linear_allocator(&temporary_storage);
 
     String cursor = find_from_left("o "_s, content);
     while(cursor.count) {
         eat_line(&cursor);
         Mesh* mesh = array_add(&model->meshes, {});
-        mesh->vertices.allocator = malloc_allocator;
-        mesh->uvs.allocator      = malloc_allocator;
-        mesh->normals.allocator  = malloc_allocator;
-        mesh->indices.allocator  = malloc_allocator;
 
         array_reset(&vertices);
         array_reset(&uvs);
@@ -103,8 +100,8 @@ void load_obj(String path, Model* model) {
                     array_add(&face_vertices, face_vertex);
                     
                     array_add(&mesh->vertices, vertices[v_index - 1]);
-                    array_add(&mesh->uvs,           uvs[vt_index - 1]);
                     array_add(&mesh->normals,   normals[vn_index - 1]);
+                    array_add(&mesh->uvs,           uvs[vt_index - 1]);
                 }
                 
             }
@@ -114,6 +111,5 @@ void load_obj(String path, Model* model) {
     }
 
     arena_reset(&temporary_storage);
-    default_allocator = malloc_allocator;
     return;
 }

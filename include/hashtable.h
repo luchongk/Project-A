@@ -9,21 +9,18 @@
 #define FNV1_32A_INIT 0x811c9dc5
 #define FNV_32_PRIME  0x01000193
 
-u32 fnv1_32a_hash(u8* to_hash, u64 length)
+u32 fnv1_32a_hash(u8* data, u64 length, u32 seed = 0)
 {
-    u32 hash = FNV1_32A_INIT;
-    
-    u8* iter = (u8*)to_hash;
-    u8* end  = iter + length;
+    u32 hash = seed ^ FNV1_32A_INIT;
 
     /*
      * FNV-1a hash each octet in the buffer
      */
-    while(iter < end) {
-        /* xor the bottom with the current octet */
-        hash ^= (u32)*iter++;
+    for(uint i = 0; i < length; i++) {
+        /* XOR the bottom with the current octet */
+        hash ^= (u32)data[i];
 
-        /* multiply by the 32 bit FNV magic prime mod 2^32 */
+        /* Multiply by the 32 bit FNV magic prime mod 2^32 */
         hash *= FNV_32_PRIME;
     }
 
@@ -32,7 +29,7 @@ u32 fnv1_32a_hash(u8* to_hash, u64 length)
 
 // This hash table does reallocation based on load factor.
 // This means pointers to values stored in it are NOT stable.
-// eg. If you call put() after get() you should NOT assume the pointer returned by get() still points to valid data.
+// eg. If you call put() you should NOT assume that pointers returned by prior calls to get() still point to valid data.
 
 template<typename K, typename V>
 struct HashTable {
@@ -215,16 +212,16 @@ void grow(HashTable<K,V>* table) {
     auto* old_entries = table->entries;
     s64 old_allocated = table->allocated;
 
-    if(table->allocator) {
-        table->entries = (typename HashTable<K,V>::Entry*)table->allocator(
+    if(table->allocator.handler) {
+        table->entries = (typename HashTable<K,V>::Entry*)table->allocator.handler(
             table->entries,
             0,
             sizeof(HashTable<K,V>::Entry) * new_size,
-            table->allocator_data
+            table->allocator.data
         );
     }
     else {
-        table->entries = alloc_<HashTable<K,V>::Entry>(new_size);
+        table->entries = alloc_<typename HashTable<K,V>::Entry>(new_size);
     }
 
     table->allocated = new_size;

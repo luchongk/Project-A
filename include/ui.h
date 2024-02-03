@@ -52,6 +52,7 @@ struct UIActionSize{
 // That means we can store the current action as a global that anyone can access.
 struct UIAction {
     UIWidget* widget;
+    String    widget_id;
     UIActionType type;        // Action type, interpreted by each widget however they need.
     u8 data[32];    // 32 bytes of custom data associated with the action.
 };
@@ -99,7 +100,7 @@ struct UITextField {
 };
 
 void ui_init();
-void ui_reset();
+void ui_begin();
 void ui_update_hot();
 bool ui_handle_click_event(EventKey* event);
 bool ui_handle_key_event(EventKey* event);

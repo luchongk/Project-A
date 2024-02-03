@@ -4,13 +4,13 @@
 void draw_quad(Vec2 p1, Vec2 p2, Vec2 p3, Vec2 p4, Vec4 color);
 void draw_quad(Vec2 p1, Vec2 p2, Vec2 p3, Vec2 p4, Vec2 uv1, Vec2 uv2, Vec2 uv3, Vec2 uv4, Vec4 color);
 void draw_rect(Rect rect, Vec4 color, Texture* texture = nullptr);
-void draw_text(Vec2 origin, String text);
+void draw_text(Vec2 origin, String text, float height, Vec4 color);
 
 Vec4 darken(Vec4 color, float amount);
 
 void sd_flush();
 
-extern Texture* sd_font_texture;
+extern Texture* texture_sd_font;
 extern Texture* texture_panel;
 
 #endif

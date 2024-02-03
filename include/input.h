@@ -45,22 +45,20 @@ struct Event {
 };
 
 struct PlayerInput {
-    Vec2 mouse_pos_pixels;
+    Vec2i mouse_raw_motion;
+    Vec2i mouse_pos_pixels;
     Vec2 mouse_pos_normalized;
-    Vec2 mouse_delta_pixels;
+    Vec2i mouse_delta_pixels;
     Vec2 mouse_delta_normalized;
     Vec3 move;
-    float rotation;
     int scroll;
-    bool action_1;
-    bool action_2;
-    bool action_3;
-    bool action_4;
 };
 
 extern PlayerInput input;
 
 void update_input();
 bool handle_input(Array<Event>* events);
+void set_mouse_pos(int x, int y);
+bool is_key_down(int vk_code);
 
 #endif

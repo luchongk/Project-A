@@ -61,7 +61,7 @@ float dot(const Vec2& u, const Vec2& v) {
 }
 
 float length(Vec2 v) {
-    return (float)sqrt(v.x * v.x + v.y * v.y);
+    return sqrtf(v.x * v.x + v.y * v.y);
 }
 
 Vec2 normalize(Vec2 v) {
@@ -79,9 +79,96 @@ Vec2 parse_vec2(String s) {
     return v;
 }
 
+union Vec2i {
+    struct {
+        int x;
+        int y;
+    };
+    int elems[2];
+
+    operator Vec2() { return Vec2{(float)x, (float)y}; }
+};
+
+Vec2i operator+(const Vec2i& u, const Vec2i& v) {
+    return Vec2i{u.x + v.x, u.y + v.y};
+}
+
+Vec2i operator-(const Vec2i& u, const Vec2i& v) {
+    return Vec2i{u.x - v.x, u.y - v.y};
+}
+
+Vec2i operator-(const Vec2i& u) {
+    return Vec2i{-u.x, -u.y};
+}
+
+bool operator==(const Vec2i& u, const Vec2i& v) {
+    return u.x == v.x && u.y == v.y;
+}
+
+Vec2i operator+=(Vec2i& u, const Vec2i& v) {
+    u = u + v;
+    return u;
+}
+
+Vec2i operator-=(Vec2i& u, const Vec2i& v) {
+    u = u - v;
+    return u;
+}
+
+Vec2i operator*(const Vec2i& u, const Vec2i& v) {
+    return Vec2i{u.x * v.x, u.y * v.y};
+}
+
+Vec2 operator/(const Vec2i& u, const Vec2i& v) {
+    return Vec2{(float)u.x / v.x, (float)u.y / v.y};
+}
+
+Vec2i operator*(const Vec2i& v, const int& scalar) {
+    return Vec2i{v.x * scalar, v.y * scalar};
+}
+
+Vec2i operator*(const int& scalar, const Vec2i& v) {
+    return v * scalar;
+}
+
+Vec2i operator/(const Vec2i& v, const int& scalar) {
+    return Vec2i{v.x / scalar, v.y / scalar};
+}
+
+int dot(const Vec2i& u, const Vec2i& v) {
+    return u.x * v.x + u.y * v.y;
+}
+
+float length(Vec2i v) {
+    return sqrtf((float)(v.x * v.x + v.y * v.y));
+}
+
+Vec2 normalize(Vec2i v) {
+    float v_length = length(v);
+    if(v_length < 0.0001) return Vec2{};
+    return Vec2{(float)v.x, (float)v.y} / v_length;
+}
+
+Vec2i parse_vec2i(String s) {
+    Vec2i v;
+    v.x = atoi((const char*)eat_until(' ', &s).data);
+    s = advance(s, 1);
+    v.y = atoi((const char*)eat_until(' ', &s).data);
+
+    return v;
+}
+
 //Vector3
 
 union Vec3 {
+    static const Vec3 zero;
+    static const Vec3 back;
+    static const Vec3 forward;
+    static const Vec3 left;
+    static const Vec3 right;
+    static const Vec3 down;
+    static const Vec3 up;
+
     struct {
         Vec2 v;
         float z2;
@@ -98,6 +185,14 @@ union Vec3 {
     };
     float elems[3];
 };
+
+const Vec3 Vec3::zero    = {};
+const Vec3 Vec3::back    = {0,0,1};
+const Vec3 Vec3::forward = {0,0,-1};
+const Vec3 Vec3::left    = {-1,0,0};
+const Vec3 Vec3::right   = {1,0,0};
+const Vec3 Vec3::up      = {0,1,0};
+const Vec3 Vec3::down    = {0,-1,0};
 
 Vec3 operator+(const Vec3& u, const Vec3& v) {
     return Vec3{u.x + v.x, u.y + v.y, u.z + v.z};
@@ -150,7 +245,7 @@ Vec3 cross(Vec3 u, Vec3 v) {
 }
 
 float length(Vec3 v) {
-    return (float)sqrt(dot(v,v));
+    return sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
 }
 
 Vec3 normalize(Vec3 v) {
@@ -161,9 +256,9 @@ Vec3 normalize(Vec3 v) {
 
 Vec3 angles_to_vec(float yaw, float pitch) {
     Vec3 result;
-    result.x = sinf(yaw) * cosf(pitch);
+    result.x = -sinf(yaw) * cosf(pitch);
     result.y = sinf(pitch);
-    result.z = cosf(yaw) * cosf(pitch);
+    result.z = -cosf(yaw) * cosf(pitch);
     result = normalize(result);
 
     return result;
@@ -236,7 +331,7 @@ float dot(const Vec4& u, const Vec4& v) {
 }
 
 float length(Vec4 v) {
-    return (float)sqrt(dot(v,v));
+    return sqrtf(v.x * v.x + v.y * v.y + v.z * v.z + v.w * v.w);
 }
 
 Vec4 normalize(Vec4 v) {

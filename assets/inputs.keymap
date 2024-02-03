@@ -1,0 +1,17 @@
+left A
+right D
+forward W
+back S
+player2_left J
+player2_right L
+player2_up I
+
+rotate_left Q
+rotate_right E
+weird 1
+do_the_thing 2
+
+reset_scene R
+pause P
+switch_perspective 3
+step_simulation 4

@@ -77,3 +77,5 @@ if($debug_build_command) {
 }
 
 cl.exe $compile_exe_opts "-Fe$exec_folder\$project.exe" src\main.cpp "-link" $link_opts
+
+if($LASTEXITCODE -ne 0) { exit 1 }

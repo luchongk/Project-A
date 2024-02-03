@@ -22,11 +22,10 @@ cbuffer per_object : register(b3) {
     matrix world : packoffset(c0);
 }
 
-Texture2D _texture;
+Texture2D    _texture;
 SamplerState _sampler;
 
-float4 main(float3 world_position : POSITION, float3 normal : NORMAL, float2 uv : UV) : SV_TARGET
-{
+float4 main(float3 world_position : POSITION, float3 normal : NORMAL, float2 uv : UV) : SV_TARGET {
     float distance    = length(light.position - world_position);
     float attenuation = 1.0 / (1.0 + 0.01f * distance * distance);
     

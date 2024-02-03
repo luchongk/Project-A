@@ -2,24 +2,28 @@
 #include "render.h"
 #include "obj_loader.h"
 #include "matrix.h"
-#include "ui.h"
+//#include "ui.h"
+#include "new_ui.h"
 #include "simple_draw.h"
 
 struct GlobalUniforms {
     Matrix projection;
+    Vec2   resolution;
+    float pad;
+    float pad2;
 };
 
 struct PerFrameUniforms {
     Matrix view;
     Vec3 view_pos;
-    float padding;
+    float pad;
     struct {
         Vec3 position;
-        float padding;
+        float pad;
         Vec3 ambient;
-        float padding2;
+        float pad2;
         Vec3 diffuse;
-        float padding3;
+        float pad3;
         Vec3 specular;
     } light;
     float time;
@@ -41,6 +45,7 @@ ShaderProgram* shader_debug;
 Texture* texture_grid;
 Texture* texture_test;
 
+MaterialBasic  MATERIAL_MISSING;
 MaterialBasic  MATERIAL_GROUND;
 MaterialBasic  MATERIAL_PLAYER;
 MaterialBasic  MATERIAL_PLAYER2;
@@ -64,8 +69,17 @@ static GlobalUniforms    global_uniforms;
 static PerFrameUniforms  per_frame_uniforms;
 static PerObjectUniforms per_object_uniforms;
 
-void set_projection(int width, int height) {
-    global_uniforms.projection = perspective(width, height);
+bool using_perspective = true;
+
+void set_orthographic_projection(float width, float height, float z_near, float z_far) {
+    global_uniforms.resolution = window->size;
+    global_uniforms.projection = orthographic(width, height, z_near, z_far);
+    modify_buffer(global_uniform_buffer, sizeof(global_uniforms), &global_uniforms);
+}
+
+void set_perspective_projection(float width, float height, float z_near, float z_far) {
+    global_uniforms.resolution = window->size;
+    global_uniforms.projection = perspective(width, height, 60.0f, z_near, z_far);
     modify_buffer(global_uniform_buffer, sizeof(global_uniforms), &global_uniforms);
 }
 
@@ -88,26 +102,33 @@ void init_renderer(OSWindow* window) {
     
     onscreen_framebuffer = create_onscreen_framebuffer((int)window->size.x, (int)window->size.y);
     
-    shader_basic = compile_shader("assets\\shaders\\basic_vertex.hlsl"_s, "assets\\shaders\\basic_pixel.hlsl"_s,      VertexFormat::PNU);
-    shader_light = compile_shader("assets\\shaders\\basic_vertex.hlsl"_s, "assets\\shaders\\light_cube_pixel.hlsl"_s, VertexFormat::PNU);
-    shader_debug = compile_shader("assets\\shaders\\debug_vertex.hlsl"_s, "assets\\shaders\\ui_pixel.hlsl"_s,         VertexFormat::PCU);
+    shader_basic = compile_shader("assets\\shaders\\basic_vertex.hlsl"_s, "assets\\shaders\\basic_pixel.hlsl"_s,      VERTEX_FORMAT_PNU);
+    shader_light = compile_shader("assets\\shaders\\basic_vertex.hlsl"_s, "assets\\shaders\\light_cube_pixel.hlsl"_s, VERTEX_FORMAT_PNU);
+    shader_debug = compile_shader("assets\\shaders\\basic_vertex.hlsl"_s, "assets\\shaders\\debug_pixel.hlsl"_s,      VERTEX_FORMAT_PNU);
 
     texture_grid = create_texture_from_file("assets\\textures\\uv_grid_white.png"_s);
 
     // Material initialization
     {
+        MATERIAL_MISSING.shader = shader_basic;
+        MATERIAL_MISSING.pixel_textures[MaterialBasic::_TEXTURE_INDEX] = white_pixel;
+        MATERIAL_MISSING.ambient   = {1.0f, 0.0f, 1.0f};
+        MATERIAL_MISSING.diffuse   = {1.0f, 0.0f, 1.0f};
+        MATERIAL_MISSING.specular  = {1.0f, 0.0f, 1.0f};
+        MATERIAL_MISSING.shininess = 32.0f;
+
         MATERIAL_GROUND.shader = shader_basic;
         MATERIAL_GROUND.pixel_textures[MaterialBasic::_TEXTURE_INDEX] = white_pixel;
-        MATERIAL_GROUND.ambient  = {1.0f, 1.0f, 1.0f};
-        MATERIAL_GROUND.diffuse  = {1.0f, 1.0f, 1.0f};
-        MATERIAL_GROUND.specular = {1.0f, 1.0f, 1.0f};
+        MATERIAL_GROUND.ambient   = {1.0f, 1.0f, 1.0f};
+        MATERIAL_GROUND.diffuse   = {1.0f, 1.0f, 1.0f};
+        MATERIAL_GROUND.specular  = {1.0f, 1.0f, 1.0f};
         MATERIAL_GROUND.shininess = 32.0f;
 
         MATERIAL_PLAYER.shader = shader_basic;
         MATERIAL_PLAYER.pixel_textures[MaterialBasic::_TEXTURE_INDEX] = white_pixel;
-        MATERIAL_PLAYER.ambient  = {0.0f, 0.0f, 0.0f};
-        MATERIAL_PLAYER.diffuse  = {1.0f, 1.0f, 1.0f};
-        MATERIAL_PLAYER.specular = {0.0f, 0.0f, 0.0f};
+        MATERIAL_PLAYER.ambient   = {0.0f, 0.0f, 0.0f};
+        MATERIAL_PLAYER.diffuse   = {1.0f, 1.0f, 1.0f};
+        MATERIAL_PLAYER.specular  = {0.0f, 0.0f, 0.0f};
         MATERIAL_PLAYER.shininess = 1.0f;
 
         MATERIAL_PLAYER2 = MATERIAL_PLAYER;
@@ -133,18 +154,16 @@ void init_renderer(OSWindow* window) {
         copy_model_to_buffers(&model_male,    &vertices, &indices);
         copy_model_to_buffers(&model_female,  &vertices, &indices);
         
-        static_vertex_buffer = create_vertex_buffer(GraphicsBufferUsage::STATIC, VertexFormat::PNU, vertices.count, vertices.data);
+        static_vertex_buffer = create_vertex_buffer(GraphicsBufferUsage::STATIC, VERTEX_FORMAT_PNU, vertices.count, vertices.data);
         static_index_buffer  = create_index_buffer(GraphicsBufferUsage::STATIC, indices.count, indices.data);
 
-        debug_vertex_buffer = create_vertex_buffer(GraphicsBufferUsage::DYNAMIC, VertexFormat::PCU, 256);
+        debug_vertex_buffer = create_vertex_buffer(GraphicsBufferUsage::DYNAMIC, VERTEX_FORMAT_PCU, 256);
     }
     
-    global_uniform_buffer = create_uniform_buffer(GraphicsBufferUsage::STATIC, sizeof(GlobalUniforms));
-    set_projection((int)window->size.x, (int)window->size.y);
-
+    global_uniform_buffer       = create_uniform_buffer(GraphicsBufferUsage::STATIC,  sizeof(GlobalUniforms));
     per_frame_uniform_buffer    = create_uniform_buffer(GraphicsBufferUsage::DYNAMIC, sizeof(PerFrameUniforms));
+    per_material_uniform_buffer = create_uniform_buffer(GraphicsBufferUsage::DYNAMIC, 160);  //@Cleanup :Hardcoded size. Figure out a good one.
     per_object_uniform_buffer   = create_uniform_buffer(GraphicsBufferUsage::DYNAMIC, sizeof(PerObjectUniforms));
-    per_material_uniform_buffer = create_uniform_buffer(GraphicsBufferUsage::DYNAMIC, 160);  //@Cleanup :Hardcoded: Hardcoded size. Figure out a good one.
 
     set_uniform_buffer(UniformBufferSlot::PER_SETTINGS, global_uniform_buffer);
     set_uniform_buffer(UniformBufferSlot::PER_FRAME,    per_frame_uniform_buffer);
@@ -153,7 +172,8 @@ void init_renderer(OSWindow* window) {
 
     set_primitive_type(GraphicsPrimitiveType::TRIANGLE);
 
-    ui_init();
+    set_perspective_projection((float)window->size.x, (float)window->size.y);
+    //ui_init();
 }
 
 void render(OSWindow* window) {
@@ -177,11 +197,14 @@ void render(OSWindow* window) {
 
     for(int i = 0; i < entity_count; i++) {
         Entity* e = &entities[i];
-
-        if(!e->model || !e->material) continue;
+        if(!e->model) continue;
         
         Material* material = e->material;
-        if(material->shader == nullptr) {
+        if(!e->material) {
+            material = &MATERIAL_MISSING;
+        }
+
+        if(!material->shader) {
             printf("Tried to draw an entity with null shader\n");
             continue;
         }
@@ -199,17 +222,6 @@ void render(OSWindow* window) {
             assert(material->constants_size < 160); // See :Hardcoded
             modify_buffer(per_material_uniform_buffer, material->constants_size, get_material_constants(material));
         }
-
-#if 0
-        //Render bounding box
-        if(e->collider.shape != ColliderShape::NONE) {
-            auto collider_size = e->collider.box.max - e->collider.box.min;
-            per_object_uniforms.world = scale(Matrix::ident, Vec3{collider_size.x, collider_size.y, 0.1f});
-            per_object_uniforms.world = translate(per_object_uniforms.world, e->position);
-            modify_buffer(per_object_uniform_buffer, sizeof(per_object_uniforms), &per_object_uniforms);
-            draw_indexed(model_cube.meshes[0].vertex_base, model_cube.meshes[0].index_base, model_cube.meshes[0].indices.count);
-        }
-#endif
         
         per_object_uniforms.world = get_world_matrix(e);
         modify_buffer(per_object_uniform_buffer, sizeof(per_object_uniforms), &per_object_uniforms);
@@ -217,6 +229,25 @@ void render(OSWindow* window) {
         For(e->model->meshes) {
             draw_indexed(it->vertex_base, it->index_base, it->indices.count);
         }
+
+#if 1
+        //Render bounding box
+        if(e->type == ENTITY_TYPE_Player) {
+            auto collider_size = e->collider.box.max - e->collider.box.min;
+            per_object_uniforms.world = scale(Matrix::ident, Vec3{collider_size.x, collider_size.y, 0.1f});
+            per_object_uniforms.world = translate(per_object_uniforms.world, e->position);
+            modify_buffer(per_object_uniform_buffer, sizeof(per_object_uniforms), &per_object_uniforms);
+            set_primitive_type(GraphicsPrimitiveType::LINE);
+
+            auto saved_shader = current_shader;
+            set_shader(shader_debug);
+            
+            draw_indexed(model_cube.meshes[0].vertex_base, model_cube.meshes[0].index_base, model_cube.meshes[0].indices.count);
+            
+            set_primitive_type(GraphicsPrimitiveType::TRIANGLE);
+            set_shader(saved_shader);
+        }
+#endif  
     }
 
 #if 0
@@ -251,19 +282,10 @@ void render(OSWindow* window) {
     set_primitive_type(GraphicsPrimitiveType::TRIANGLE);
 #endif
 
-    if(ui_visible) {
-        for(int i = 0; i < count_Player; i++) {
-            sprintf(velocity_strings[i], "Pos %d: (%f,%f,%f) Vel: %f", i, pool_Player[i].entity->position.x, pool_Player[i].entity->position.y, pool_Player[i].entity->position.z, pool_Player[i].velocity.x);
-        }
-        ui_render();
-    }
-
+    ui_build();
     swap_buffers();
 }
 
 void end_renderer() {
-    release_texture(texture_grid);
-    release_texture(sd_font_texture);
-    release_texture(texture_panel);
     end_graphics();
 }

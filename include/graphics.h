@@ -1,11 +1,12 @@
 #ifndef GRAPHICS_H
 #define GRAPHICS_H
 
-ENUM(VertexFormat,
-    PCU,
-    PNU,
-    COUNT,
-)
+enum VertexFormat {
+    VERTEX_FORMAT_PCU,
+    VERTEX_FORMAT_PNU,
+    VERTEX_FORMAT_PCNU,
+    VERTEX_FORMAT_COUNT,
+};
 
 struct VertexPCU {
     Vec3 position;
@@ -15,6 +16,13 @@ struct VertexPCU {
 
 struct VertexPNU {
     Vec3 position;
+    Vec3 normal;
+    Vec2 uv;
+};
+
+struct VertexPCNU {
+    Vec3 position;
+    Vec4 color;
     Vec3 normal;
     Vec2 uv;
 };
@@ -55,9 +63,8 @@ struct ShaderProgram {
 
 // Vertex, index or uniform buffer.
 struct GraphicsBuffer;
-
-struct Texture;
 struct Framebuffer;
+struct Texture;
 
 // API
 
@@ -86,7 +93,8 @@ void clear_depth_buffer();
 void set_depth(bool on);
 void set_blend(bool on);
 
-Texture* create_texture_from_file(String path);
+Texture* create_texture_from_data(void* data, int width, int height, int num_channels, bool generate_mips);
+Texture* create_texture_from_file(String path, bool generate_mips = true);
 void set_texture(uint slot, Texture* texture);
 void release_texture(Texture* texture);
 
