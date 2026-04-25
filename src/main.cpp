@@ -52,7 +52,7 @@ void main() {
     float accum = 0;
 
     window = os_create_window(1600, 800, "PepegaClap"_s);
-    os_set_fullscreen(window, true);
+    //os_set_fullscreen(window, true);
 
     reset_scene();
     
@@ -60,7 +60,7 @@ void main() {
     init_renderer(window);
 
     while(true) {
-        wait_for_vblank();
+        //wait_for_vblank();
 
         update_time();
         update_input(window);

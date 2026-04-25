@@ -244,8 +244,8 @@ bool ui_handle_click_event(EventKey* event) {
 
     // Using ui_hot here means that we don't allow real "in between frames" clicks, because we consider the click position to always be the the last position registered for the mouse in last frame, regardless of where the click really happened.
     // We do still register multiple clicks per frame if they happen, they just might not be exactly at the right position. I don't think we care about this right now, if at all, because the cases that make this implementation incorrect
-    // would occur when clicking while moving the mouse REALLY fast, at which point you are probably just trolling with the UI instead of using it legitimately.
-    // Doing it like this saves us from calculating the widget on which each click landed; we just assume if a click lands on a widget then all of them land on that same widget, which is highly likely.
+    // would occur when clicking while moving the mouse REALLY fast, at which point you are just probably trolling with the UI instead of using it legitimately.
+    // Doing it like this saves us from calculating the widget on which each click landed; we just assume all of them land on the hot widget, which is highly likely.
     if(event->pressed) {
         ui_current_action.widget    = ui_hot;
         ui_current_action.widget_id = ui_hot_id;

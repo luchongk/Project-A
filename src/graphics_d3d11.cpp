@@ -109,7 +109,7 @@ static void maybe_create_input_layout(VertexFormat format, ID3DBlob* bytecode, S
 
 bool init_graphics(OSWindow* window) {
     hwnd = ((Win32Window*)window)->handle;
-
+    
     ID3D11Device* dev11;
     ID3D11DeviceContext* devcon11;
 
@@ -164,7 +164,7 @@ bool init_graphics(OSWindow* window) {
     rt_blend_desc.DestBlend             = D3D11_BLEND_INV_SRC_ALPHA;
     rt_blend_desc.BlendOp               = D3D11_BLEND_OP_ADD;
     rt_blend_desc.SrcBlendAlpha         = D3D11_BLEND_ONE;
-    rt_blend_desc.DestBlendAlpha        = D3D11_BLEND_INV_SRC_ALPHA;
+    rt_blend_desc.DestBlendAlpha        = D3D11_BLEND_ONE;
     rt_blend_desc.BlendOpAlpha          = D3D11_BLEND_OP_ADD;
     rt_blend_desc.RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 

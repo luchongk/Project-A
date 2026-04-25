@@ -18,12 +18,12 @@
     infinite, so any calculations that depended on those forces would break at that point. There are more reasons why
     working with forces is normally avoided, but they all have to do with stability.
 
-    Velocity and position constraints are what most engines use to model contacts (aka. collisions) and joints. Solving velocity constraints is hard
+    Velocity and position constraints are what most engines use to model contacts (aka. collisions) and joints. Solving velocity constraints is hard (computationally)
     if you have actual bodies that have gravity and rotate and also if you have many different kinds of joints. The difficulty lies in
     the fact that to be accurate, all constraints must be satisfied at the same time, and what makes it worse, constraints tend to
     contradict each other. For example, if you have a body pushing another against a wall, the wall pushes to one side and the pushing body to the other.
-    Even such a simple case makes the problem too hard solve analitically, even more so for the general case, and so most constraint solvers work iteratively
-    When you formulate the problem as an actual math problem you almost always end up with known problem called Linear Complementary Problem (LCP) or Mixed Linear
+    Even such a simple case makes the problem too hard solve analitically, even more so for the general case, and so most constraint solvers work iteratively.
+    When you formulate the problem as an actual math problem you end up with known problem called Linear Complementary Problem (LCP) or Mixed Linear
     Complementary Problem (MLCP), depending on how many and what types of constraints you want to have.
 
     There are many (shitty) ways to solve, or approximate I should say, a solution to these kinds of problems. There's numerical methods involving matrix math, but there's
