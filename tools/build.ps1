@@ -28,38 +28,38 @@ tools\faster-vcvars.ps1 $platform
 # /MACHINE:X64
 # -LIBPATH:lib                  Add library folder
 # -INCREMENTAL:NO               Disable incremental linking
+# -PDB:path						Program PDB output location
 # -OPT:REF                      Linker optimizations
 
 $project = "Project_A"
-$includes = "include", "include\3rdParty"
+$includes = "..\CModules", "include", "include\3rdParty"
 $libraries = "user32.lib", "winmm.lib", "gdi32.lib", "d3d11.lib", "d3dcompiler.lib", "dxguid.lib"
-$ignored_warnings = "4100", "4127", "4201", "4458", "4706", "4505", "4459" , "4702", "4326"#"4189"
-$exec_folder = if($release) { "bin\Release" } else { "bin\Debug" }
+$ignored_warnings = "4100", "4127", "4201", "4458", "4706", "4505", "4459", "4326" #"4189"
+
+$release_type = if($release) { "Release" } else { "Debug" }
+$build_folder = "build\$release_type"
+$exec_folder  = "run\"
+$executable   = "$project" + $(if($release) { "" } else { "_debug" })
 
 $compile_exe_opts = 
 	"-nologo", 
 	"-std:c++20",
 	"-Zi", 
 	"-Zc:offsetof-", 
-	"-EHsc", 
 	"-FC",
 #	"-WX",
 	"-W4" +
 	($ignored_warnings | % { "-wd$_" }) +
-	$(if($release) {
-		"-MT",
-		"-O2"
-	} else {
-		"-MTd",
-		"-Od"
-	}) +
+	$(if($release) { "-MD", "-O2" } else { "-MD", "-Od", "-Zi" }) +
     "-GR-" +
 	($includes | % { "-I$_" }) +
-	"-Fo$exec_folder\",
-	"-Fd$exec_folder\",
-#	"-Fa$exec_folder\",
+	"-Fo$build_folder\",
+	"-Fd$build_folder\",
+#	"-Fa$build_folder\",
+	"-FIpreload.h",
 #	"-P",
 	"-D_CRT_SECURE_NO_WARNINGS",
+#	"-DENABLE_ASSERTS",
 	"-DUNICODE",
 	"-D_UNICODE" +
 	$(if($release) { } else { "-DDEBUG" })
@@ -69,13 +69,16 @@ $link_opts =
 	"-MACHINE:X$platform",
 	"-LIBPATH:lib",
 	"-INCREMENTAL:NO",
+	"-PDB:$build_folder\",
 	"-OPT:REF" +
 	$libraries
 
+md -Force $build_folder | Out-Null
+md -Force $exec_folder  | Out-Null
+
 if($debug_build_command) {
-	echo "cl.exe $compile_exe_opts -Fe$exec_folder\$project.exe src\main.cpp $link_opts`n"
+	echo "cl.exe $compile_exe_opts -Fe$exec_folder\$project.exe src\*.cpp $link_opts`n"
 }
 
-cl.exe $compile_exe_opts "-Fe$exec_folder\$project.exe" src\main.cpp "-link" $link_opts
-
-if($LASTEXITCODE -ne 0) { exit 1 }
+cl.exe $compile_exe_opts "-Fe$exec_folder\$executable.exe" src\*.cpp "-link" $link_opts
+exit $LASTEXITCODE

@@ -1,4 +1,5 @@
 #include "entities.h"
+#include "simulation.h"
 
 const int MAX_ENTITIES = 100;
 
@@ -22,7 +23,7 @@ Light* light;
 Player* main_player;
 Player* player2;
 
-Entity* create_entity(Vec3 position, Vec3 scale, Model* model, Material* material) {
+Entity* create_entity(Vector3 position, Vector3 scale, Model* model, Material* material) {
     Entity* e = &entities[entity_count++];
     e->type        = ENTITY_TYPE_UNINITIALIZED;
     e->scale       = scale;
@@ -34,7 +35,7 @@ Entity* create_entity(Vec3 position, Vec3 scale, Model* model, Material* materia
     return e;
 }
 
-inline void* create_entity_of_type(EntityType type, u8* pool, int* count, int size, Vec3 position, Vec3 scale, Model* model, Material* material) {
+inline void* create_entity_of_type(EntityType type, u8* pool, int* count, int size, Vector3 position, Vector3 scale, Model* model, Material* material) {
     void* specific = pool + size * (*count);
     (*count)++;
     
@@ -46,21 +47,21 @@ inline void* create_entity_of_type(EntityType type, u8* pool, int* count, int si
     return specific;
 }
 
-Ground* create_ground(Vec3 position, float width, float height, float depth) {
-    auto scale = Vec3{width, height, depth};
+Ground* create_ground(Vector3 position, float width, float height, float depth) {
+    auto scale = Vector3{width, height, depth};
     auto ground = CREATE_ENTITY(Ground, position, scale, &model_cube, &MATERIAL_GROUND);
     ground->entity->collider.shape = COLLIDER_SHAPE_BOX;
-    ground->entity->collider.box.min = -vec2(ground->entity->scale) / 2;
-    ground->entity->collider.box.max = vec2(ground->entity->scale) / 2;
+    ground->entity->collider.box.min = -(Vector2)ground->entity->scale / 2;
+    ground->entity->collider.box.max = (Vector2)ground->entity->scale / 2;
     return ground;
 }
 
-Player* create_player(Vec3 position, float width, float height, float depth, Model* model = &model_male) {
-    auto scale = Vec3{1, 1, 1};
+Player* create_player(Vector3 position, float width, float height, float depth, Model* model = &model_male) {
+    auto scale = Vector3{1, 1, 1};
     auto player = CREATE_ENTITY(Player, position, scale, model, &MATERIAL_PLAYER);
     player->entity->collider.shape = COLLIDER_SHAPE_BOX;
-    player->entity->collider.box.min = -Vec2{width, height} / 2;
-    player->entity->collider.box.max = Vec2{width, height} / 2;
+    player->entity->collider.box.min = -Vector2{width, height} / 2;
+    player->entity->collider.box.max = Vector2{width, height} / 2;
     player->velocity = {};
     return player;
 }
@@ -74,13 +75,13 @@ void reset_scene() {
     count_Player = 0;
     do_the_thing_cooldown = 0;
 
-    main_camera = CREATE_ENTITY(Camera, (Vec3{-6, 5, 7}), (Vec3{1,1,1}), nullptr, nullptr);
+    main_camera = CREATE_ENTITY(Camera, (Vector3{-6, 5, 7}), (Vector3{1,1,1}), nullptr, nullptr);
     main_camera->yaw   = radians(0);
     main_camera->pitch = radians(-25);
     main_camera->target = main_camera->entity->position;
     main_camera->entity->type_specific_data = &main_camera;
 
-    light = CREATE_ENTITY(Light, (Vec3{-2, 3, 3}), 0.1f * (Vec3{1,1,1}), &model_cube, &MATERIAL_LIGHT);
+    light = CREATE_ENTITY(Light, (Vector3{-2, 3, 3}), 0.1f * (Vector3{1,1,1}), &model_cube, &MATERIAL_LIGHT);
     light->ambient  = {0.0005f, 0.0005f, 0.0005f};
     light->diffuse  = {1.0f, 1.0f, 1.0f};
     light->specular = {1.0f, 1.0f, 1.0f};
@@ -111,8 +112,8 @@ Matrix get_world_matrix(Entity* entity) {
 
 AABB get_transformed_collider(Entity* entity) {
     AABB aabb;
-    aabb.min = vec2(entity->position) + entity->collider.box.min;
-    aabb.max = vec2(entity->position) + entity->collider.box.max;
+    aabb.min = (Vector2)entity->position + entity->collider.box.min;
+    aabb.max = (Vector2)entity->position + entity->collider.box.max;
 
     return aabb;
 }

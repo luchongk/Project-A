@@ -2,7 +2,6 @@
 #define ENTITY_H
 
 #include "obj_loader.h"
-#include "matrix.h"
 #include "render.h"
 #include "physics.h"
 
@@ -20,8 +19,8 @@ enum EntityType {
 struct Entity {
     int id;
     EntityType type;
-    Vec3 position;
-    Vec3 scale;
+    Vector3 position;
+    Vector3 scale;
     Matrix orientation;
     Model* model;
     Material* material;
@@ -35,14 +34,15 @@ struct Camera {
     Entity* entity;
     float yaw;
     float pitch;
-    Vec3 target;
+    Vector3 forward;
+    Vector3 target;
 };
 
 struct Light {
     Entity* entity;
-    Vec3 ambient;
-    Vec3 diffuse;
-    Vec3 specular;
+    Vector3 ambient;
+    Vector3 diffuse;
+    Vector3 specular;
 };
 
 struct Ground {
@@ -53,8 +53,8 @@ extern int count_Ground;
 
 struct Player {
     Entity* entity;
-    Vec3 move;
-    Vec3 velocity = {0,0,0};
+    Vector3 move;
+    Vector3 velocity = {0,0,0};
     bool grounded = false;
     bool was_grounded = false;
     bool jumped_this_frame = false;
@@ -77,7 +77,7 @@ T* down_cast(Entity* entity) {
     return (T*)entity->type_specific_data;
 }
 
-Ground* create_ground(Vec3 position, float width, float height, float depth);
+Ground* create_ground(Vector3 position, float width, float height, float depth);
 
 AABB get_transformed_collider(Entity* entity);
 

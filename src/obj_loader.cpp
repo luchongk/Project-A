@@ -1,6 +1,10 @@
 #include <cstdlib>
 
 #include "obj_loader.h"
+#include "file.h"
+#include "base/temp_allocator.h"
+#include "maths.h"
+#include "render.h"
 
 struct ObjVertex {
     int v_index;
@@ -10,23 +14,24 @@ struct ObjVertex {
 
 void load_obj(String path, Model* model) {
     Array<u8> bytes;
-    bytes.allocator = linear_allocator(&temporary_storage);
-    os_read_entire_file(path, &bytes);
+    bytes.allocator = temp_allocator;
+    read_entire_file(path, (String*)(&bytes));
     auto content = (String)bytes;
 
-    Array<Vec3> vertices;
-    vertices.allocator = linear_allocator(&temporary_storage);
+    Array<Vector3> vertices;
+    vertices.allocator = temp_allocator;
     
-    Array<Vec2> uvs;
-    uvs.allocator = linear_allocator(&temporary_storage);
+    Array<Vector2> uvs;
+    uvs.allocator = temp_allocator;
     
-    Array<Vec3> normals;
-    normals.allocator = linear_allocator(&temporary_storage);
+    Array<Vector3> normals;
+    normals.allocator = temp_allocator;
     
     Array<ObjVertex> face_vertices;
-    face_vertices.allocator = linear_allocator(&temporary_storage);
+    face_vertices.allocator = temp_allocator;
 
-    String cursor = find_from_left("o "_s, content);
+    String cursor;
+    split_from_left(content, "o "_s, &cursor, SPLIT_BEFORE);
     while(cursor.count) {
         eat_line(&cursor);
         Mesh* mesh = array_add(&model->meshes, {});
@@ -37,48 +42,48 @@ void load_obj(String path, Model* model) {
         array_reset(&face_vertices);
     
         //Vertices
-        while(starts_with("v "_s, cursor)) {
+        while(begins_with(cursor, "v "_s)) {
             auto line = eat_line(&cursor);
             line = advance(line, 2);
-            auto v = parse_vec3(line);
+            auto v = parse_vector3(line);
 
             array_add(&vertices, v);
         }
 
         //Normals
-        while(starts_with("vn"_s, cursor)) {
+        while(begins_with(cursor, "vn"_s)) {
             auto line = eat_line(&cursor);
             line = advance(line, 3);
-            auto vn = parse_vec3(line);
+            auto vn = parse_vector3(line);
 
             array_add(&normals, vn);
         }
 
         //UVs
-        while(starts_with("vt"_s, cursor)) {
+        while(begins_with(cursor, "vt"_s)) {
             auto line = eat_line(&cursor);
             line = advance(line, 3);
-            auto vt = parse_vec2(line);
+            auto vt = parse_vector2(line);
 
             array_add(&uvs, vt);
         }
 
-        cursor = find_from_left("f "_s, cursor);
+        split_from_left(cursor, "f "_s, &cursor, SPLIT_BEFORE);
         
         while(cursor.count && cursor[0] == 'f') {
             auto line = eat_line(&cursor);
             line = advance(line, 2);
             
             for(int i = 0; i < 3; i++) {
-                auto v_string = eat_until('/', &line);
+                auto v_string = eat_until(&line, '/');
                 auto v_index = atoi((const char*)v_string.data);
                 line = advance(line, 1);
                 
-                auto vt_string = eat_until('/', &line);
+                auto vt_string = eat_until(&line, '/');
                 auto vt_index = atoi((const char*)vt_string.data);
                 line = advance(line, 1);
 
-                auto vn_string = eat_until(' ', &line);
+                auto vn_string = eat_until(&line, ' ');
                 auto vn_index = atoi((const char*)vn_string.data);
                 line = advance(line, 1);
 
@@ -96,7 +101,7 @@ void load_obj(String path, Model* model) {
                     array_add(&mesh->indices,  (uint)found);
                 }
                 else {
-                    array_add(&mesh->indices, face_vertices.count);
+                    array_add(&mesh->indices, (u32)face_vertices.count);
                     array_add(&face_vertices, face_vertex);
                     
                     array_add(&mesh->vertices, vertices[v_index - 1]);
@@ -107,9 +112,9 @@ void load_obj(String path, Model* model) {
             }
         }
 
-        cursor = find_from_left("o "_s, cursor);
+        split_from_left(cursor, "o "_s, &cursor, SPLIT_BEFORE);
     }
 
-    arena_reset(&temporary_storage);
+    arena_clear(temp_arena);
     return;
 }

@@ -190,6 +190,8 @@ void render(OSWindow* window) {
     per_frame_uniforms.light.ambient  = light->ambient;
     per_frame_uniforms.light.specular = light->specular;
     per_frame_uniforms.time = my_time.since_start;
+    per_frame_uniforms.view_pos = main_camera->entity->position;
+    per_frame_uniforms.view = look_to(main_camera->entity->position, main_camera->forward);
     modify_buffer(per_frame_uniform_buffer, sizeof(per_frame_uniforms), &per_frame_uniforms);
 
     set_vertex_buffer(static_vertex_buffer);

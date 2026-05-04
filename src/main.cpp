@@ -1,17 +1,16 @@
-#ifdef _WIN32
-    #include "platform_win32.cpp"
-#endif
-
-#include "main.h"
-
-bool do_step = false;
-bool use_perspective = true;
-
-#include "stb_image.cpp"
+#include "windowing.h"
+#include "times.h"
+#include "entities.h"
+#include "render.h"
+#include "input.h"
+#include "handle_input.h"
+#include "simulation.h"
+#include "basic.h"
+#include "general.h"
+/*#include "stb_image.cpp"
 #include "stb_truetype.cpp"
 #include "input_callbacks.cpp"
 #include "input.cpp"
-#include "render.cpp"
 #include "physics.cpp"
 #include "simulation.cpp"
 #include "graphics_d3d11.cpp"
@@ -21,17 +20,20 @@ bool use_perspective = true;
 #include "font.cpp"
 #include "simple_draw.cpp"
 //#include "ui.cpp"
-#include "new_ui.cpp"
+#include "new_ui.cpp"*/
+
+const float ORTHOGRAPHIC_VIEW_WIDTH = 20.0f;    // In world units.
 
 Time my_time;
-OSWindow* window;
-LinearArena temporary_storage;
+OsWindow window;
+bool do_step;
+bool use_perspective = true;
 
 static void update_time() {
-    u64 now = os_get_timestamp();
+    u64 now = get_timestamp();
     
-    my_time.since_start = os_elapsed_time(my_time.start_stamp, now);
-    my_time.dt          = os_elapsed_time(my_time.last_frame_stamp, now);
+    my_time.since_start = get_elapsed_time(my_time.start_stamp, now);
+    my_time.dt          = get_elapsed_time(my_time.last_frame_stamp, now);
     
     if(my_time.dt > my_time.max_dt_allowed) {
         //Framerate too low, we are falling behind in the simulation (or we had a big spike)! D: Preventing spiral of death by slowing down the simulation.
@@ -41,31 +43,29 @@ static void update_time() {
     my_time.last_frame_stamp = now;
 }
 
-void main() {
-    arena_init(&temporary_storage, megabytes(64));
-
-    my_time.start_stamp = os_get_timestamp();
+int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
+    my_time.start_stamp = get_timestamp();
     my_time.simulation_dt = 1.0f/144;
     my_time.sim_scale = 1.0f;
     my_time.max_dt_allowed = 0.25f;
 
-    float accum = 0;
-
-    window = os_create_window(1600, 800, "PepegaClap"_s);
+    
+    window = create_window(0, 0, 1600, 800, "PepegaClap"_s);
     //os_set_fullscreen(window, true);
-
+    
     reset_scene();
     
-    init_input();
+    //init_input();
     init_renderer(window);
-
+    
+    float accum = 0;
     while(true) {
         //wait_for_vblank();
 
         update_time();
-        update_input(window);
+        update_os_events();
 
-        bool should_quit = handle_input(&events);
+        bool should_quit = handle_input(&os_events);
         if(should_quit) break;
 
         //ui_update();
@@ -118,14 +118,14 @@ void main() {
 
         update_camera(my_time.dt);
 
-        render(window);
+        render();
 
         /*float elapsed = os_elapsed_time(before, os_get_timestamp());
         if(elapsed > 0.002f) {
             printf_s("elapsed: %.4f\n", elapsed);
         }*/
 
-        arena_reset(&temporary_storage);
+        arena_clear(temp_arena);
 
 #if 0
     printf_s("last frame: %f ms\n", my_time.dt * 1000);

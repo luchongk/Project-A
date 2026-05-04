@@ -1,9 +1,7 @@
-#pragma once
+#ifndef GENERAL_H
+#define GENERAL_H
 
-#include "types.h"
-#include "memory.h"
-
-struct OSWindow;
+#include "base/types.h"
 
 // TODO: It would be nice to have a "since_start" that doesn't add time while we are paused.
 struct Time {
@@ -17,8 +15,7 @@ struct Time {
 };
 
 extern Time my_time;
-extern OSWindow* window;
-extern LinearArena temporary_storage;
-extern bool do_step;
+extern OsWindow window;
+extern const float ORTHOGRAPHIC_VIEW_WIDTH;
 
-const float ORTHOGRAPHIC_VIEW_WIDTH = 20.0f;    // In world units.
+#endif

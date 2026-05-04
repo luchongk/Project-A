@@ -1,8 +1,7 @@
 #ifndef PHYSICS_H
 #define PHYSICS_H
 
-#include "utils.h"
-#include "vector.h"
+#include "maths.h"
 
 struct Player;
 struct Entity;
@@ -15,13 +14,13 @@ enum ColliderShape {
 struct CollisionContact {
     Player* player;
     Entity* other_entity;
-    Vec2 normal;
+    Vector2 normal;
     float penetration;
 };
 
 struct AABB {
-    Vec2 min;
-    Vec2 max;
+    Vector2 min;
+    Vector2 max;
 };
 
 struct Collider {

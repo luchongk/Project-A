@@ -21,20 +21,20 @@ bool collide_aabb_aabb(AABB* a, AABB* b, CollisionContact* contact) {
         contact->penetration = penetration_x;
 
         if(penetration_x_left < penetration_x_right) {
-            contact->normal = Vec2{1, 0};
+            contact->normal = Vector2{1, 0};
         }
         else {
-            contact->normal = Vec2{-1, 0};
+            contact->normal = Vector2{-1, 0};
         }
     }
     else {
         contact->penetration = penetration_y;
 
         if(penetration_y_down < penetration_y_up) {
-            contact->normal = Vec2{0, 1};
+            contact->normal = Vector2{0, 1};
         }
         else {
-            contact->normal = Vec2{0, -1};
+            contact->normal = Vector2{0, -1};
         }
     }
 
