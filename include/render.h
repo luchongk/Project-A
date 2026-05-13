@@ -4,12 +4,81 @@
 #include "windowing.h"
 #include "graphics.h"
 
+struct GlobalUniforms {
+    Matrix projection;
+    Vector2   resolution;
+    float pad;
+    float pad2;
+};
+
+struct PerFrameUniforms {
+    Matrix view;
+    Vector3 view_pos;
+    float pad;
+    struct {
+        Vector3 position;
+        float pad;
+        Vector3 ambient;
+        float pad2;
+        Vector3 diffuse;
+        float pad3;
+        Vector3 specular;
+    } light;
+    float time;
+};
+
+struct PerObjectUniforms {
+    Matrix world;
+};
+
+enum VertexFormat {
+    VERTEX_FORMAT_PCU,
+    VERTEX_FORMAT_PNU,
+    VERTEX_FORMAT_PCNU,
+    VERTEX_FORMAT_COUNT,
+};
+
+struct VertexPCU {
+    Vector3 position;
+    Vector4 color;
+    Vector2 uv;
+};
+
+struct VertexPNU {
+    Vector3 position;
+    Vector3 normal;
+    Vector2 uv;
+};
+
+struct VertexPCNU {
+    Vector3 position;
+    Vector4 color;
+    Vector3 normal;
+    Vector2 uv;
+};
+
+struct Framebuffer;
+struct GraphicsBuffer;
+struct Texture;
+struct CompiledShader;  // This is compiled shader code for a single shader stage (eg. compiled vertex shader)
+
+#undef DOMAIN
+enum ShaderStage : u8 {
+    VERTEX,
+    HULL,
+    DOMAIN,
+    GEOMETRY,
+    PIXEL,
+    COMPUTE,
+};
+
 // 6/5/2023: Material system seems good enough for now. One thing that I could change that would make the handling of textures in code a bit more safe is
 // to make texture indices an enum class so that we can avoid using texture indices with any other materials than the one where the enum was defined.
 // If I do that, the "safe" way to access textures would be through a pair of get and set functions defined for each struct instead of directly through vertex_textures/pixel_textures.
 
 struct Material {
-    ShaderProgram* shader;
+    CompiledShader* vertex_shader;
+    CompiledShader* pixel_shader;
     Texture* vertex_textures[16];  // Count is the same as for shader.vertex_texture_slots
     Texture*  pixel_textures[16];  // Count is the same as for shader.pixel_texture_slots
     u64 constants_size;

@@ -60,7 +60,7 @@ bool handle_input(Array<OsEvent>* events) {
                 auto window = it.window;
                 if(!is_minimized(window)) {
                     auto resize = it.resize;
-                    set_onscreen_framebuffer_size(resize.width, resize.height);
+                    //set_onscreen_framebuffer_size(resize.width, resize.height);
                     
                     if(using_perspective) {
                         set_perspective_projection((float)resize.width, (float)resize.height);
