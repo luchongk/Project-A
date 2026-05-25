@@ -1,42 +1,13 @@
 
-#include "render.h"
-#include "obj_loader.h"
-//#include "ui.h"
-#include "simple_draw.h"
-#include "graphics_d3d11.h"
-#include "d3dcompiler.h"
 #include <cstdio>
+
+#include "render.h"
 #include "base/temp_allocator.h"
-
-struct Framebuffer {
-    ID3D11Texture2D* buffer;
-    ID3D11RenderTargetView* render_target;
-    ID3D11DepthStencilView* depth_stencil;
-    ID3D11ShaderResourceView* shader_resource; // Optional
-};
-
-struct GraphicsBuffer {
-    ID3D11Buffer* d3d;
-};
-
-struct Texture {
-    //@Incomplete: What about ID3D11Texture3D or even ID3D11Texture3D?
-    ID3D11Texture2D* d3d;
-    ID3D11ShaderResourceView* shader_resource; // Optional
-};
-
-struct CompiledShader {
-    union {
-        ID3D11VertexShader*   vertex;
-        ID3D11HullShader*     hull;
-        ID3D11DomainShader*   domain;
-        ID3D11GeometryShader* geometry;
-        ID3D11PixelShader*    pixel;
-        ID3D11ComputeShader*  compute;
-    };
-    ID3D10Blob* bytecode;
-    ShaderStage stage;
-};
+#include "graphics/d3d11/utils.h"
+#include "general.h"
+#include "entities.h"
+#include "obj_loader.h"
+#include "simple_draw.h"
 
 // These will probably be loaded from somewhere
 Model model_weird;
@@ -44,12 +15,13 @@ Model model_cube;
 Model model_male;
 Model model_female;
 
-CompiledShader shader_vertex_basic;
-CompiledShader shader_pixel_light;
-CompiledShader shader_pixel_debug;
+Shader shader_vertex_basic;
+Shader shader_pixel_basic;
+Shader shader_pixel_light;
+Shader shader_pixel_debug;
 
-Texture* texture_grid;
-Texture* texture_test;
+Texture texture_grid;
+Texture white_pixel;
 
 MaterialBasic  MATERIAL_MISSING;
 MaterialBasic  MATERIAL_GROUND;
@@ -60,153 +32,88 @@ MaterialNoData MATERIAL_LIGHT;
 
 Vector3 background = {0,0.02f,0.08f};
 
-static OsWindow window;
 static WindowGraphics* graphics;
-Framebuffer onscreen_framebuffer;
+
+static ID3D11DepthStencilState* depth_stencil_state_off;
+static ID3D11BlendState1* blend_state_on;
+static ID3D11SamplerState* sampler_state;
+static ID3D11RasterizerState2* rasterizer_state;
+
+ID3D11DepthStencilView* depth_stencil_view;
 
 static GraphicsBuffer static_vertex_buffer;
 static GraphicsBuffer static_index_buffer;
 static GraphicsBuffer debug_vertex_buffer;
 
-static GraphicsBuffer global_uniform_buffer;
-static GraphicsBuffer per_frame_uniform_buffer;
-static GraphicsBuffer per_material_uniform_buffer;
-static GraphicsBuffer per_object_uniform_buffer;
+static GraphicsBuffer constant_buffer_global;
+static GraphicsBuffer constant_buffer_per_frame;
+static GraphicsBuffer constant_buffer_per_material;
+static GraphicsBuffer constant_buffer_per_object;
 
-static GlobalUniforms    global_uniforms;
-static PerFrameUniforms  per_frame_uniforms;
-static PerObjectUniforms per_object_uniforms;
+static ConstantBufferGlobal    constants_global;
+static ConstantBufferPerFrame  constants_per_frame;
+static ConstantBufferPerObject constants_per_object;
+
+static ID3D11InputLayout* input_layouts[VERTEX_FORMAT_COUNT];
 
 bool using_perspective = true;
 
-void init_buffer(GraphicsBuffer* g, D3D11_BIND_FLAG type, D3D11_USAGE usage, uint size, void* data) {
-    D3D11_BUFFER_DESC buffer_desc{};
-    buffer_desc.ByteWidth = size;
-    buffer_desc.BindFlags = type;
-    buffer_desc.Usage = usage;
-    if(usage == D3D11_USAGE_DYNAMIC) buffer_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+static void create_input_layout(VertexFormat format, ID3DBlob* bytecode) {
+    switch(format) {
+        case VERTEX_FORMAT_PCU: {
+            D3D11_INPUT_ELEMENT_DESC attributes[] = {
+                {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0,                            0, D3D11_INPUT_PER_VERTEX_DATA, 0},
+                {"COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
+                {"UV",       0, DXGI_FORMAT_R32G32_FLOAT,       0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
+            };
 
-    D3D11_SUBRESOURCE_DATA subresource_data{};
-    D3D11_SUBRESOURCE_DATA* srd_pointer = nullptr;
-    if(data) {
-        subresource_data.pSysMem = data;
-        srd_pointer = &subresource_data;
-    }
+            HRESULT error;
+            error = d3d_device->CreateInputLayout(attributes, 3, bytecode->GetBufferPointer(), bytecode->GetBufferSize(), &input_layouts[VERTEX_FORMAT_PCU]);
+            
+            break;
+        }
 
-    ID3D11Buffer* buffer;
-    HRESULT error;
-    error = d3d_device->CreateBuffer(&buffer_desc, srd_pointer, &buffer);
+        case VERTEX_FORMAT_PNU: {
+            D3D11_INPUT_ELEMENT_DESC attributes[] = {
+                {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,    0,                            0, D3D11_INPUT_PER_VERTEX_DATA, 0},
+                {"NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
+                {"UV",       0, DXGI_FORMAT_R32G32_FLOAT,       0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
+            };
 
-    g->d3d = buffer;
-    return;
-}
+            HRESULT error;
+            error = d3d_device->CreateInputLayout(attributes, 3, bytecode->GetBufferPointer(), bytecode->GetBufferSize(), &input_layouts[VERTEX_FORMAT_PNU]);
 
-// This is for development only. Release builds should use precompiled shaders.
-bool compile_shader(String path, CompiledShader* compiled, bool store_bytecode) {
-    const char* target_version = nullptr;
-    switch(compiled->stage) {
-        case ShaderStage::VERTEX:   target_version = "vs_5_0"; break;
-        case ShaderStage::HULL:     target_version = "hs_5_0"; break;
-        case ShaderStage::DOMAIN:   target_version = "ds_5_0"; break;
-        case ShaderStage::GEOMETRY: target_version = "gs_5_0"; break;
-        case ShaderStage::PIXEL:    target_version = "ps_5_0"; break;
-        case ShaderStage::COMPUTE:  target_version = "cs_5_0"; break;
+            break;
+        }
+
         default: assert(false);
     }
-    
-    // ROW MAJOR vs COLUMN MAJOR STORAGE.
-    //
-    // mul(matrix, vector) with row major storage compiles down to 4 dot product instructions (1 dot product per matrix row) while the same operation with column major storage compiles to 1 MUL and 3 MADs.
-    // The opposite is true if you are using a row vector convention (mul(vector, matrix)) in your shader code. Apparently, on modern hardware there's no difference in performance between the two sets of instructions, as mentioned
-    // by Fabian Giesen in a comment on one of his posts: https://fgiesen.wordpress.com/2012/02/12/row-major-vs-column-major-row-vectors-vs-column-vectors/.
-    //
-    // So basically, it comes down to preference when choosing between D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR (the default) or D3DCOMPILE_PACK_MATRIX_ROW_MAJOR.
-    // I'm going to use the latter just because I want to use column vector notation in my shader code, and translating that to 4 dot products in assembly reads better than the other option.
-
-    char* c_path = to_cstring(path, temp_allocator);
-    static wchar_t path_wide[256];
-    mbstowcs(path_wide, c_path, 256);
-    ID3D10Blob* errors = nullptr;
-    HRESULT error;
-    error = D3DCompileFromFile(path_wide, nullptr, nullptr, "main", target_version, D3DCOMPILE_PACK_MATRIX_ROW_MAJOR, 0, &compiled->bytecode, &errors);
-    if(errors) {
-        printf((char*)errors->GetBufferPointer());
-        errors->Release();
-    }
-    if(error != S_OK) return false;
-
-    switch(compiled->stage) {
-        case ShaderStage::VERTEX:   d3d_device->CreateVertexShader(compiled->bytecode->GetBufferPointer(),   compiled->bytecode->GetBufferSize(), nullptr, (ID3D11VertexShader**)&compiled->vertex);     break;
-        case ShaderStage::HULL:     d3d_device->CreateHullShader(compiled->bytecode->GetBufferPointer(),     compiled->bytecode->GetBufferSize(), nullptr, (ID3D11HullShader**)&compiled->hull);         break;
-        case ShaderStage::DOMAIN:   d3d_device->CreateDomainShader(compiled->bytecode->GetBufferPointer(),   compiled->bytecode->GetBufferSize(), nullptr, (ID3D11DomainShader**)&compiled->domain);     break;
-        case ShaderStage::GEOMETRY: d3d_device->CreateGeometryShader(compiled->bytecode->GetBufferPointer(), compiled->bytecode->GetBufferSize(), nullptr, (ID3D11GeometryShader**)&compiled->geometry); break;
-        case ShaderStage::PIXEL:    d3d_device->CreatePixelShader(compiled->bytecode->GetBufferPointer(),    compiled->bytecode->GetBufferSize(), nullptr, (ID3D11PixelShader**)&compiled->pixel);       break;
-        case ShaderStage::COMPUTE:  d3d_device->CreateComputeShader(compiled->bytecode->GetBufferPointer(),  compiled->bytecode->GetBufferSize(), nullptr, (ID3D11ComputeShader**)&compiled->compute);   break;
-        default: assert(false);
-    }
-
-    if(!store_bytecode) {
-        compiled->bytecode->Release();
-        compiled->bytecode = nullptr;
-    }
-
-    return true;
 }
 
-void init_texture_from_file(Texture* t, String path) {
-    
+void update_and_bind_constant_buffer(GraphicsBuffer* buffer, void* data, u64 size, int slot) {
+    copy_to_buffer(buffer->d3d, data, size);
+    d3d_context->VSSetConstantBuffers(slot, 1, &buffer->d3d);
+    d3d_context->PSSetConstantBuffers(slot, 1, &buffer->d3d);
 }
 
-void init_texture(Texture* t, int width, int height, int num_channels) {
-    D3D11_TEXTURE2D_DESC texture_desc;
-    texture_desc.Width = width;
-    texture_desc.Height = height;
-    texture_desc.MipLevels = 1;
-    texture_desc.ArraySize = 1;
-    texture_desc.SampleDesc.Quality = 0;
-    texture_desc.SampleDesc.Count = 1;
-    texture_desc.Usage = D3D11_USAGE_DEFAULT;
-    texture_desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-    texture_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-    texture_desc.MiscFlags = 0;
-    
-    assert(num_channels >= 1 && num_channels <= 4);
-    if(num_channels == 1) {
-        texture_desc.Format = DXGI_FORMAT_R8_UNORM;
-    }
-    else if(num_channels == 2) {
-        texture_desc.Format = DXGI_FORMAT_R8G8_UNORM;
-    }
-    else {
-        texture_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-    }
+static void set_orthographic_projection(float width, float height, float z_near = 0.1f, float z_far = 100.0f) {
+    constants_global.resolution = {width, height};
+    constants_global.projection = orthographic(width, height, z_near, z_far);
 
-    ID3D11Texture2D *texture;
-    HRESULT error = d3d_device->CreateTexture2D(&texture_desc, nullptr, &texture);
-
-    ID3D11ShaderResourceView* shader_resource;
-    error = d3d_device->CreateShaderResourceView(texture, nullptr, &shader_resource);
-
-    t->d3d = texture;
-    t->shader_resource = shader_resource;
+    update_and_bind_constant_buffer(&constant_buffer_global, &constants_global, sizeof(constants_global), CONSTANT_BUFFER_GLOBAL);
 }
 
-void set_orthographic_projection(float width, float height, float z_near, float z_far) {
-    global_uniforms.resolution = {width, height};
-    global_uniforms.projection = orthographic(width, height, z_near, z_far);
-    d3d_context->UpdateSubresource(global_uniform_buffer.d3d, 0, nullptr, &global_uniforms, 0, 0);
-}
+static void set_perspective_projection(float width, float height, float z_near = 0.1f, float z_far = 100.0f) {
+    constants_global.resolution = {width, height};
+    constants_global.projection = perspective(width, height, 60.0f, z_near, z_far);
 
-void set_perspective_projection(float width, float height, float z_near, float z_far) {
-    global_uniforms.resolution = {width, height};
-    global_uniforms.projection = perspective(width, height, 60.0f, z_near, z_far);
-    d3d_context->UpdateSubresource(global_uniform_buffer.d3d, 0, nullptr, &global_uniforms, 0, 0);
+    update_and_bind_constant_buffer(&constant_buffer_global, &constants_global, sizeof(constants_global), CONSTANT_BUFFER_GLOBAL);
 }
 
 void copy_model_to_buffers(Model* model, Array<VertexPNU>* vertices, Array<uint>* indices) {
     ForP(model->meshes) {
-        it->vertex_base = vertices->count;
-        it->index_base  = indices->count;
+        it->vertex_base = (u32)vertices->count;
+        it->index_base  = (u32)indices->count;
         for(uint i = 0; i < it->vertices.count; i++) {
             array_add(vertices, {it->vertices[i], it->normals[i], it->uvs[i]});
         }
@@ -217,36 +124,118 @@ void copy_model_to_buffers(Model* model, Array<VertexPNU>* vertices, Array<uint>
     }
 }
 
-void init_renderer(OsWindow w) {
-    window = w;
-    graphics = init_window_graphics(window);
-
-    //init_framebuffer(&onscreen_framebuffer, w, (int)window->size.x, (int)window->size.y);
+void renderer_on_resize(int width, int height) {    
+    d3d_context->OMSetRenderTargets(0, nullptr, nullptr);
     
-    compile_shader("assets\\shaders\\basic_vertex.hlsl"_s, &shader_vertex_basic, false);
-    compile_shader("assets\\shaders\\light_cube_pixel.hlsl"_s, &shader_pixel_light, false);
-    compile_shader("assets\\shaders\\debug_pixel.hlsl"_s, &shader_pixel_debug, false);
+    resize_buffers(the_window, width, height);
+    if(depth_stencil_view) depth_stencil_view->Release();
+    depth_stencil_view = create_depth_stencil_view(width, height);
 
-    texture_grid = create_texture_from_file("assets\\textures\\uv_grid_white.png"_s);
+    auto size = Vector2{(float)width, (float)height};
+    if(using_perspective) {
+        set_perspective_projection(size.x, size.y);
+    } else {
+        set_orthographic_projection(20, 20.0f * size.y / size.x);
+    }
+
+    set_viewport(width, height);
+}
+
+void init_renderer() {
+    graphics = init_window_graphics(the_window);
+
+    // PIPELINE STATE
+    {
+        D3D11_DEPTH_STENCIL_DESC depth_stencil_desc;
+        depth_stencil_desc.DepthEnable = false;
+        depth_stencil_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+        //depth_stencil_desc.DepthFunc = D3D11_COMPARISON_LESS;
+        
+        depth_stencil_desc.StencilEnable = false;
+        /*depth_stencil_desc.StencilReadMask = D3D11_DEFAULT_STENCIL_READ_MASK;
+        depth_stencil_desc.StencilWriteMask = D3D11_DEFAULT_STENCIL_WRITE_MASK;
+
+        // Stencil operations if pixel is front-facing
+        depth_stencil_desc.FrontFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
+        depth_stencil_desc.FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_INCR;
+        depth_stencil_desc.FrontFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
+        depth_stencil_desc.FrontFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
+
+        // Stencil operations if pixel is back-facing
+        depth_stencil_desc.BackFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
+        depth_stencil_desc.BackFace.StencilDepthFailOp = D3D11_STENCIL_OP_DECR;
+        depth_stencil_desc.BackFace.StencilPassOp = D3D11_STENCIL_OP_KEEP;
+        depth_stencil_desc.BackFace.StencilFunc = D3D11_COMPARISON_ALWAYS;*/
+        
+        d3d_device->CreateDepthStencilState(&depth_stencil_desc, &depth_stencil_state_off);
+
+        D3D11_RENDER_TARGET_BLEND_DESC1 rt_blend_desc;
+        rt_blend_desc.BlendEnable           = true;
+        rt_blend_desc.LogicOpEnable         = false;
+        rt_blend_desc.SrcBlend              = D3D11_BLEND_SRC_ALPHA;
+        rt_blend_desc.DestBlend             = D3D11_BLEND_INV_SRC_ALPHA;
+        rt_blend_desc.BlendOp               = D3D11_BLEND_OP_ADD;
+        rt_blend_desc.SrcBlendAlpha         = D3D11_BLEND_ONE;
+        rt_blend_desc.DestBlendAlpha        = D3D11_BLEND_ONE;
+        rt_blend_desc.BlendOpAlpha          = D3D11_BLEND_OP_ADD;
+        rt_blend_desc.RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+
+        D3D11_BLEND_DESC1 blend_desc;
+        blend_desc.AlphaToCoverageEnable  = false;
+        blend_desc.IndependentBlendEnable = false;
+        blend_desc.RenderTarget[0] = rt_blend_desc;
+        d3d_device->CreateBlendState1(&blend_desc, &blend_state_on);
+
+        CD3D11_SAMPLER_DESC sampler_desc{D3D11_DEFAULT};
+        d3d_device->CreateSamplerState(&sampler_desc, &sampler_state);
+
+        CD3D11_RASTERIZER_DESC2 rasterizer_desc{D3D11_DEFAULT};
+        rasterizer_desc.FrontCounterClockwise = true;
+        d3d_device->CreateRasterizerState2(&rasterizer_desc, &rasterizer_state);
+        //d3d_context->RSSetState(rasterizer_state);
+    }
+    
+    shader_vertex_basic.stage = ShaderStage::VERTEX;
+    shader_vertex_basic.vertex = (ID3D11VertexShader*)compile_shader(&shader_vertex_basic.bytecode, "assets\\shaders\\basic_vertex.hlsl"_s, "vs_5_0"_s);
+    
+    create_input_layout(VertexFormat::VERTEX_FORMAT_PNU, shader_vertex_basic.bytecode);
+    
+    shader_pixel_basic.stage = ShaderStage::PIXEL;
+    shader_pixel_basic.pixel = (ID3D11PixelShader*)compile_shader(nullptr, "assets\\shaders\\basic_pixel.hlsl"_s, "ps_5_0"_s);
+    
+    shader_pixel_light.stage = ShaderStage::PIXEL;
+    shader_pixel_light.pixel = (ID3D11PixelShader*)compile_shader(nullptr, "assets\\shaders\\light_cube_pixel.hlsl"_s, "ps_5_0"_s);
+    
+    shader_pixel_debug.stage = ShaderStage::PIXEL;
+    shader_pixel_debug.pixel = (ID3D11PixelShader*)compile_shader(nullptr, "assets\\shaders\\debug_pixel.hlsl"_s, "ps_5_0"_s);
+
+    texture_grid.d3d = load_texture_from_file(&texture_grid.shader_resource, "assets\\textures\\uv_grid_white.png"_s, true);
+
+    white_pixel.d3d = create_texture(&white_pixel.shader_resource, 1, 1, 4);
+    u8 white[4] = {255, 255, 255, 255};
+    d3d_context->UpdateSubresource(white_pixel.d3d, 0, nullptr, white, 4, 0);
 
     // Material initialization
     {
-        MATERIAL_MISSING.shader = shader_basic;
-        MATERIAL_MISSING.pixel_textures[MaterialBasic::_TEXTURE_INDEX] = white_pixel;
+        MATERIAL_MISSING.vertex_shader = &shader_vertex_basic;
+        MATERIAL_MISSING.pixel_shader  = &shader_pixel_basic;
+        MATERIAL_MISSING.pixel_textures[MaterialBasic::_TEXTURE_INDEX] = &white_pixel;
         MATERIAL_MISSING.ambient   = {1.0f, 0.0f, 1.0f};
         MATERIAL_MISSING.diffuse   = {1.0f, 0.0f, 1.0f};
         MATERIAL_MISSING.specular  = {1.0f, 0.0f, 1.0f};
         MATERIAL_MISSING.shininess = 32.0f;
 
-        MATERIAL_GROUND.shader = shader_basic;
-        MATERIAL_GROUND.pixel_textures[MaterialBasic::_TEXTURE_INDEX] = white_pixel;
+        MATERIAL_GROUND.vertex_shader = &shader_vertex_basic;
+        MATERIAL_GROUND.pixel_shader  = &shader_pixel_basic;
+        MATERIAL_GROUND.pixel_textures[MaterialBasic::_TEXTURE_INDEX] = &white_pixel;
         MATERIAL_GROUND.ambient   = {1.0f, 1.0f, 1.0f};
         MATERIAL_GROUND.diffuse   = {1.0f, 1.0f, 1.0f};
         MATERIAL_GROUND.specular  = {1.0f, 1.0f, 1.0f};
         MATERIAL_GROUND.shininess = 32.0f;
 
-        MATERIAL_PLAYER.shader = shader_basic;
-        MATERIAL_PLAYER.pixel_textures[MaterialBasic::_TEXTURE_INDEX] = white_pixel;
+        MATERIAL_PLAYER.vertex_shader = &shader_vertex_basic;
+        MATERIAL_PLAYER.pixel_shader  = &shader_pixel_basic;
+        MATERIAL_PLAYER.pixel_textures[MaterialBasic::_TEXTURE_INDEX] = &white_pixel;
         MATERIAL_PLAYER.ambient   = {0.0f, 0.0f, 0.0f};
         MATERIAL_PLAYER.diffuse   = {1.0f, 1.0f, 1.0f};
         MATERIAL_PLAYER.specular  = {0.0f, 0.0f, 0.0f};
@@ -254,7 +243,8 @@ void init_renderer(OsWindow w) {
 
         MATERIAL_PLAYER2 = MATERIAL_PLAYER;
 
-        MATERIAL_LIGHT.shader = shader_light;
+        MATERIAL_LIGHT.vertex_shader = &shader_vertex_basic;
+        MATERIAL_LIGHT.pixel_shader  = &shader_pixel_light;
     }
 
     // Static mesh loading. @Speed: Doing multiple unnecessary buffer copies. Instead, pass vertices and indices to load_obj and add them directly there.
@@ -265,59 +255,64 @@ void init_renderer(OsWindow w) {
         load_obj("assets\\models\\Female.obj"_s,     &model_female);
 
         Array<VertexPNU> vertices;
-        vertices.allocator = linear_allocator(&temporary_storage);
+        vertices.allocator = temp_allocator;
 
         Array<uint> indices;
-        indices.allocator = linear_allocator(&temporary_storage);
+        indices.allocator = temp_allocator;
 
         copy_model_to_buffers(&model_weird,   &vertices, &indices);
         copy_model_to_buffers(&model_cube,    &vertices, &indices);
         copy_model_to_buffers(&model_male,    &vertices, &indices);
         copy_model_to_buffers(&model_female,  &vertices, &indices);
         
-        static_vertex_buffer = create_vertex_buffer(GraphicsBufferUsage::STATIC, VERTEX_FORMAT_PNU, vertices.count, vertices.data);
-        static_index_buffer  = create_index_buffer(GraphicsBufferUsage::STATIC, indices.count, indices.data);
-
-        debug_vertex_buffer = create_vertex_buffer(GraphicsBufferUsage::DYNAMIC, VERTEX_FORMAT_PCU, 256);
+        static_vertex_buffer.d3d = create_buffer(D3D11_BIND_VERTEX_BUFFER, D3D11_USAGE_DEFAULT, (uint)(sizeof(VertexPNU) * vertices.count), vertices.data);
+        static_index_buffer.d3d  = create_buffer(D3D11_BIND_INDEX_BUFFER,  D3D11_USAGE_DEFAULT, (uint)(sizeof(uint) * indices.count), indices.data);
+        debug_vertex_buffer.d3d  = create_buffer(D3D11_BIND_VERTEX_BUFFER, D3D11_USAGE_DEFAULT, (uint)(sizeof(VertexPCU) * 256));
     }
     
-    global_uniform_buffer       = create_uniform_buffer(GraphicsBufferUsage::STATIC,  sizeof(GlobalUniforms));
-    per_frame_uniform_buffer    = create_uniform_buffer(GraphicsBufferUsage::DYNAMIC, sizeof(PerFrameUniforms));
-    per_material_uniform_buffer = create_uniform_buffer(GraphicsBufferUsage::DYNAMIC, 160);  //@Cleanup :Hardcoded size. Figure out a good one.
-    per_object_uniform_buffer   = create_uniform_buffer(GraphicsBufferUsage::DYNAMIC, sizeof(PerObjectUniforms));
+    constant_buffer_global.d3d       = create_buffer(D3D11_BIND_CONSTANT_BUFFER, D3D11_USAGE_DYNAMIC, sizeof(ConstantBufferGlobal), &constants_global);
+    constant_buffer_per_frame.d3d    = create_buffer(D3D11_BIND_CONSTANT_BUFFER, D3D11_USAGE_DYNAMIC, sizeof(ConstantBufferPerFrame), &constants_per_frame);
+    constant_buffer_per_material.d3d = create_buffer(D3D11_BIND_CONSTANT_BUFFER, D3D11_USAGE_DYNAMIC, 160);
+    constant_buffer_per_object.d3d   = create_buffer(D3D11_BIND_CONSTANT_BUFFER, D3D11_USAGE_DYNAMIC, sizeof(ConstantBufferPerObject), &constants_per_object);
 
-    set_uniform_buffer(UniformBufferSlot::PER_SETTINGS, global_uniform_buffer);
-    set_uniform_buffer(UniformBufferSlot::PER_FRAME,    per_frame_uniform_buffer);
-    set_uniform_buffer(UniformBufferSlot::PER_MATERIAL, per_material_uniform_buffer);
-    set_uniform_buffer(UniformBufferSlot::PER_OBJECT,   per_object_uniform_buffer);
-
-    set_primitive_type(GraphicsPrimitiveType::TRIANGLE);
-
-    set_perspective_projection((float)window->size.x, (float)window->size.y);
-    //ui_init();
+    auto window_size = get_window_size(the_window);
+    renderer_on_resize(window_size.x, window_size.y);
 }
 
-void render(OSWindow* window) {
-    bind_framebuffer(onscreen_framebuffer);
-    
-    set_blend(false);
-    set_depth(true);
-    
-    clear_color_buffer(background.r, background.g, background.b);
-    clear_depth_buffer();
-    
-    per_frame_uniforms.light.position = light->entity->position;
-    per_frame_uniforms.light.diffuse  = light->diffuse;
-    per_frame_uniforms.light.ambient  = light->ambient;
-    per_frame_uniforms.light.specular = light->specular;
-    per_frame_uniforms.time = my_time.since_start;
-    per_frame_uniforms.view_pos = main_camera->entity->position;
-    per_frame_uniforms.view = look_to(main_camera->entity->position, main_camera->forward);
-    modify_buffer(per_frame_uniform_buffer, sizeof(per_frame_uniforms), &per_frame_uniforms);
+Shader* current_vertex_shader;
+Shader* current_pixel_shader;
 
-    set_vertex_buffer(static_vertex_buffer);
-    set_index_buffer(static_index_buffer);
+void render() {
+    d3d_context->RSSetState(rasterizer_state);
+    d3d_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
+    d3d_context->OMSetRenderTargets(1, &graphics->render_target, depth_stencil_view);
+    
+    d3d_context->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
+    d3d_context->OMSetDepthStencilState(nullptr, 0);
+    
+    d3d_context->ClearRenderTargetView(graphics->render_target, background.elems);
+    d3d_context->ClearDepthStencilView(depth_stencil_view, D3D11_CLEAR_DEPTH, 1.0f, 0);
+    
+    update_and_bind_constant_buffer(&constant_buffer_global, &constants_global, sizeof(constants_global), CONSTANT_BUFFER_GLOBAL);
+
+    constants_per_frame.light.position = light->entity->position;
+    constants_per_frame.light.diffuse  = light->diffuse;
+    constants_per_frame.light.ambient  = light->ambient;
+    constants_per_frame.light.specular = light->specular;
+    constants_per_frame.time = my_time.since_start;
+    constants_per_frame.view_pos = main_camera->entity->position;
+    constants_per_frame.view = look_to(main_camera->entity->position, main_camera->forward);
+    update_and_bind_constant_buffer(&constant_buffer_per_frame, &constants_per_frame, sizeof(constants_per_frame), CONSTANT_BUFFER_PER_FRAME);
+
+    uint stride = sizeof(VertexPNU);
+    uint offsets = 0;
+    d3d_context->IASetVertexBuffers(0, 1, &static_vertex_buffer.d3d, &stride, &offsets);
+    d3d_context->IASetIndexBuffer(static_index_buffer.d3d, DXGI_FORMAT_R32_UINT, 0);
+
+    
+    current_vertex_shader = nullptr;
+    current_pixel_shader = nullptr;
     for(int i = 0; i < entity_count; i++) {
         Entity* e = &entities[i];
         if(!e->model) continue;
@@ -327,48 +322,60 @@ void render(OSWindow* window) {
             material = &MATERIAL_MISSING;
         }
 
-        if(!material->shader) {
+        if(!material->vertex_shader || !material->pixel_shader) {
             printf("Tried to draw an entity with null shader\n");
             continue;
         }
 
+        d3d_context->IASetInputLayout(input_layouts[VERTEX_FORMAT_PNU]);
+
         //@Speed: Sort by shader/material instead!
-        if(current_shader != material->shader) {
-            set_shader(material->shader);
+        if(current_vertex_shader != material->vertex_shader) {
+            d3d_context->VSSetShader(material->vertex_shader->vertex, nullptr, 0);
+            current_vertex_shader = material->vertex_shader;
         }
-            
-        for(uint j = 0; j < material->shader->pixel_texture_slots.count; j++) {
-            set_texture(material->shader->pixel_texture_slots[j], material->pixel_textures[j]);
+        if(current_pixel_shader != material->pixel_shader) {
+            d3d_context->PSSetShader(material->pixel_shader->pixel, nullptr, 0);
+            current_pixel_shader = material->pixel_shader;
+        }
+        d3d_context->PSSetSamplers(0, 1, &sampler_state);
+        
+        for(uint j = 0; j < 16; j++) {
+            if(material->pixel_textures[j]) {
+                d3d_context->PSSetShaderResources(j, 1, &material->pixel_textures[j]->shader_resource);
+            }
         }
 
         if(material->constants_size > 0) {
             assert(material->constants_size < 160); // See :Hardcoded
-            modify_buffer(per_material_uniform_buffer, material->constants_size, get_material_constants(material));
+            void* constants = get_material_constants(material);
+            update_and_bind_constant_buffer(&constant_buffer_per_material, constants, material->constants_size, CONSTANT_BUFFER_PER_MATERIAL);
         }
         
-        per_object_uniforms.world = get_world_matrix(e);
-        modify_buffer(per_object_uniform_buffer, sizeof(per_object_uniforms), &per_object_uniforms);
+        constants_per_object.world = get_world_matrix(e);
+        update_and_bind_constant_buffer(&constant_buffer_per_object, &constants_per_object, sizeof(constants_per_object), CONSTANT_BUFFER_PER_OBJECT);
         
         For(e->model->meshes) {
-            draw_indexed(it->vertex_base, it->index_base, it->indices.count);
+            d3d_context->DrawIndexed((uint)it.indices.count, it.index_base, it.vertex_base);
         }
 
 #if 1
         //Render bounding box
         if(e->type == ENTITY_TYPE_Player) {
             auto collider_size = e->collider.box.max - e->collider.box.min;
-            per_object_uniforms.world = scale(Matrix::ident, Vector3{collider_size.x, collider_size.y, 0.1f});
-            per_object_uniforms.world = translate(per_object_uniforms.world, e->position);
-            modify_buffer(per_object_uniform_buffer, sizeof(per_object_uniforms), &per_object_uniforms);
-            set_primitive_type(GraphicsPrimitiveType::LINE);
+            constants_per_object.world = scale(Matrix::ident, Vector3{collider_size.x, collider_size.y, 0.1f});
+            constants_per_object.world = translate(constants_per_object.world, e->position);
+            update_and_bind_constant_buffer(&constant_buffer_per_object, &constants_per_object, sizeof(constants_per_object), CONSTANT_BUFFER_PER_OBJECT);
+            d3d_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP);
 
-            auto saved_shader = current_shader;
-            set_shader(shader_debug);
+            auto saved_pixel_shader = current_pixel_shader;
+            d3d_context->PSSetShader(shader_pixel_debug.pixel, nullptr, 0);
             
-            draw_indexed(model_cube.meshes[0].vertex_base, model_cube.meshes[0].index_base, model_cube.meshes[0].indices.count);
+            auto mesh = &model_cube.meshes[0];
+            d3d_context->DrawIndexed((uint)mesh->indices.count, mesh->index_base, mesh->vertex_base);
             
-            set_primitive_type(GraphicsPrimitiveType::TRIANGLE);
-            set_shader(saved_shader);
+            d3d_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            d3d_context->PSSetShader(saved_pixel_shader->pixel, nullptr, 0);
         }
 #endif  
     }
@@ -404,11 +411,41 @@ void render(OSWindow* window) {
     }
     set_primitive_type(GraphicsPrimitiveType::TRIANGLE);
 #endif
-
-    ui_build();
-    swap_buffers();
 }
 
 void end_renderer() {
+    shader_vertex_basic.vertex->Release();
+    shader_vertex_basic.bytecode->Release();
+    shader_pixel_basic.pixel->Release();
+    shader_pixel_light.pixel->Release();
+    shader_pixel_debug.pixel->Release();
+
+    texture_grid.d3d->Release();
+    texture_grid.shader_resource->Release();
+    white_pixel.d3d->Release();
+    white_pixel.shader_resource->Release();
+
+    depth_stencil_state_off->Release();
+    blend_state_on->Release();
+    sampler_state->Release();
+    rasterizer_state->Release();
+
+    if(depth_stencil_view) depth_stencil_view->Release();
+
+    static_vertex_buffer.d3d->Release();
+    static_index_buffer.d3d->Release();
+    debug_vertex_buffer.d3d->Release();
+
+    constant_buffer_global.d3d->Release();
+    constant_buffer_per_frame.d3d->Release();
+    constant_buffer_per_material.d3d->Release();
+    constant_buffer_per_object.d3d->Release();
+
+    for(int i = 0; i < VERTEX_FORMAT_COUNT; i++) {
+        if(input_layouts[i]) input_layouts[i]->Release();
+    }
+
+    sd_free();
+    
     end_graphics();
 }

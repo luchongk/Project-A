@@ -1,3 +1,4 @@
+#include <cstdio>
 #include "windowing.h"
 #include "times.h"
 #include "entities.h"
@@ -7,27 +8,20 @@
 #include "simulation.h"
 #include "basic.h"
 #include "general.h"
-/*#include "stb_image.cpp"
-#include "stb_truetype.cpp"
-#include "input_callbacks.cpp"
-#include "input.cpp"
-#include "physics.cpp"
-#include "simulation.cpp"
-#include "graphics_d3d11.cpp"
-#include "obj_loader.cpp"
-#include "entities.cpp"
-#include "rect.cpp"
-#include "font.cpp"
-#include "simple_draw.cpp"
-//#include "ui.cpp"
-#include "new_ui.cpp"*/
+#include "ui.h"
+#include "graphics/d3d11/utils.h"
+#include "font.h"
 
 const float ORTHOGRAPHIC_VIEW_WIDTH = 20.0f;    // In world units.
 
 Time my_time;
-OsWindow window;
+OsWindow the_window;
 bool do_step;
 bool use_perspective = true;
+
+const int DEVTOOLS_FONT_LARGE  = 24;
+const int DEVTOOLS_FONT_MEDIUM = 18;
+FontHandle inconsolata;
 
 static void update_time() {
     u64 now = get_timestamp();
@@ -44,31 +38,40 @@ static void update_time() {
 }
 
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
+    setvbuf(stdout, nullptr, _IONBF, 0);
+    SetCurrentDirectoryA("..\\");
+    
     my_time.start_stamp = get_timestamp();
     my_time.simulation_dt = 1.0f/144;
     my_time.sim_scale = 1.0f;
     my_time.max_dt_allowed = 0.25f;
 
+    the_window = create_window(400, 400, 1600, 800, "PepegaClap"_s, false);
+    set_window_min_size(the_window, 500, 500); 
+    set_fullscreen(the_window, true);
     
-    window = create_window(0, 0, 1600, 800, "PepegaClap"_s);
-    //os_set_fullscreen(window, true);
-    
+    init_renderer();
+
+    inconsolata = font_load_from_file("assets\\fonts\\Inconsolata.ttf"_s);
+    add_glyphs_to_atlas(inconsolata, DEVTOOLS_FONT_MEDIUM, "1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz !@#$%^&*()_+-=:;'/[]{},.?<>|`~\\"_s);
+    add_glyphs_to_atlas(inconsolata, DEVTOOLS_FONT_LARGE, "1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz !@#$%^&*()_+-=:;'/[]{},.?<>|`~\\"_s);
+    ui_init(2560, 1440);
+
     reset_scene();
-    
-    //init_input();
-    init_renderer(window);
-    
+
+    ShowWindow(the_window, SW_SHOW);
+    flush_os_events();
+
     float accum = 0;
     while(true) {
-        //wait_for_vblank();
+        wait_for_present(the_window);
 
         update_time();
-        update_os_events();
 
-        bool should_quit = handle_input(&os_events);
+        gather_os_events();
+        bool should_quit = handle_input();
+        flush_os_events();
         if(should_quit) break;
-
-        //ui_update();
        
         auto sim_dt = my_time.simulation_dt;
         if(paused) {
@@ -119,6 +122,9 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
         update_camera(my_time.dt);
 
         render();
+        ui_render();
+
+        swap_buffers(the_window);
 
         /*float elapsed = os_elapsed_time(before, os_get_timestamp());
         if(elapsed > 0.002f) {
@@ -135,5 +141,47 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 #endif
     }
 
+    font_release(inconsolata);
+    free_font_atlas();
     end_renderer();
+}
+
+const int TEXT_HORIZONTAL_PAD = 4;
+ArrayView<GlyphInfo> ui_text(FontHandle font, int size, String text) {
+    auto run = get_glyph_run(font, size, text, temp_allocator);
+    float width = 0;
+    float height = run[0].subregion.h;
+    For(run) width += it.advance;
+    
+    ui_element(); w_px(width + 2 * TEXT_HORIZONTAL_PAD) h_px(height)
+    return run;
+}
+
+void draw_text(Rect rect, ArrayView<GlyphInfo> glyphs, Vector4 color = {1,1,1,1}) {
+    float x = floorf(rect.x + TEXT_HORIZONTAL_PAD);
+    For(glyphs) {
+        sd_draw_rect({x + it.x_offset, rect.y, it.subregion.w, it.subregion.h}, it.uv, it.atlas_texture, color);
+        x += it.advance;
+    }
+}
+
+bool devtools_open;
+void ui_declare() {
+    ui_enter_data_scope("devtools"_s); {
+        if(devtools_open) {
+            auto e = ui_begin_element(); w_fit _pad_x(10) _pad_top(10) h_expand(1) _column _gap(5) {
+                sd_draw_rect(e->rect, {0,0.1f,0.2f,0.6f});
+
+                auto glyphs = ui_text(inconsolata, DEVTOOLS_FONT_LARGE, "Reset Scene"_s);
+                sd_draw_rect(current_element->rect, {0.1f, 0.1f, 0.1f, 1.0f}, 0.15f, true);
+                draw_text(current_element->rect, glyphs);
+                if(on_click(ui_interactable(current_element->rect))) reset_scene();
+
+                auto pos = main_player->entity->position;
+                auto pos_string = sprint("Player position: (%f, %f, %f)", temp_allocator, pos.x, pos.y, pos.z);
+                glyphs = ui_text(inconsolata, DEVTOOLS_FONT_MEDIUM, pos_string);
+                draw_text(current_element->rect, glyphs);
+            } ui_end_element();
+        }
+    }
 }

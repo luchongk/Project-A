@@ -123,7 +123,7 @@ void update_camera(float dt) {
         else {
             if(keystates[VK_RBUTTON] & IS_DOWN) {
                 Vector2i new_mouse_pos = mouse_position;
-                Vector2i window_size = get_window_size(window);
+                Vector2i window_size = get_window_size(the_window);
 
                 if(mouse_position.x < 5) new_mouse_pos.x = window_size.x - 5;
                 else if(mouse_position.x > window_size.x - 5) new_mouse_pos.x = 5;

@@ -1,4 +1,11 @@
 
-float4 main(float3 world_position : POSITION, /*float4 color : COLOR,*/ float3 normal : NORMAL, float2 uv : UV) : SV_TARGET {
+struct PSInput {
+    float4 world_position : POSITION;
+    float4 normal : NORMAL;
+    float2 uv : UV;
+    float4 screenPos : SV_POSITION;
+};
+
+float4 main(PSInput input) : SV_TARGET {
     return float4(0,1,0,1);
 }

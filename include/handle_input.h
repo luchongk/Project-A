@@ -4,7 +4,6 @@
 struct OsEvent;
 template<typename T> struct Array;
 
-void update_input();
-bool handle_input(Array<OsEvent>* events);
+bool handle_input();
 
 #endif
