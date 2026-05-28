@@ -267,7 +267,7 @@ void init_renderer() {
         
         static_vertex_buffer.d3d = create_buffer(D3D11_BIND_VERTEX_BUFFER, D3D11_USAGE_DEFAULT, (uint)(sizeof(VertexPNU) * vertices.count), vertices.data);
         static_index_buffer.d3d  = create_buffer(D3D11_BIND_INDEX_BUFFER,  D3D11_USAGE_DEFAULT, (uint)(sizeof(uint) * indices.count), indices.data);
-        debug_vertex_buffer.d3d  = create_buffer(D3D11_BIND_VERTEX_BUFFER, D3D11_USAGE_DEFAULT, (uint)(sizeof(VertexPCU) * 256));
+        debug_vertex_buffer.d3d  = create_buffer(D3D11_BIND_VERTEX_BUFFER, D3D11_USAGE_DYNAMIC, (uint)(sizeof(VertexPCU) * 64000));
     }
     
     constant_buffer_global.d3d       = create_buffer(D3D11_BIND_CONSTANT_BUFFER, D3D11_USAGE_DYNAMIC, sizeof(ConstantBufferGlobal), &constants_global);
@@ -283,16 +283,14 @@ Shader* current_vertex_shader;
 Shader* current_pixel_shader;
 
 void render() {
-    d3d_context->RSSetState(rasterizer_state);
-    d3d_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
     d3d_context->OMSetRenderTargets(1, &graphics->render_target, depth_stencil_view);
-    
-    d3d_context->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
-    d3d_context->OMSetDepthStencilState(nullptr, 0);
-    
     d3d_context->ClearRenderTargetView(graphics->render_target, background.elems);
     d3d_context->ClearDepthStencilView(depth_stencil_view, D3D11_CLEAR_DEPTH, 1.0f, 0);
+    
+    d3d_context->RSSetState(rasterizer_state);
+    d3d_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    d3d_context->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
+    d3d_context->OMSetDepthStencilState(nullptr, 0);
     
     update_and_bind_constant_buffer(&constant_buffer_global, &constants_global, sizeof(constants_global), CONSTANT_BUFFER_GLOBAL);
 
@@ -309,7 +307,7 @@ void render() {
     uint offsets = 0;
     d3d_context->IASetVertexBuffers(0, 1, &static_vertex_buffer.d3d, &stride, &offsets);
     d3d_context->IASetIndexBuffer(static_index_buffer.d3d, DXGI_FORMAT_R32_UINT, 0);
-
+    d3d_context->IASetInputLayout(input_layouts[VERTEX_FORMAT_PNU]);
     
     current_vertex_shader = nullptr;
     current_pixel_shader = nullptr;
@@ -326,8 +324,6 @@ void render() {
             printf("Tried to draw an entity with null shader\n");
             continue;
         }
-
-        d3d_context->IASetInputLayout(input_layouts[VERTEX_FORMAT_PNU]);
 
         //@Speed: Sort by shader/material instead!
         if(current_vertex_shader != material->vertex_shader) {
@@ -381,35 +377,37 @@ void render() {
     }
 
 #if 0
+    // Draw normals
     // TODO: This is a good example of something we could do in a geometry shader, whenever we support those anyways...
-    set_primitive_type(GraphicsPrimitiveType::LINE);
-    set_vertex_buffer(debug_vertex_buffer);
-    set_shader(shader_debug);
-    Array<VertexPCU> vertices;
-    for(int i = 0; i < entity_count; i++) {
-        array_reset(&vertices);
-        
+    d3d_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
+    stride = sizeof(VertexPNU);
+    offsets = 0;
+    d3d_context->IASetVertexBuffers(0, 1, &debug_vertex_buffer.d3d, &stride, &offsets);
+    d3d_context->PSSetShader(shader_pixel_debug.pixel, nullptr, 0);
+    Array<VertexPNU> vertices;
+    for(int i = 0; i < entity_count; i++) {        
         Entity* entity = &entities[i];
-        if(!entity->mesh) continue;
-        per_object_uniforms.world = get_world_matrix(&entities[i]);
-        
-        for(uint j = 0; j < entity->mesh->indices.count; j++) {
-            uint index = entity->mesh->indices[j];
-            VertexPCU v;
-            v.color = {1,0,0,1};
-            v.position = entity->mesh->vertices[index];
-            array_add(&vertices, v);
+        if(!entity->model) continue;
+        constants_per_object.world = get_world_matrix(&entities[i]);
 
-            v.color = {1,0,0,1};
-            v.position = entity->mesh->vertices[index] + 0.25f * entity->mesh->normals[index];
-            array_add(&vertices, v);
+        ForP(entity->model->meshes) {
+            for(uint j = 0; j < it->indices.count; j++) {
+                uint index = it->indices[j];
+                VertexPNU v;
+                v.position = it->vertices[index];
+                array_add(&vertices, v);
+
+                v.position = it->vertices[index] + 0.25f * it->normals[index];
+                array_add(&vertices, v);
+            }
+            
+            copy_to_buffer(debug_vertex_buffer.d3d, vertices.data, vertices.count * sizeof(VertexPNU));
+            update_and_bind_constant_buffer(&constant_buffer_per_object, &constants_per_object, sizeof(constants_per_object), CONSTANT_BUFFER_PER_OBJECT);
+            d3d_context->Draw((uint)vertices.count, 0);
+
+            array_reset(&vertices);
         }
-        
-        modify_buffer(debug_vertex_buffer, vertices.count * sizeof(VertexPCU), vertices.data);
-        modify_buffer(per_object_uniform_buffer, sizeof(per_object_uniforms), &per_object_uniforms);
-        draw(0, vertices.count);
     }
-    set_primitive_type(GraphicsPrimitiveType::TRIANGLE);
 #endif
 }
 

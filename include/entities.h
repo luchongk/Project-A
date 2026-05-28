@@ -1,7 +1,6 @@
 #ifndef ENTITY_H
 #define ENTITY_H
 
-#include "obj_loader.h"
 #include "render.h"
 #include "physics.h"
 
@@ -79,6 +78,6 @@ T* down_cast(Entity* entity) {
 
 Ground* create_ground(Vector3 position, float width, float height, float depth);
 
-AABB get_transformed_collider(Entity* entity);
+AABB get_world_space_collider(Entity* entity);
 
 #endif

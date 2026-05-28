@@ -19,8 +19,6 @@ OsWindow the_window;
 bool do_step;
 bool use_perspective = true;
 
-const int DEVTOOLS_FONT_LARGE  = 24;
-const int DEVTOOLS_FONT_MEDIUM = 18;
 FontHandle inconsolata;
 
 static void update_time() {
@@ -53,8 +51,6 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
     init_renderer();
 
     inconsolata = font_load_from_file("assets\\fonts\\Inconsolata.ttf"_s);
-    add_glyphs_to_atlas(inconsolata, DEVTOOLS_FONT_MEDIUM, "1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz !@#$%^&*()_+-=:;'/[]{},.?<>|`~\\"_s);
-    add_glyphs_to_atlas(inconsolata, DEVTOOLS_FONT_LARGE, "1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz !@#$%^&*()_+-=:;'/[]{},.?<>|`~\\"_s);
     ui_init(2560, 1440);
 
     reset_scene();
@@ -122,7 +118,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
         update_camera(my_time.dt);
 
         render();
-        ui_render();
+        ui_render_pass();
 
         swap_buffers(the_window);
 
@@ -146,40 +142,42 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
     end_renderer();
 }
 
-const int TEXT_HORIZONTAL_PAD = 4;
-ArrayView<GlyphInfo> ui_text(FontHandle font, int size, String text) {
+ArrayView<GlyphInfo> ui_text(FontHandle font, int size, String text, int x_padding = 0) {
     auto run = get_glyph_run(font, size, text, temp_allocator);
     float width = 0;
     float height = run[0].subregion.h;
     For(run) width += it.advance;
     
-    ui_element(); w_px(width + 2 * TEXT_HORIZONTAL_PAD) h_px(height)
+    ui_element(); w_px(width + 2 * x_padding) h_px(height)
     return run;
 }
 
-void draw_text(Rect rect, ArrayView<GlyphInfo> glyphs, Vector4 color = {1,1,1,1}) {
-    float x = floorf(rect.x + TEXT_HORIZONTAL_PAD);
+void draw_text(Rect rect, ArrayView<GlyphInfo> glyphs, int x_padding = 0, Vector4 color = {1,1,1,1}) {
+    float x = floorf(rect.x + x_padding);
     For(glyphs) {
         sd_draw_rect({x + it.x_offset, rect.y, it.subregion.w, it.subregion.h}, it.uv, it.atlas_texture, color);
         x += it.advance;
     }
 }
 
-bool devtools_open;
+bool devtools_open = true;
 void ui_declare() {
     ui_enter_data_scope("devtools"_s); {
         if(devtools_open) {
             auto e = ui_begin_element(); w_fit _pad_x(10) _pad_top(10) h_expand(1) _column _gap(5) {
                 sd_draw_rect(e->rect, {0,0.1f,0.2f,0.6f});
 
-                auto glyphs = ui_text(inconsolata, DEVTOOLS_FONT_LARGE, "Reset Scene"_s);
-                sd_draw_rect(current_element->rect, {0.1f, 0.1f, 0.1f, 1.0f}, 0.15f, true);
-                draw_text(current_element->rect, glyphs);
-                if(on_click(ui_interactable(current_element->rect))) reset_scene();
+                auto glyphs = ui_text(inconsolata, 24, "Reset Scene!"_s, 8);
+                auto b_reset = ui_interactable(current_element->rect);
+                auto background = lerp(Vector3{0.1f, 0.1f, 0.1f}, Vector3{0.2f, 0.2f, 0.2f}, b_reset->hover_t);
+                background = lerp(background, Vector3{0.01f, 0.01f, 0.01f}, b_reset->hold_t);
+                sd_draw_rect(current_element->rect, background, 8, false);
+                draw_text(current_element->rect, glyphs, 8);
+                if(on_click(b_reset)) reset_scene();
 
                 auto pos = main_player->entity->position;
                 auto pos_string = sprint("Player position: (%f, %f, %f)", temp_allocator, pos.x, pos.y, pos.z);
-                glyphs = ui_text(inconsolata, DEVTOOLS_FONT_MEDIUM, pos_string);
+                glyphs = ui_text(inconsolata, 18, pos_string);
                 draw_text(current_element->rect, glyphs);
             } ui_end_element();
         }

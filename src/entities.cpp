@@ -24,6 +24,8 @@ Player* main_player;
 Player* player2;
 
 Entity* create_entity(Vector3 position, Vector3 scale, Model* model, Material* material) {
+    if(entity_count >= MAX_ENTITIES) return nullptr;
+
     Entity* e = &entities[entity_count++];
     e->type        = ENTITY_TYPE_UNINITIALIZED;
     e->scale       = scale;
@@ -79,13 +81,13 @@ void reset_scene() {
     main_camera->yaw   = radians(0);
     main_camera->pitch = radians(-25);
     main_camera->target = main_camera->entity->position;
-    main_camera->entity->type_specific_data = &main_camera;
+    main_camera->entity->type_specific_data = main_camera;
 
     light = CREATE_ENTITY(Light, (Vector3{-2, 3, 3}), 0.1f * (Vector3{1,1,1}), &model_cube, &MATERIAL_LIGHT);
     light->ambient  = {0.0005f, 0.0005f, 0.0005f};
     light->diffuse  = {1.0f, 1.0f, 1.0f};
     light->specular = {1.0f, 1.0f, 1.0f};
-    light->entity->type_specific_data = &light;
+    light->entity->type_specific_data = light;
 
     main_player = create_player({0, 0.5f, 0}, 0.65f, 1.8f, 1);
 
@@ -103,14 +105,13 @@ void reset_scene() {
 // @Speed: Can we calculate world-view matrix at once or do we need them to be separate?
 Matrix get_world_matrix(Entity* entity) {
     Matrix localToWorld = entity->orientation;
-
     localToWorld = scale(localToWorld, entity->scale);
     localToWorld = translate(localToWorld, entity->position);
-
+    
     return localToWorld;
 }
 
-AABB get_transformed_collider(Entity* entity) {
+AABB get_world_space_collider(Entity* entity) {
     AABB aabb;
     aabb.min = (Vector2)entity->position + entity->collider.box.min;
     aabb.max = (Vector2)entity->position + entity->collider.box.max;

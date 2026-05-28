@@ -49,7 +49,7 @@ static void handle_text_event(OsEvent* event) {
 
 bool handle_input() {
 
-    ui_process_input(&os_events, mouse_position.x, mouse_position.y, my_time.dt);
+    ui_resolve_input(&os_events, mouse_position.x, mouse_position.y, my_time.dt);
 
     for(int i = 0; i < os_events.count; i++) {
         auto& e = os_events[i];
@@ -87,6 +87,8 @@ bool handle_input() {
     main_player->move.x = (float)((bool)(keystates['D'] & IS_DOWN) - (bool)(keystates['A'] & IS_DOWN));
     main_player->move.y = (float)(bool)(keystates[VK_SPACE] & IS_DOWN);
     main_player->move.z = (float)((bool)(keystates['S'] & IS_DOWN) - (bool)(keystates['W'] & IS_DOWN));   // Flipped because -Z is forward.
+
+    ui_input_pass();
 
     return false;
 }

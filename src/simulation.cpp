@@ -231,13 +231,13 @@ CollisionContact dynamic_contacts[64];
 int dynamic_contacts_count = 0;
 
 void find_new_contacts(Player* player) {
-    AABB player_aabb = get_transformed_collider(player->entity);
+    AABB player_aabb = get_world_space_collider(player->entity);
     
     for(int e = 0; e < entity_count; e++) {
         if(player->entity == &entities[e]) continue;
         if(entities[e].collider.shape == COLLIDER_SHAPE_NONE) continue;
 
-        AABB other_aabb = get_transformed_collider(&entities[e]);
+        AABB other_aabb = get_world_space_collider(&entities[e]);
         CollisionContact maybe_new_contact;
         bool overlap = collide_aabb_aabb(&player_aabb, &other_aabb, &maybe_new_contact);
         if(overlap) {
@@ -314,8 +314,8 @@ void solve_collisions(float dt) {
             if(other_entity == player->entity) continue;
             if(other_entity->collider.shape == COLLIDER_SHAPE_NONE) continue;
 
-            AABB player_aabb = get_transformed_collider(player->entity);
-            AABB other_aabb  = get_transformed_collider(other_entity);
+            AABB player_aabb = get_world_space_collider(player->entity);
+            AABB other_aabb  = get_world_space_collider(other_entity);
             
             CollisionContact* contacts = other_entity->type == ENTITY_TYPE_Player ? dynamic_contacts : static_contacts;
             int* contacts_count = other_entity->type == ENTITY_TYPE_Player ? &dynamic_contacts_count : &static_contacts_count;
@@ -346,8 +346,8 @@ void solve_collisions(float dt) {
             auto player       = contact.player;
             auto other_entity = contact.other_entity;
             
-            AABB player_aabb = get_transformed_collider(player->entity);
-            AABB other_aabb  = get_transformed_collider(other_entity);
+            AABB player_aabb = get_world_space_collider(player->entity);
+            AABB other_aabb  = get_world_space_collider(other_entity);
 
             // @Speed: There's no need to do a full collide here, we only want to update the separation
             // between the bodies involved in a contact we already have.
@@ -384,8 +384,8 @@ void solve_collisions(float dt) {
             auto& contact = static_contacts[i];
             auto player   = contact.player;
 
-            AABB player_aabb = get_transformed_collider(player->entity);
-            AABB other_aabb  = get_transformed_collider(contact.other_entity);
+            AABB player_aabb = get_world_space_collider(player->entity);
+            AABB other_aabb  = get_world_space_collider(contact.other_entity);
             
             // @Speed: There's no need to do a full collide here, we only want to update the separation
             // between the bodies involved in a contact we already have.
