@@ -30,7 +30,7 @@ MaterialBasic  MATERIAL_PLAYER2;
 MaterialNoData MATERIAL_LIGHT;
 //--------------------------------------------
 
-Vector3 background = {0,0.02f,0.08f};
+Vector4 background = {0,0.02f,0.08f};
 
 static WindowGraphics* graphics;
 
@@ -294,13 +294,22 @@ void render() {
     
     update_and_bind_constant_buffer(&constant_buffer_global, &constants_global, sizeof(constants_global), CONSTANT_BUFFER_GLOBAL);
 
-    constants_per_frame.light.position = light->entity->position;
-    constants_per_frame.light.diffuse  = light->diffuse;
-    constants_per_frame.light.ambient  = light->ambient;
-    constants_per_frame.light.specular = light->specular;
+    auto light_e = get_entity(light);
+    if(light_e) {
+        auto l = light_e->light;
+        constants_per_frame.light.position = l->entity->position;
+        constants_per_frame.light.diffuse  = l->diffuse;
+        constants_per_frame.light.ambient  = l->ambient;
+        constants_per_frame.light.specular = l->specular;
+    } else {
+        constants_per_frame.light.diffuse  = {};
+        constants_per_frame.light.ambient  = {};
+        constants_per_frame.light.specular = {};
+    }
     constants_per_frame.time = my_time.since_start;
-    constants_per_frame.view_pos = main_camera->entity->position;
-    constants_per_frame.view = look_to(main_camera->entity->position, main_camera->forward);
+    auto camera = get_entity(main_camera)->camera;
+    constants_per_frame.view_pos = camera->entity->position;
+    constants_per_frame.view = look_to(camera->entity->position, camera->forward);
     update_and_bind_constant_buffer(&constant_buffer_per_frame, &constants_per_frame, sizeof(constants_per_frame), CONSTANT_BUFFER_PER_FRAME);
 
     uint stride = sizeof(VertexPNU);
@@ -311,9 +320,10 @@ void render() {
     
     current_vertex_shader = nullptr;
     current_pixel_shader = nullptr;
-    for(int i = 0; i < entity_count; i++) {
+    auto entities = manager->entities.all;
+    for(int i = 0; i < entities.count; i++) {
         Entity* e = &entities[i];
-        if(!e->model) continue;
+        if(!(e->flags & ENTITY_FLAG_ACTIVE) || !e->model) continue;
         
         Material* material = e->material;
         if(!e->material) {

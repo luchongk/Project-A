@@ -17,6 +17,8 @@ struct Time {
 extern Time my_time;
 extern OsWindow the_window;
 extern const float ORTHOGRAPHIC_VIEW_WIDTH;
-extern bool devtools_open;
+extern bool editor_on;
+extern bool do_step;
+extern Vector3 move;
 
 #endif

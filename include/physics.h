@@ -31,5 +31,6 @@ struct Collider {
 };
 
 bool collide_aabb_aabb(AABB* a, AABB* b, CollisionContact* contact);
+float raycast(Vector3 origin, Vector3 direction, AABB box);
 
 #endif

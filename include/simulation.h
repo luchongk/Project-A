@@ -4,10 +4,7 @@
 #include "maths.h"
 
 //All these are @TEMPORARY
-extern float cubes_rotation;
 extern bool paused;
-extern bool character_selected;
-extern float do_the_thing_cooldown;
 extern Vector2i saved_mouse_pos;
 extern char velocity_strings[64][128];
 

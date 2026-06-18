@@ -9,17 +9,15 @@
 #include "basic.h"
 #include "general.h"
 #include "ui.h"
+#include "editor.h"
 #include "graphics/d3d11/utils.h"
-#include "font.h"
 
 const float ORTHOGRAPHIC_VIEW_WIDTH = 20.0f;    // In world units.
 
 Time my_time;
 OsWindow the_window;
-bool do_step;
 bool use_perspective = true;
-
-FontHandle inconsolata;
+bool do_step;
 
 static void update_time() {
     u64 now = get_timestamp();
@@ -47,12 +45,12 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
     the_window = create_window(400, 400, 1600, 800, "PepegaClap"_s, false);
     set_window_min_size(the_window, 500, 500); 
     set_fullscreen(the_window, true);
+    capture_and_hide_mouse(the_window, true);
     
     init_renderer();
+    init_editor();
 
-    inconsolata = font_load_from_file("assets\\fonts\\Inconsolata.ttf"_s);
-    ui_init(2560, 1440);
-
+    init_entity_manager();
     reset_scene();
 
     ShowWindow(the_window, SW_SHOW);
@@ -68,9 +66,14 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
         bool should_quit = handle_input();
         flush_os_events();
         if(should_quit) break;
+
+        move.x = (float)((bool)(keystates['D'] & IS_DOWN) - (bool)(keystates['A'] & IS_DOWN));
+        move.y = (float)(bool)(keystates[VK_SPACE] & IS_DOWN);
+        move.z = (float)((bool)(keystates['S'] & IS_DOWN) - (bool)(keystates['W'] & IS_DOWN));   // Flipped because -Z is forward
        
         auto sim_dt = my_time.simulation_dt;
         if(paused) {
+            printf("do_step: %d\n", do_step);
             if(do_step) {
                 simulate(sim_dt);
                 do_step = false;
@@ -118,6 +121,8 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
         update_camera(my_time.dt);
 
         render();
+        
+        ui_input_pass();
         ui_render_pass();
 
         swap_buffers(the_window);
@@ -132,54 +137,11 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 #if 0
     printf_s("last frame: %f ms\n", my_time.dt * 1000);
     printf_s("FPS: %f\n", 1 / my_time.dt);
-#elif 0
     printf_s("Mouse X: %f Y: %f\n", input.mouse_position.x, input.mouse_position.y);
 #endif
     }
 
-    font_release(inconsolata);
-    free_font_atlas();
+    free_entity_manager(manager);
+    end_editor();
     end_renderer();
-}
-
-ArrayView<GlyphInfo> ui_text(FontHandle font, int size, String text, int x_padding = 0) {
-    auto run = get_glyph_run(font, size, text, temp_allocator);
-    float width = 0;
-    float height = run[0].subregion.h;
-    For(run) width += it.advance;
-    
-    ui_element(); w_px(width + 2 * x_padding) h_px(height)
-    return run;
-}
-
-void draw_text(Rect rect, ArrayView<GlyphInfo> glyphs, int x_padding = 0, Vector4 color = {1,1,1,1}) {
-    float x = floorf(rect.x + x_padding);
-    For(glyphs) {
-        sd_draw_rect({x + it.x_offset, rect.y, it.subregion.w, it.subregion.h}, it.uv, it.atlas_texture, color);
-        x += it.advance;
-    }
-}
-
-bool devtools_open = true;
-void ui_declare() {
-    ui_enter_data_scope("devtools"_s); {
-        if(devtools_open) {
-            auto e = ui_begin_element(); w_fit _pad_x(10) _pad_top(10) h_expand(1) _column _gap(5) {
-                sd_draw_rect(e->rect, {0,0.1f,0.2f,0.6f});
-
-                auto glyphs = ui_text(inconsolata, 24, "Reset Scene!"_s, 8);
-                auto b_reset = ui_interactable(current_element->rect);
-                auto background = lerp(Vector3{0.1f, 0.1f, 0.1f}, Vector3{0.2f, 0.2f, 0.2f}, b_reset->hover_t);
-                background = lerp(background, Vector3{0.01f, 0.01f, 0.01f}, b_reset->hold_t);
-                sd_draw_rect(current_element->rect, background, 8, false);
-                draw_text(current_element->rect, glyphs, 8);
-                if(on_click(b_reset)) reset_scene();
-
-                auto pos = main_player->entity->position;
-                auto pos_string = sprint("Player position: (%f, %f, %f)", temp_allocator, pos.x, pos.y, pos.z);
-                glyphs = ui_text(inconsolata, 18, pos_string);
-                draw_text(current_element->rect, glyphs);
-            } ui_end_element();
-        }
-    }
 }
