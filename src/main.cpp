@@ -121,9 +121,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
         update_camera(my_time.dt);
 
         render();
-        
-        ui_input_pass();
-        ui_render_pass();
+        ui_process_frame();
 
         swap_buffers(the_window);
 

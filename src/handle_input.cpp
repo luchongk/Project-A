@@ -7,6 +7,7 @@
 #include "windowing.h"
 #include "ui.h"
 #include "editor.h"
+#include "simple_draw.h"
 
 static void handle_key_event(OsEvent* event) {
     auto key = event->key;
@@ -91,20 +92,20 @@ static void handle_text_event(OsEvent* event) {
 
 bool handle_input() {
 
-    ui_resolve_interactables(&os_events, mouse_position.x, mouse_position.y, my_time.dt);
+    ui_resolve_interactables(os_events, mouse_position.x, mouse_position.y, my_time.dt);
 
-    for(int i = 0; i < os_events.count; i++) {
-        auto& e = os_events[i];
-
-        switch(e.type) {
+    for(auto e = os_events; e != nullptr; e = e->next) {
+        switch(e->type) {
             case OsEventType::WINDOW_CLOSED: return true;
 
             case OsEventType::WINDOW_RESIZED: {
-                auto window = e.window;
+                auto window = e->window;
                 if(!is_minimized(window)) {
-                    renderer_on_resize(e.resize.width, e.resize.height);
+                    renderer_on_resize(e->resize.width, e->resize.height);
+                    ui_handle_resize(e->resize.width, e->resize.height);
+                    sd_set_resolution(e->resize.width, e->resize.height);
                 }
-                //fallthrough
+                break;
             }
             
             case OsEventType::KEY: {
@@ -113,12 +114,12 @@ bool handle_input() {
                     auto callback = input_buttons[button].callback;
                     if(callback) callback(it->key.pressed, it->key.is_repeat);
                 }*/
-                handle_key_event(&e);
+                handle_key_event(e);
                 break;
             }
 
             case OsEventType::TEXT: {
-                handle_text_event(&e);
+                handle_text_event(e);
                 break;
             }
         }

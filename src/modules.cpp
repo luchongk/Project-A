@@ -16,6 +16,10 @@
 #define FILE_IMPLEMENTATION
 #include "file.h"
 
+#define SIMPLE_DRAW_IMPLEMENTATION
+#define SIMPLE_DRAW_UI_EXTENSION
+#include "simple_draw.h"
+
 #define UI_IMPLEMENTATION
 #include "ui.h"
 

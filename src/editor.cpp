@@ -1,7 +1,9 @@
 #include "font.h"
+#include "simple_draw.h"
 #include "ui.h"
 #include "entities.h"
 #include "general.h"
+#include <cstdio>
 
 FontHandle inconsolata;
 EntityHandle editor_selected;
@@ -26,18 +28,18 @@ ArrayView<GlyphInfo> ui_layout_text(FontHandle font, int size, String text, int 
 
 void ui_text(FontHandle font, int size, String text, Vector3 color = {1,1,1}, int x_padding = 0) {
     auto glyphs = ui_layout_text(font, size, text, x_padding);
-    draw_text(current_element->rect, glyphs, color, x_padding);
+    draw_text(ui_pass.current_element->rect, glyphs, color, x_padding);
 }
 
 void do_button(String text, FontHandle font = inconsolata, int font_size = 24, int padding = 8, Vector3 bg_color = {.1f,.1f,.1f}, Vector3 text_color = {1,1,1}) {
     auto glyphs = ui_layout_text(font, font_size, text, padding);
 
-    auto i = ui_interactable(current_element->rect);
+    auto i = ui_interactable(ui_pass.current_element->rect);
     auto color = lerp(bg_color, 2*bg_color, i->hover_t);
     color = lerp(color, 0.1f*bg_color, i->hold_t);
-    sd_draw_rect(current_element->rect, color, 8, false);
+    sd_draw_rect(ui_pass.current_element->rect, color, 8, false);
 
-    draw_text(current_element->rect, glyphs, text_color, padding);
+    draw_text(ui_pass.current_element->rect, glyphs, text_color, padding);
 }
 
 void ui_text_field(char* data) {
@@ -64,7 +66,7 @@ void ui_declare() {
 
                 ui_begin_element(); h_fit _row _gap(15) _pad_top(10) {
                     do_button("Reset Scene!"_s);
-                    if(on_click(current_interactable)) {
+                    if(on_click(ui_pass.current_interactable)) {
                         (*reset_count)++;
                         reset_scene();
                     }
@@ -75,7 +77,8 @@ void ui_declare() {
 
     ui_begin_element(); w_expand(1) _column x_align(1) {
         auto fps_string = sprint("FPS: %.2f", temp_allocator, 1 / my_time.dt);
-        ui_text(inconsolata, 18, fps_string);
+        auto glyphs = ui_layout_text(inconsolata, 18, fps_string); w_px(100)
+        draw_text(ui_pass.current_element->rect, glyphs);
 
         auto dt_string = sprint("dt: %.4fms", temp_allocator, my_time.dt);
         ui_text(inconsolata, 18, dt_string);
@@ -89,7 +92,7 @@ void ui_declare() {
 }
 
 void init_editor() {
-    sd_init();
+    sd_init(2560, 1440);
     ui_init(2560, 1440);
     inconsolata = font_load_from_file("assets\\fonts\\Inconsolata.ttf"_s);
 }
