@@ -36,7 +36,7 @@ void do_button(String text, FontHandle font = inconsolata, int font_size = 24, i
 
     auto i = ui_interactable(ui_pass.current_element->rect);
     auto color = lerp(bg_color, 2*bg_color, i->hover_t);
-    color = lerp(color, 0.1f*bg_color, i->hold_t);
+    color = lerp(color, 0.1f*bg_color, i->hover_t * i->hold_t);
     sd_draw_rect(ui_pass.current_element->rect, color, 8, false);
 
     draw_text(ui_pass.current_element->rect, glyphs, text_color, padding);
@@ -88,7 +88,7 @@ void ui_declare() {
     } ui_end_element();
 
     auto size = get_window_size(the_window);
-    sd_draw_rect({(float)size.x / 2 - 5, (float)size.y / 2 - 5, 10, 10}, {1,1,1,1});
+    sd_draw_rect({(float)size.x / 2 - 2, (float)size.y / 2 - 2, 4, 4}, {1,1,1,1});
 }
 
 void init_editor() {

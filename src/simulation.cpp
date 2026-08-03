@@ -67,13 +67,94 @@
 bool paused = false;
 float zoom_sensitivity = 2.5f;
 float zoom_snappiness = 10.0f;
-Vector2i saved_mouse_pos = {0,0};
 
 // Player movement
 Vector3 move;
 const Vector3 g_acceleration = {0, 3 * -9.8f, 0};
 float grounded_speed = 10;
 float jump_speed = 12;
+
+void process_game_input(OsEvent* event) {
+    move.x = (float)(is_key_down('D') - is_key_down('A'));
+    move.y = (float)is_key_down(VK_SPACE);
+    move.z = -(float)(is_key_down('W') - is_key_down('S'));   // Flipped because -Z is forward
+    
+    for(auto e = os_events; e != nullptr; e = e->next) {
+        auto key = event->key; 
+        switch(key.keycode) {
+            case VK_LBUTTON: {
+                if(key.state & JUST_PRESSED) {                
+                    auto c = get_entity(main_camera);
+                    if(c) {
+                        Entity* closest = nullptr;
+                        float closest_t = MAX_FLOAT;
+                        ForP(manager->entities.all) {
+                            if((it->flags & (ENTITY_FLAG_ACTIVE | ENTITY_FLAG_MOUSE_PICKABLE)) != (ENTITY_FLAG_ACTIVE | ENTITY_FLAG_MOUSE_PICKABLE)) continue;
+
+                            auto t = raycast(c->position, c->camera->forward, get_world_space_collider(it));
+                            if(t > 0.0001f && t < closest_t) {
+                                closest = it;
+                                closest_t = t;
+                            }
+                        }
+                        if(closest) {
+                            editor_selected = closest->handle;
+                        } else {
+                            editor_selected = INVALID_ENTITY_HANDLE;
+                        }
+                    }
+                }
+                break;
+            }
+
+            case VK_LEFT: {
+                if(key.state & JUST_PRESSED) my_time.sim_scale *= 0.5f;
+                break;
+            }
+
+            case VK_RIGHT: {
+                if(paused && key.state & IS_DOWN) {
+                    do_step = true;
+                }
+                else if(key.state & JUST_PRESSED) {
+                    my_time.sim_scale *= 2.0f;
+                }
+                break;
+            }
+
+            case 'P': {
+                if(key.state & JUST_PRESSED) paused = !paused;
+                break;
+            }
+
+            case 'R': {
+                if(key.state & JUST_PRESSED) reset_scene();
+                break;
+            }
+
+            case 'T': {
+                if(key.state & JUST_PRESSED) using_perspective = !using_perspective;
+                break;
+            }
+
+            case VK_TAB: {
+                if(key.state & JUST_PRESSED) {
+                    editor_on = !editor_on;
+                    capture_and_hide_mouse(event->window, !editor_on);
+                }
+                break;
+            }
+
+            case VK_F11: {
+                if(key.state & JUST_PRESSED) {
+                    bool fullscreen = is_fullscreen(event->window);
+                    set_fullscreen(event->window, !fullscreen);
+                }
+                break;
+            }
+        }
+    }
+}
 
 void update_camera(float dt) {
     auto camera_e = get_entity(main_camera);

@@ -4,13 +4,13 @@
 #include "entities.h"
 #include "render.h"
 #include "input.h"
-#include "handle_input.h"
 #include "simulation.h"
 #include "basic.h"
 #include "general.h"
 #include "ui.h"
 #include "editor.h"
 #include "graphics/d3d11/utils.h"
+#include "simple_draw.h"
 
 const float ORTHOGRAPHIC_VIEW_WIDTH = 20.0f;    // In world units.
 
@@ -31,6 +31,30 @@ static void update_time() {
     }
 
     my_time.last_frame_stamp = now;
+}
+
+static bool handle_window_events() {
+    for(auto e = os_events; e != nullptr; e = e->next) {
+        switch(e->type) {
+            case OsEventType::WINDOW_CLOSED: {
+                consume_event(e);
+                return true;
+            }
+
+            case OsEventType::WINDOW_RESIZED: {
+                auto window = e->window;
+                if(!is_minimized(window)) {
+                    renderer_on_resize(e->resize.width, e->resize.height);
+                    ui_handle_resize(e->resize.width, e->resize.height);
+                    sd_set_resolution(e->resize.width, e->resize.height);
+                }
+                consume_event(e);
+                break;
+            }
+        }
+    }
+
+    return false;
 }
 
 int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd) {
@@ -54,7 +78,6 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
     reset_scene();
 
     ShowWindow(the_window, SW_SHOW);
-    flush_os_events();
 
     float accum = 0;
     while(true) {
@@ -62,14 +85,13 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 
         update_time();
 
-        gather_os_events();
-        bool should_quit = handle_input();
-        flush_os_events();
+        update_os_events();
+        bool should_quit = handle_window_events();
         if(should_quit) break;
 
-        move.x = (float)((bool)(keystates['D'] & IS_DOWN) - (bool)(keystates['A'] & IS_DOWN));
-        move.y = (float)(bool)(keystates[VK_SPACE] & IS_DOWN);
-        move.z = (float)((bool)(keystates['S'] & IS_DOWN) - (bool)(keystates['W'] & IS_DOWN));   // Flipped because -Z is forward
+        ui_route_input(os_events, mouse_position.x, mouse_position.y);
+
+        process_game_input(os_events);
        
         auto sim_dt = my_time.simulation_dt;
         if(paused) {
@@ -121,7 +143,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
         update_camera(my_time.dt);
 
         render();
-        ui_process_frame();
+        ui_process_frame(my_time.dt);
 
         swap_buffers(the_window);
 

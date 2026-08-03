@@ -31,6 +31,8 @@ MaterialNoData MATERIAL_LIGHT;
 //--------------------------------------------
 
 Vector4 background = {0,0.02f,0.08f};
+ID3D11DepthStencilView* depth_stencil_view;
+bool using_perspective = true;
 
 static WindowGraphics* graphics;
 
@@ -38,8 +40,6 @@ static ID3D11DepthStencilState* depth_stencil_state_off;
 static ID3D11BlendState1* blend_state_on;
 static ID3D11SamplerState* sampler_state;
 static ID3D11RasterizerState2* rasterizer_state;
-
-ID3D11DepthStencilView* depth_stencil_view;
 
 static GraphicsBuffer static_vertex_buffer;
 static GraphicsBuffer static_index_buffer;
@@ -56,7 +56,8 @@ static ConstantBufferPerObject constants_per_object;
 
 static ID3D11InputLayout* input_layouts[VERTEX_FORMAT_COUNT];
 
-bool using_perspective = true;
+static Shader* current_vertex_shader;
+static Shader* current_pixel_shader;
 
 static void create_input_layout(VertexFormat format, ID3DBlob* bytecode) {
     switch(format) {
@@ -278,9 +279,6 @@ void init_renderer() {
     auto window_size = get_window_size(the_window);
     renderer_on_resize(window_size.x, window_size.y);
 }
-
-Shader* current_vertex_shader;
-Shader* current_pixel_shader;
 
 void render() {
     d3d_context->OMSetRenderTargets(1, &graphics->render_target, depth_stencil_view);
